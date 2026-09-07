@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
 const bodySchema = z.object({
-  project_id: z.string().min(4).max(64).default("0c188306"),
+  project_id: z.string().min(4).max(64).default("PJ0c188306515689f8"),
   // "sms" | "viber" — Telerivet routes both; we tag stored rows with this channel
   // unless the message itself reports a message_type we understand.
   default_channel: z.enum(["sms", "viber"]).default("sms"),
