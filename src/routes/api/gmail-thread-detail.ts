@@ -17,7 +17,6 @@ export const Route = createFileRoute("/api/gmail-thread-detail")({
             `${process.env["N8N_WEBHOOK_BASE_URL"]}/gmail-thread-detail?threadId=${encodeURIComponent(threadId)}`,
           );
           const body = await res.text();
-          console.log(`[gmail-thread-detail] threadId=${threadId} status=${res.status}`);
           return new Response(body, {
             status: res.status,
             headers: {

@@ -1,9 +1,13 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, ChannelBadge } from "@/components/collections/Bits";
-import { clientsQuery, peso, shortDate } from "@/lib/collections";
+
+function shortDate(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+}
 
 export const Route = createFileRoute("/email")({
   head: () => ({
@@ -23,9 +27,6 @@ export const Route = createFileRoute("/email")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData(clientsQuery);
-  },
   component: EmailInbox,
 });
 
@@ -133,7 +134,6 @@ function FlagTag({ kind }: { kind: "promise" | "ar" }) {
 }
 
 function EmailInbox() {
-  const { data: clients } = useSuspenseQuery(clientsQuery);
   const { data: threadsData, isLoading, error } = useThreadsList();
   const threads = threadsData ?? [];
   const [active, setActive] = useState<string | null>(null);
@@ -141,7 +141,6 @@ function EmailInbox() {
   const { data: detail, isLoading: detailLoading } = useThreadDetail(
     activeItem?.thread_id ?? null,
   );
-  const activeClient = clients.find((c) => c.id === activeItem?.client_id);
 
   const messages = detail?.messages ?? [];
 
@@ -214,22 +213,7 @@ function EmailInbox() {
 
         <Panel
           title={activeItem?.client_name ?? "No conversation selected"}
-          description={
-            activeClient
-              ? `${peso(activeClient.collection_amount)} outstanding · due ${shortDate(activeClient.due_date)}`
-              : (detail?.subject ?? undefined)
-          }
-          action={
-            activeClient ? (
-              <Link
-                to="/clients/$clientId"
-                params={{ clientId: activeClient.id }}
-                className="text-xs font-semibold text-primary hover:underline"
-              >
-                View client
-              </Link>
-            ) : null
-          }
+          description={detail?.subject ?? undefined}
         >
           {detail?.subject ? (
             <div className="flex items-center gap-3 border-b border-border px-5 py-4">

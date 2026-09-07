@@ -7,7 +7,6 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
         try {
           const res = await fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/gmail-threads-list`);
           const body = await res.text();
-          console.log(`[gmail-threads-list] status=${res.status}`);
           return new Response(body, {
             status: res.status,
             headers: {
