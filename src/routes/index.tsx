@@ -1,17 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { StatCard, Panel, ChannelBadge, StatusPill, TimeAgo } from "@/components/collections/Bits";
-import {
-  CHANNELS,
-  clientsQuery,
-  countersQuery,
-  messagesQuery,
-  peso,
-  queueQuery,
-  runLogsQuery,
-  shortDate,
-} from "@/lib/collections";
+import { StatCard, Panel, ChannelBadge, StatusPill } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -20,45 +10,132 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Live overdue-reminder overview across WhatsApp, Viber, SMS, Email and Voice for Rare Global Food accounts receivable.",
+          "Live overdue-reminder overview across SMS, Email and Voice for Rare Global Food accounts receivable.",
       },
       { property: "og:title", content: "Collections Overview | Rare Global Food" },
-      {
-        property: "og:description",
-        content:
-          "Track every overdue reminder sent through WhatsApp, Viber, SMS, Email and AI voice agents in one dashboard.",
-      },
     ],
   }),
-  loader: async ({ context }) => {
-    await Promise.all([
-      context.queryClient.ensureQueryData(clientsQuery),
-      context.queryClient.ensureQueryData(messagesQuery),
-      context.queryClient.ensureQueryData(queueQuery),
-      context.queryClient.ensureQueryData(runLogsQuery),
-      context.queryClient.ensureQueryData(countersQuery),
-    ]);
-  },
   component: Overview,
 });
 
-function Overview() {
-  const { data: clients } = useSuspenseQuery(clientsQuery);
-  const { data: messages } = useSuspenseQuery(messagesQuery);
-  const { data: queue } = useSuspenseQuery(queueQuery);
-  const { data: runs } = useSuspenseQuery(runLogsQuery);
-  const { data: counters } = useSuspenseQuery(countersQuery);
+const CHANNELS = [
+  { id: "whatsapp", label: "WhatsApp", colorVar: "#25D366" },
+  { id: "viber", label: "Viber", colorVar: "#7360F2" },
+  { id: "sms", label: "SMS", colorVar: "#0EA5E9" },
+  { id: "email", label: "Email", colorVar: "#F59E0B" },
+  { id: "voice", label: "Voice", colorVar: "#EF4444" },
+];
 
-  const outstanding = clients.reduce((sum, c) => sum + Number(c.collection_amount), 0);
-  const latestRun = runs[0];
-  const replies = messages.filter((m) => m.direction === "inbound").length;
-  const noContact = clients.filter((c) => c.status === "no_contact");
+function peso(v: number) {
+  return "PHP " + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+}
+function shortDate(v: string | null | undefined) {
+  if (!v) return "—";
+  try {
+    return new Date(v).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return v;
+  }
+}
+function timeAgo(v: string) {
+  const diff = Date.now() - new Date(v).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function useOverviewData() {
+  return useQuery({
+    queryKey: ["overview-data"],
+    queryFn: async () => {
+      const [clientsRes, queueRes, countersRes, runsRes, smsRes, voiceRes, gmailRes] = await Promise.all(
+        [
+          fetch("/api/clients-list").then((r) => r.json()),
+          fetch("/api/reminder-queue-list").then((r) => r.json()),
+          fetch("/api/channel-counters").then((r) => r.json()),
+          fetch("/api/daily-run-logs").then((r) => r.json()),
+          fetch("/api/sms-conversations").then((r) => r.json()),
+          fetch("/api/vapi-calls-list").then((r) => r.json()),
+          fetch("/api/gmail-threads-list").then((r) => r.json()),
+        ],
+      );
+
+      const clients = clientsRes.clients || [];
+      const queue = queueRes.queue || [];
+      const counters = countersRes.counters || [];
+      const latestRun = (runsRes.runs || [])[0];
+
+      const recent: {
+        channel: string;
+        client_name: string;
+        preview: string;
+        direction: string;
+        occurred_at: string;
+        status: string;
+      }[] = [];
+
+      for (const c of smsRes.conversations || []) {
+        const last = c.messages[c.messages.length - 1];
+        if (last) {
+          recent.push({
+            channel: "sms",
+            client_name: c.client_name,
+            preview: last.content,
+            direction: last.role === "ai" ? "outbound" : "inbound",
+            occurred_at: last.ts,
+            status: last.status || "",
+          });
+        }
+      }
+      for (const c of voiceRes.calls || []) {
+        recent.push({
+          channel: "voice",
+          client_name: c.client_name,
+          preview: c.preview || c.endedReason || c.status,
+          direction: "outbound",
+          occurred_at: c.startedAt,
+          status: c.status,
+        });
+      }
+      for (const t of gmailRes.threads || []) {
+        recent.push({
+          channel: "email",
+          client_name: t.client_name,
+          preview: t.lastMessagePreview,
+          direction: t.lastDirection,
+          occurred_at: t.lastMessageAt,
+          status: "",
+        });
+      }
+      recent.sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime());
+
+      return { clients, queue, counters, latestRun, recent: recent.slice(0, 8) };
+    },
+    refetchInterval: 30000,
+  });
+}
+
+function Overview() {
+  const { data, isLoading, error } = useOverviewData();
+  const clients = data?.clients ?? [];
+  const queue = data?.queue ?? [];
+  const counters = data?.counters ?? [];
+  const latestRun = data?.latestRun;
+  const recent = data?.recent ?? [];
+
+  const outstanding = clients.reduce((sum: number, c: { collection_amount: number }) => sum + Number(c.collection_amount), 0);
+  const replies = recent.filter((m) => m.direction === "inbound").length;
 
   return (
     <AppShell
       title="Collections Overview"
-      subtitle={`Daily overdue run · ${latestRun ? shortDate(latestRun.run_date) : "no runs yet"}`}
+      subtitle={`Daily overdue run · ${latestRun ? shortDate(latestRun.run_date) : "no runs yet"} · live`}
     >
+      {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
+      {error ? <p className="text-sm text-destructive">Could not load overview data.</p> : null}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Total outstanding"
@@ -66,16 +143,12 @@ function Overview() {
           hint={`${clients.length} accounts tracked`}
           tone="primary"
         />
-        <StatCard
-          label="Messages sent"
-          value={String(messages.filter((m) => m.direction === "outbound").length)}
-          hint="Across all channels"
-        />
+        <StatCard label="Recent messages" value={String(recent.length)} hint="Across all channels" />
         <StatCard label="Client replies" value={String(replies)} hint="Inbound conversations" />
         <StatCard
-          label="No contact on file"
-          value={String(noContact.length)}
-          hint={peso(noContact.reduce((s, c) => s + Number(c.collection_amount), 0))}
+          label="Queued today"
+          value={String(queue.length)}
+          hint={peso(queue.reduce((s: number, q: { collection_amount: number }) => s + Number(q.collection_amount), 0))}
         />
       </div>
 
@@ -84,8 +157,7 @@ function Overview() {
           <Panel title="Channel activity" description="Sent today vs. daily provider limit">
             <ul className="divide-y divide-border">
               {CHANNELS.map((ch) => {
-                const counter = counters.find((c) => c.channel === ch.id);
-                const total = messages.filter((m) => m.channel === ch.id).length;
+                const counter = counters.find((c: { channel: string }) => c.channel === ch.id);
                 const pct = counter
                   ? Math.min(100, (counter.sent_count / counter.daily_limit) * 100)
                   : 0;
@@ -93,7 +165,6 @@ function Overview() {
                   <li key={ch.id} className="flex items-center gap-4 px-4 py-3">
                     <div className="w-32 shrink-0">
                       <ChannelBadge channel={ch.id} />
-                      <p className="mt-1 text-[11px] text-muted-foreground">{ch.provider}</p>
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -103,57 +174,40 @@ function Overview() {
                         />
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {counter?.sent_count ?? 0} sent today of {counter?.daily_limit ?? 0} limit ·{" "}
-                        {total} logged messages
+                        {counter?.sent_count ?? 0} sent today of {counter?.daily_limit ?? 0} limit
                       </p>
                     </div>
-                    <Link
-                      to="/inbox/$channel"
-                      params={{ channel: ch.id }}
-                      className="shrink-0 text-xs font-semibold text-primary hover:underline"
-                    >
-                      Open inbox
-                    </Link>
                   </li>
                 );
               })}
             </ul>
           </Panel>
 
-          <Panel
-            title="Latest communications"
-            description="Newest events pulled from every provider"
-          >
+          <Panel title="Latest communications" description="Newest events pulled from every provider">
             <ul className="divide-y divide-border">
-              {messages.slice(0, 8).map((m) => {
-                const client = clients.find((c) => c.id === m.client_id);
-                return (
-                  <li key={m.id} className="flex flex-wrap items-start gap-3 px-4 py-3">
-                    <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-1">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <ChannelBadge channel={m.channel} />
-                          <span className="text-sm font-semibold">
-                            {client?.client_name ?? "Unknown client"}
-                          </span>
-                          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                            {m.direction}
-                          </span>
-                        </div>
-                        <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
-                          {m.subject ?? m.body ?? "—"}
-                        </p>
+              {recent.map((m, i) => (
+                <li key={i} className="flex flex-wrap items-start gap-3 px-4 py-3">
+                  <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-1">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <ChannelBadge channel={m.channel} />
+                        <span className="text-sm font-semibold">{m.client_name}</span>
+                        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          {m.direction}
+                        </span>
                       </div>
+                      <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{m.preview}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <StatusPill status={m.status} />
-                      <span className="text-xs text-muted-foreground">
-                        <TimeAgo value={m.occurred_at} />
-                      </span>
-                    </div>
-                  </li>
-                );
-              })}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {m.status ? <StatusPill status={m.status} /> : null}
+                    <span className="text-xs text-muted-foreground">{timeAgo(m.occurred_at)}</span>
+                  </div>
+                </li>
+              ))}
+              {!isLoading && recent.length === 0 ? (
+                <li className="px-4 py-6 text-center text-sm text-muted-foreground">No activity yet.</li>
+              ) : null}
             </ul>
           </Panel>
         </div>
@@ -161,30 +215,33 @@ function Overview() {
         <div className="space-y-5">
           <Panel title="Today's queue" description="From the n8n daily overdue run">
             <ul className="divide-y divide-border">
-              {queue.slice(0, 6).map((q) => (
-                <li key={q.id} className="px-4 py-3">
+              {queue.slice(0, 6).map((q: { queue_id: string; client_name: string; queue_status: string; collection_amount: number; due_date: string; preferred_channel: string; fallback_channel: string }) => (
+                <li key={q.queue_id} className="px-4 py-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-sm font-semibold">{q.client_name}</span>
-                    <StatusPill status={q.queue_status} />
+                    <StatusPill status={q.queue_status.toLowerCase()} />
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {peso(q.collection_amount)} · due {shortDate(q.due_date)}
                   </p>
                   <div className="mt-1.5 flex items-center gap-1.5">
-                    {q.preferred_channel !== "none" ? (
-                      <ChannelBadge channel={q.preferred_channel} />
+                    {q.preferred_channel ? (
+                      <ChannelBadge channel={q.preferred_channel.toLowerCase()} />
                     ) : (
                       <span className="text-[11px] text-muted-foreground">No channel on file</span>
                     )}
                     {q.fallback_channel ? (
                       <>
                         <span className="text-[11px] text-muted-foreground">fallback →</span>
-                        <ChannelBadge channel={q.fallback_channel} />
+                        <ChannelBadge channel={q.fallback_channel.toLowerCase()} />
                       </>
                     ) : null}
                   </div>
                 </li>
               ))}
+              {!isLoading && queue.length === 0 ? (
+                <li className="px-4 py-6 text-center text-sm text-muted-foreground">Nothing queued yet.</li>
+              ) : null}
             </ul>
           </Panel>
 
@@ -200,9 +257,7 @@ function Overview() {
                   ["Email only", `${latestRun.email_only_count} · ${peso(latestRun.email_only_amount)}`],
                 ].map(([label, value]) => (
                   <div key={label} className="bg-card px-4 py-3">
-                    <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                      {label}
-                    </dt>
+                    <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</dt>
                     <dd className="mt-0.5 text-sm font-semibold">{value}</dd>
                   </div>
                 ))}

@@ -1,15 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Panel, StatusPill } from "@/components/collections/Bits";
-import {
-  clientsQuery,
-  daysOverdue,
-  messagesQuery,
-  peso,
-  shortDate,
-} from "@/lib/collections";
 
 export const Route = createFileRoute("/clients/")({
   head: () => ({
@@ -18,27 +11,65 @@ export const Route = createFileRoute("/clients/")({
       {
         name: "description",
         content:
-          "Every overdue account with reachable channels, outstanding balance, invoices and last contact date.",
+          "Every overdue account with reachable channels, outstanding balance, invoices and status, synced live from n8n.",
       },
       { property: "og:title", content: "Client Ledger | Rare Global Food Collections" },
-      {
-        property: "og:description",
-        content: "Overdue accounts with reachable channels, balances, invoices and last contact.",
-      },
     ],
   }),
-  loader: async ({ context }) => {
-    await Promise.all([
-      context.queryClient.ensureQueryData(clientsQuery),
-      context.queryClient.ensureQueryData(messagesQuery),
-    ]);
-  },
   component: ClientsPage,
 });
 
+interface ClientRow {
+  client_id: string;
+  client_name: string;
+  parent_name: string;
+  contact_person: string;
+  email: string;
+  phone: string;
+  gmail_available: boolean;
+  sms_available: boolean;
+  voice_available: boolean;
+  whatsapp_available: boolean;
+  viber_available: boolean;
+  collection_amount: number;
+  due_date: string;
+  status: string;
+  invoice_numbers: string;
+}
+
+function peso(v: number) {
+  return "PHP " + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+}
+function shortDate(v: string | null | undefined) {
+  if (!v) return "—";
+  try {
+    return new Date(v).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return v;
+  }
+}
+function daysOverdue(v: string | null | undefined) {
+  if (!v) return 0;
+  const diff = Date.now() - new Date(v).getTime();
+  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+}
+
+function useClients() {
+  return useQuery({
+    queryKey: ["clients-list"],
+    queryFn: async () => {
+      const r = await fetch("/api/clients-list");
+      if (!r.ok) throw new Error("Clients fetch failed");
+      const d = await r.json();
+      return (d.clients ?? []) as ClientRow[];
+    },
+    refetchInterval: 30000,
+  });
+}
+
 function ClientsPage() {
-  const { data: clients } = useSuspenseQuery(clientsQuery);
-  const { data: messages } = useSuspenseQuery(messagesQuery);
+  const { data, isLoading, error } = useClients();
+  const clients = data ?? [];
   const [search, setSearch] = useState("");
 
   const filtered = clients.filter((c) =>
@@ -50,7 +81,7 @@ function ClientsPage() {
   return (
     <AppShell
       title="Clients"
-      subtitle="Overdue accounts and the channels we can reach them on"
+      subtitle="Overdue accounts and the channels we can reach them on · live"
       actions={
         <input
           value={search}
@@ -61,8 +92,10 @@ function ClientsPage() {
       }
     >
       <Panel title="Client ledger" description={`${filtered.length} accounts`}>
+        {isLoading ? <p className="p-4 text-sm text-muted-foreground">Loading…</p> : null}
+        {error ? <p className="p-4 text-sm text-destructive">Could not load clients.</p> : null}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[880px] text-sm">
+          <table className="w-full min-w-[820px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                 <th className="px-4 py-2.5 font-semibold">Client</th>
@@ -70,12 +103,10 @@ function ClientsPage() {
                 <th className="px-4 py-2.5 text-right font-semibold">Amount due</th>
                 <th className="px-4 py-2.5 font-semibold">Due date</th>
                 <th className="px-4 py-2.5 font-semibold">Status</th>
-                <th className="px-4 py-2.5 font-semibold">Last contact</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filtered.map((c) => {
-                const last = messages.find((m) => m.client_id === c.id);
                 const channels = [
                   c.whatsapp_available && "WhatsApp",
                   c.viber_available && "Viber",
@@ -84,17 +115,17 @@ function ClientsPage() {
                   c.voice_available && "Voice",
                 ].filter(Boolean) as string[];
                 return (
-                  <tr key={c.id} className="hover:bg-muted/60">
+                  <tr key={c.client_id} className="hover:bg-muted/60">
                     <td className="px-4 py-3">
                       <Link
                         to="/clients/$clientId"
-                        params={{ clientId: c.id }}
+                        params={{ clientId: c.client_id }}
                         className="font-semibold text-primary hover:underline"
                       >
                         {c.client_name}
                       </Link>
                       <p className="text-xs text-muted-foreground">
-                        {c.parent_name ?? "Direct account"} · {c.ar_owner ?? "Unassigned"}
+                        {c.parent_name ?? "Direct account"}
                       </p>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
@@ -112,12 +143,16 @@ function ClientsPage() {
                     <td className="px-4 py-3">
                       <StatusPill status={c.status} />
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {last ? shortDate(last.occurred_at) : "Never"}
-                    </td>
                   </tr>
                 );
               })}
+              {!isLoading && filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    No clients found.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

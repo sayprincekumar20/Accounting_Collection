@@ -1,17 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { Panel, ChannelBadge, StatusPill, StatCard, TimeAgo } from "@/components/collections/Bits";
-import {
-  CHANNELS,
-  clientsQuery,
-  daysOverdue,
-  messagesQuery,
-  peso,
-  queueQuery,
-  shortDate,
-} from "@/lib/collections";
+import { Panel, ChannelBadge, StatusPill, StatCard } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/clients/$clientId")({
   head: () => ({
@@ -20,47 +10,163 @@ export const Route = createFileRoute("/clients/$clientId")({
       {
         name: "description",
         content:
-          "Full communication history for a single account across WhatsApp, Viber, SMS, Email and voice calls.",
+          "Full communication history for a single account across SMS, Email and voice calls, synced live.",
       },
       { property: "og:title", content: "Client Conversation Timeline | Rare Global Food" },
-      {
-        property: "og:description",
-        content: "Every reminder and reply for one account, in one timeline.",
-      },
     ],
   }),
-  loader: async ({ context }) => {
-    await Promise.all([
-      context.queryClient.ensureQueryData(clientsQuery),
-      context.queryClient.ensureQueryData(messagesQuery),
-      context.queryClient.ensureQueryData(queueQuery),
-    ]);
-  },
   component: ClientDetail,
 });
 
+interface ClientRow {
+  client_id: string;
+  client_name: string;
+  parent_name: string;
+  contact_person: string;
+  email: string;
+  phone: string;
+  gmail_available: boolean;
+  sms_available: boolean;
+  voice_available: boolean;
+  whatsapp_available: boolean;
+  viber_available: boolean;
+  collection_amount: number;
+  due_date: string;
+  status: string;
+  invoice_numbers: string;
+  credit_terms: string;
+  credit_limit: number | null;
+}
+interface QueueRow {
+  queue_id: string;
+  client_id: string;
+  preferred_channel: string;
+  queue_status: string;
+  collection_amount: number;
+  sent_date: string;
+}
+
+function peso(v: number) {
+  return "PHP " + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+}
+function shortDate(v: string | null | undefined) {
+  if (!v) return "—";
+  try {
+    return new Date(v).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return v;
+  }
+}
+function daysOverdue(v: string | null | undefined) {
+  if (!v) return 0;
+  return Math.max(0, Math.floor((Date.now() - new Date(v).getTime()) / 86400000));
+}
+function digits(v: string | null | undefined) {
+  return (v || "").replace(/\D/g, "");
+}
+
+interface TimelineItem {
+  channel: string;
+  direction: "outbound" | "inbound";
+  body: string;
+  occurred_at: string;
+  status: string;
+}
+
+function useClientDetail(clientId: string) {
+  return useQuery({
+    queryKey: ["client-detail", clientId],
+    queryFn: async () => {
+      const [clientsRes, queueRes, smsRes, voiceRes, gmailRes] = await Promise.all([
+        fetch("/api/clients-list").then((r) => r.json()),
+        fetch("/api/reminder-queue-list").then((r) => r.json()),
+        fetch("/api/sms-conversations").then((r) => r.json()),
+        fetch("/api/vapi-calls-list").then((r) => r.json()),
+        fetch("/api/gmail-threads-list").then((r) => r.json()),
+      ]);
+
+      const client = (clientsRes.clients as ClientRow[]).find((c) => c.client_id === clientId);
+      const queue = (queueRes.queue as QueueRow[]).filter((q) => q.client_id === clientId);
+
+      const timeline: TimelineItem[] = [];
+
+      if (client?.phone) {
+        const phoneDigits = digits(client.phone);
+        const conv = (smsRes.conversations || []).find(
+          (c: { client_id: string }) => digits(c.client_id) === phoneDigits,
+        );
+        if (conv) {
+          for (const m of conv.messages) {
+            timeline.push({
+              channel: "sms",
+              direction: m.role === "ai" ? "outbound" : "inbound",
+              body: m.content,
+              occurred_at: m.ts,
+              status: m.status || "",
+            });
+          }
+        }
+      }
+
+      const calls = (voiceRes.calls || []).filter(
+        (c: { client_id: string }) => c.client_id === clientId,
+      );
+      for (const c of calls) {
+        timeline.push({
+          channel: "voice",
+          direction: "outbound",
+          body: c.preview || `Call ${c.endedReason || c.status}`,
+          occurred_at: c.startedAt,
+          status: c.status,
+        });
+      }
+
+      if (client) {
+        const nameLower = client.client_name.toLowerCase();
+        const emailLower = (client.email || "").toLowerCase();
+        const threads = (gmailRes.threads || []).filter(
+          (t: { client_name: string }) =>
+            (emailLower && t.client_name.toLowerCase().includes(emailLower)) ||
+            t.client_name.toLowerCase().includes(nameLower) ||
+            nameLower.includes(t.client_name.toLowerCase()),
+        );
+        for (const t of threads) {
+          timeline.push({
+            channel: "email",
+            direction: t.lastDirection,
+            body: t.lastMessagePreview,
+            occurred_at: t.lastMessageAt,
+            status: "",
+          });
+        }
+      }
+
+      timeline.sort((a, b) => new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime());
+
+      return { client, queue, timeline };
+    },
+    refetchInterval: 30000,
+  });
+}
+
 function ClientDetail() {
   const { clientId } = Route.useParams();
-  const { data: clients } = useSuspenseQuery(clientsQuery);
-  const { data: messages } = useSuspenseQuery(messagesQuery);
-  const { data: queue } = useSuspenseQuery(queueQuery);
-  const [filter, setFilter] = useState<string>("all");
+  const { data, isLoading } = useClientDetail(clientId);
 
-  const client = clients.find((c) => c.id === clientId);
-  if (!client) throw notFound();
-
-  const thread = messages
-    .filter((m) => m.client_id === client.id)
-    .filter((m) => filter === "all" || m.channel === filter)
-    .slice()
-    .sort((a, b) => new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime());
-
-  const clientQueue = queue.filter((q) => q.client_id === client.id);
+  if (isLoading) {
+    return (
+      <AppShell title="Loading…" subtitle="">
+        <p className="text-sm text-muted-foreground">Loading client…</p>
+      </AppShell>
+    );
+  }
+  if (!data?.client) throw notFound();
+  const { client, queue, timeline } = data;
 
   return (
     <AppShell
       title={client.client_name}
-      subtitle={`${client.parent_name ?? "Direct account"} · Account ${client.external_id ?? "—"}`}
+      subtitle={`${client.parent_name ?? "Direct account"} · live`}
       actions={
         <Link
           to="/clients"
@@ -77,7 +183,7 @@ function ClientDetail() {
           value={String(daysOverdue(client.due_date))}
           hint={`Due ${shortDate(client.due_date)}`}
         />
-        <StatCard label="Messages" value={String(messages.filter((m) => m.client_id === client.id).length)} hint="All channels" />
+        <StatCard label="Messages" value={String(timeline.length)} hint="All channels" />
         <StatCard
           label="Credit limit"
           value={client.credit_limit ? peso(client.credit_limit) : "—"}
@@ -87,39 +193,19 @@ function ClientDetail() {
 
       <div className="mt-5 grid gap-5 xl:grid-cols-3">
         <div className="xl:col-span-2">
-          <Panel
-            title="Conversation timeline"
-            description="Everything sent and received, newest at the bottom"
-            action={
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                className="rounded-lg border border-input bg-card px-2 py-1.5 text-xs"
-              >
-                <option value="all">All channels</option>
-                {CHANNELS.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            }
-          >
+          <Panel title="Conversation timeline" description="Everything sent and received, newest at the bottom">
             <ol className="space-y-4 p-4">
-              {thread.length === 0 ? (
-                <li className="text-sm text-muted-foreground">No messages on this channel yet.</li>
+              {timeline.length === 0 ? (
+                <li className="text-sm text-muted-foreground">No messages yet.</li>
               ) : null}
-              {thread.map((m) => {
+              {timeline.map((m, i) => {
                 const outbound = m.direction === "outbound";
                 return (
-                  <li
-                    key={m.id}
-                    className={`flex flex-col gap-1 ${outbound ? "items-end" : "items-start"}`}
-                  >
+                  <li key={i} className={`flex flex-col gap-1 ${outbound ? "items-end" : "items-start"}`}>
                     <div className="flex items-center gap-2">
                       <ChannelBadge channel={m.channel} />
                       <span className="text-[11px] text-muted-foreground">
-                        {m.provider ?? "—"} · {shortDate(m.occurred_at)} · <TimeAgo value={m.occurred_at} />
+                        {shortDate(m.occurred_at)}
                       </span>
                     </div>
                     <div
@@ -129,26 +215,9 @@ function ClientDetail() {
                           : "border-border bg-muted"
                       }`}
                     >
-                      {m.subject ? (
-                        <p className="mb-1 text-xs font-bold uppercase tracking-wide opacity-80">
-                          {m.subject}
-                        </p>
-                      ) : null}
                       <p className="whitespace-pre-wrap">{m.body}</p>
-                      {m.transcript ? (
-                        <p className="mt-2 border-t border-current/20 pt-2 text-xs opacity-90">
-                          Transcript: {m.transcript}
-                        </p>
-                      ) : null}
-                      {m.duration_seconds != null ? (
-                        <p className="mt-1 text-xs opacity-80">
-                          Call duration: {Math.floor(m.duration_seconds / 60)}m{" "}
-                          {m.duration_seconds % 60}s
-                          {m.agent_name ? ` · ${m.agent_name}` : ""}
-                        </p>
-                      ) : null}
                     </div>
-                    <StatusPill status={m.status} />
+                    {m.status ? <StatusPill status={m.status} /> : null}
                   </li>
                 );
               })}
@@ -160,17 +229,13 @@ function ClientDetail() {
           <Panel title="Account details">
             <dl className="divide-y divide-border text-sm">
               {[
-                ["Email", client.email ?? "Not on file"],
-                ["Phone", client.phone ?? "Not on file"],
-                ["Branches", client.branches ?? "—"],
-                ["AR owner", client.ar_owner ?? "Unassigned"],
-                ["Source", client.source ?? "—"],
-                ["Invoices", client.invoice_numbers ?? "—"],
+                ["Contact person", client.contact_person || "Not on file"],
+                ["Email", client.email || "Not on file"],
+                ["Phone", client.phone || "Not on file"],
+                ["Invoices", client.invoice_numbers || "—"],
               ].map(([label, value]) => (
                 <div key={label} className="px-4 py-2.5">
-                  <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                    {label}
-                  </dt>
+                  <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</dt>
                   <dd className="mt-0.5 break-words">{value}</dd>
                 </div>
               ))}
@@ -200,18 +265,17 @@ function ClientDetail() {
             </div>
           </Panel>
 
-          {clientQueue.length ? (
+          {queue.length ? (
             <Panel title="Queue entries">
               <ul className="divide-y divide-border text-sm">
-                {clientQueue.map((q) => (
-                  <li key={q.id} className="px-4 py-3">
+                {queue.map((q) => (
+                  <li key={q.queue_id} className="px-4 py-3">
                     <div className="flex items-center justify-between gap-2">
-                      <ChannelBadge channel={q.preferred_channel} />
-                      <StatusPill status={q.queue_status} />
+                      <ChannelBadge channel={q.preferred_channel.toLowerCase()} />
+                      <StatusPill status={q.queue_status.toLowerCase()} />
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Sent {q.sent_date ? shortDate(q.sent_date) : "not yet"} ·{" "}
-                      {peso(q.collection_amount)}
+                      Sent {q.sent_date ? shortDate(q.sent_date) : "not yet"} · {peso(q.collection_amount)}
                     </p>
                   </li>
                 ))}
