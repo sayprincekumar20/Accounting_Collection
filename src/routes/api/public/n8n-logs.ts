@@ -47,7 +47,29 @@ const counterSchema = z.object({
   daily_limit: z.number().int().min(1).max(100000).default(250),
 });
 
-const payloadSchema = z.discriminatedUnion("type", [messageSchema, runSchema, counterSchema]);
+const queueSchema = z.object({
+  type: z.literal("reminder_queue"),
+  external_client_id: z.string().min(1).max(120).optional(),
+  client_name: z.string().min(1).max(200).optional(),
+  preferred_channel: z.string().max(40),
+  queue_status: z.string().max(40).default("pending"),
+  fallback_channel: z.string().max(40).optional(),
+  fallback_status: z.string().max(40).optional(),
+  collection_amount: z.number().min(0).default(0),
+  due_date: z.string().max(10).optional(),
+  invoice_numbers: z.string().max(4000).optional(),
+  created_date: z.string().min(8).max(10),
+  attempted_date: z.string().datetime().optional(),
+  sent_date: z.string().datetime().optional(),
+  source: z.string().max(60).optional(),
+});
+
+const payloadSchema = z.discriminatedUnion("type", [
+  messageSchema,
+  runSchema,
+  counterSchema,
+  queueSchema,
+]);
 
 function compact<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
@@ -132,6 +154,44 @@ export const Route = createFileRoute("/api/public/n8n-logs")({
             return new Response("Could not store run log", { status: 500 });
           }
           return Response.json({ ok: true, stored: "daily_run" });
+        }
+
+        if (payload.type === "reminder_queue") {
+          const { type: _t, external_client_id, client_name, ...queueRow } = payload;
+          let clientId: string | null = null;
+
+          if (external_client_id) {
+            const { data } = await supabaseAdmin
+              .from("clients")
+              .select("id")
+              .eq("external_id", external_client_id)
+              .maybeSingle();
+            clientId = data?.id ?? null;
+          }
+          if (!clientId && client_name) {
+            const { data } = await supabaseAdmin
+              .from("clients")
+              .select("id")
+              .eq("client_name", client_name)
+              .maybeSingle();
+            clientId = data?.id ?? null;
+          }
+          if (!clientId) return new Response("Unknown client", { status: 404 });
+
+          const { error } = await supabaseAdmin
+            .from("reminder_queue")
+            .upsert(
+              compact({ ...queueRow, client_id: clientId, client_name: client_name ?? null }) as {
+                client_id: string;
+                created_date: string;
+              },
+              { onConflict: "client_id,created_date" },
+            );
+          if (error) {
+            console.error("n8n reminder_queue upsert failed", error.message);
+            return new Response("Could not store queue entry", { status: 500 });
+          }
+          return Response.json({ ok: true, stored: "reminder_queue" });
         }
 
         const { type: _t, ...counter } = payload;

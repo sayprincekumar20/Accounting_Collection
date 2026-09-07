@@ -168,6 +168,26 @@ export const Route = createFileRoute("/api/public/n8n-conversation")({
             byName.set(name.toLowerCase(), clientId);
             if (key) byExternal.set(key.toLowerCase(), clientId);
             if (digits(t.phone)) byPhone.set(digits(t.phone), clientId);
+          } else {
+            // Existing client: a message on a new channel means that channel is
+            // genuinely reachable for them, even if their record was first created
+            // from a different channel. Flip that flag on if it isn't already -
+            // never turn one off just because this particular message used another.
+            const availabilityColumn =
+              channel === "whatsapp"
+                ? "whatsapp_available"
+                : channel === "viber"
+                  ? "viber_available"
+                  : channel === "sms"
+                    ? "sms_available"
+                    : channel === "email"
+                      ? "gmail_available"
+                      : "voice_available";
+            await supabaseAdmin
+              .from("clients")
+              .update({ [availabilityColumn]: true })
+              .eq("id", clientId)
+              .eq(availabilityColumn, false);
           }
 
           const direction = normDirection(t.direction);
