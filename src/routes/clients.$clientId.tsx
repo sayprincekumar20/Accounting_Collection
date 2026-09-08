@@ -45,6 +45,13 @@ interface QueueRow {
   collection_amount: number;
   sent_date: string;
 }
+interface PromiseRow {
+  client_id: string;
+  channel: string;
+  promise_date: string;
+  reason: string;
+  recorded_at: string;
+}
 
 function peso(v: number) {
   return "PHP " + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
@@ -73,20 +80,34 @@ interface TimelineItem {
   status: string;
 }
 
+function reasonLabel(reason: string) {
+  const map: Record<string, string> = {
+    payment_promise: "Promise to Pay",
+    investigation_hold: "Investigation Hold",
+    client_unavailable: "Client Unavailable",
+    business_closed_pending_review: "Business Closed (Pending Review)",
+  };
+  return map[reason] ?? reason;
+}
+
 function useClientDetail(clientId: string) {
   return useQuery({
     queryKey: ["client-detail", clientId],
     queryFn: async () => {
-      const [clientsRes, queueRes, smsRes, voiceRes, gmailRes] = await Promise.all([
+      const [clientsRes, queueRes, smsRes, voiceRes, gmailRes, promisesRes] = await Promise.all([
         fetch("/api/clients-list").then((r) => r.json()),
         fetch("/api/reminder-queue-list").then((r) => r.json()),
         fetch("/api/sms-conversations").then((r) => r.json()),
         fetch("/api/vapi-calls-list").then((r) => r.json()),
         fetch("/api/gmail-threads-list").then((r) => r.json()),
+        fetch("/api/promise-history").then((r) => r.json()),
       ]);
 
       const client = (clientsRes.clients as ClientRow[]).find((c) => c.client_id === clientId);
       const queue = (queueRes.queue as QueueRow[]).filter((q) => q.client_id === clientId);
+      const promises = (promisesRes.promises as PromiseRow[]).filter(
+        (p) => p.client_id === clientId,
+      );
 
       const timeline: TimelineItem[] = [];
 
@@ -143,7 +164,7 @@ function useClientDetail(clientId: string) {
 
       timeline.sort((a, b) => new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime());
 
-      return { client, queue, timeline };
+      return { client, queue, timeline, promises };
     },
     refetchInterval: 30000,
   });
@@ -161,7 +182,7 @@ function ClientDetail() {
     );
   }
   if (!data?.client) throw notFound();
-  const { client, queue, timeline } = data;
+  const { client, queue, timeline, promises } = data;
 
   return (
     <AppShell
@@ -184,6 +205,11 @@ function ClientDetail() {
           hint={`Due ${shortDate(client.due_date)}`}
         />
         <StatCard label="Messages" value={String(timeline.length)} hint="All channels" />
+        <StatCard
+          label="Payment promises"
+          value={String(promises.length)}
+          hint={promises[0] ? `Latest: ${shortDate(promises[0].promise_date)}` : "None recorded"}
+        />
         <StatCard
           label="Credit limit"
           value={client.credit_limit ? peso(client.credit_limit) : "—"}
@@ -263,6 +289,29 @@ function ClientDetail() {
                 ),
               )}
             </div>
+          </Panel>
+
+          <Panel title="Payment promises" description="Recorded by the AI reply agent">
+            {promises.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-muted-foreground">
+                No payment promises recorded yet.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border text-sm">
+                {promises.map((p, i) => (
+                  <li key={i} className="px-4 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold">{reasonLabel(p.reason)}</span>
+                      <ChannelBadge channel={p.channel} />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Committed to pay by {shortDate(p.promise_date)} · recorded{" "}
+                      {shortDate(p.recorded_at)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Panel>
 
           {queue.length ? (

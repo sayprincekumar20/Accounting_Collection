@@ -1,6 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { useLiveCollections } from "@/hooks/useLiveCollections";
-import { LiveIndicator } from "@/components/collections/LiveIndicator";
 import type { ReactNode } from "react";
 import {
   LayoutDashboard,
@@ -23,7 +21,7 @@ const nav = [
 
 const inboxes = [
   { channel: "whatsapp", label: "WhatsApp", icon: MessageSquare, to: "/whatsapp" as const },
-  { channel: "viber", label: "Viber", icon: MessageCircle },
+  { channel: "viber", label: "Viber", icon: MessageCircle, to: "/viber" as const },
   { channel: "sms", label: "SMS", icon: Smartphone, to: "/sms" as const },
   { channel: "email", label: "Email", icon: Mail, to: "/email" as const },
   { channel: "voice", label: "Voice", icon: Phone, to: "/voice" as const },
@@ -33,26 +31,13 @@ type InboxItem = {
   channel: string;
   label: string;
   icon: typeof Mail;
-  to?: "/email" | "/sms" | "/voice" | "/whatsapp";
+  to?: "/email" | "/sms" | "/voice" | "/whatsapp" | "/viber";
 };
 
 function InboxLink({ item, className }: { item: InboxItem; className: string }) {
   const activeProps = { className: "bg-primary text-primary-foreground hover:bg-primary" };
-  if ("to" in item) {
-    return (
-      <Link to={item.to} className={className} activeProps={activeProps}>
-        <item.icon className="h-4 w-4" />
-        {item.label}
-      </Link>
-    );
-  }
   return (
-    <Link
-      to="/inbox/$channel"
-      params={{ channel: item.channel }}
-      className={className}
-      activeProps={activeProps}
-    >
+    <Link to={item.to} className={className} activeProps={activeProps}>
       <item.icon className="h-4 w-4" />
       {item.label}
     </Link>
@@ -73,8 +58,6 @@ export function AppShell({
   actions?: ReactNode;
   children: ReactNode;
 }) {
-  const { status, lastEventAt } = useLiveCollections();
-
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-ink px-4 py-5 lg:flex">
@@ -121,8 +104,9 @@ export function AppShell({
             Automation
           </p>
           <p className="mt-1 text-xs text-ink-foreground">n8n webhook connected</p>
-          <div className="mt-2">
-            <LiveIndicator status={status} lastEventAt={lastEventAt} compact />
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-success">
+            <span className="h-1.5 w-1.5 rounded-full bg-success" />
+            Live
           </div>
         </div>
       </aside>
@@ -137,7 +121,10 @@ export function AppShell({
               ) : null}
             </div>
             <div className="flex items-center gap-3">
-              <LiveIndicator status={status} lastEventAt={lastEventAt} />
+              <div className="flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
+                <span className="h-1.5 w-1.5 rounded-full bg-success" />
+                Live
+              </div>
               {actions}
             </div>
           </div>

@@ -46,12 +46,22 @@ function timeAgo(v: string) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function reasonLabel(reason: string) {
+  const map: Record<string, string> = {
+    payment_promise: "Promise to Pay",
+    investigation_hold: "Investigation Hold",
+    client_unavailable: "Client Unavailable",
+    business_closed_pending_review: "Business Closed (Pending Review)",
+  };
+  return map[reason] ?? reason;
+}
+
 function useOverviewData() {
   return useQuery({
     queryKey: ["overview-data"],
     queryFn: async () => {
-      const [clientsRes, queueRes, countersRes, runsRes, smsRes, voiceRes, gmailRes] = await Promise.all(
-        [
+      const [clientsRes, queueRes, countersRes, runsRes, smsRes, voiceRes, gmailRes, promisesRes] =
+        await Promise.all([
           fetch("/api/clients-list").then((r) => r.json()),
           fetch("/api/reminder-queue-list").then((r) => r.json()),
           fetch("/api/channel-counters").then((r) => r.json()),
@@ -59,13 +69,14 @@ function useOverviewData() {
           fetch("/api/sms-conversations").then((r) => r.json()),
           fetch("/api/vapi-calls-list").then((r) => r.json()),
           fetch("/api/gmail-threads-list").then((r) => r.json()),
-        ],
-      );
+          fetch("/api/promise-history").then((r) => r.json()),
+        ]);
 
       const clients = clientsRes.clients || [];
       const queue = queueRes.queue || [];
       const counters = countersRes.counters || [];
       const latestRun = (runsRes.runs || [])[0];
+      const promises = (promisesRes.promises || []).slice(0, 6);
 
       const recent: {
         channel: string;
@@ -111,7 +122,7 @@ function useOverviewData() {
       }
       recent.sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime());
 
-      return { clients, queue, counters, latestRun, recent: recent.slice(0, 8) };
+      return { clients, queue, counters, latestRun, recent: recent.slice(0, 8), promises };
     },
     refetchInterval: 30000,
   });
@@ -124,6 +135,7 @@ function Overview() {
   const counters = data?.counters ?? [];
   const latestRun = data?.latestRun;
   const recent = data?.recent ?? [];
+  const promises = data?.promises ?? [];
 
   const outstanding = clients.reduce((sum: number, c: { collection_amount: number }) => sum + Number(c.collection_amount), 0);
   const replies = recent.filter((m) => m.direction === "inbound").length;
@@ -145,6 +157,11 @@ function Overview() {
         />
         <StatCard label="Recent messages" value={String(recent.length)} hint="Across all channels" />
         <StatCard label="Client replies" value={String(replies)} hint="Inbound conversations" />
+        <StatCard
+          label="Payment promises"
+          value={String(promises.length)}
+          hint="Recorded by the AI reply agent"
+        />
         <StatCard
           label="Queued today"
           value={String(queue.length)}
@@ -243,6 +260,30 @@ function Overview() {
                 <li className="px-4 py-6 text-center text-sm text-muted-foreground">Nothing queued yet.</li>
               ) : null}
             </ul>
+          </Panel>
+
+          <Panel title="Recent payment promises" description="Recorded by the AI reply agent">
+            {promises.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+                None recorded yet.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {promises.map(
+                  (p: { client_name: string; channel: string; reason: string; promise_date: string }, i: number) => (
+                    <li key={i} className="px-4 py-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm font-semibold">{p.client_name}</span>
+                        <ChannelBadge channel={p.channel} />
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {reasonLabel(p.reason)} · by {shortDate(p.promise_date)}
+                      </p>
+                    </li>
+                  ),
+                )}
+              </ul>
+            )}
           </Panel>
 
           {latestRun ? (
