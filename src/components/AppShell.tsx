@@ -22,7 +22,7 @@ const nav = [
 ] as const;
 
 const inboxes = [
-  { channel: "whatsapp", label: "WhatsApp", icon: MessageSquare },
+  { channel: "whatsapp", label: "WhatsApp", icon: MessageSquare, to: "/whatsapp" as const },
   { channel: "viber", label: "Viber", icon: MessageCircle },
   { channel: "sms", label: "SMS", icon: Smartphone, to: "/sms" as const },
   { channel: "email", label: "Email", icon: Mail, to: "/email" as const },
@@ -33,7 +33,7 @@ type InboxItem = {
   channel: string;
   label: string;
   icon: typeof Mail;
-  to?: "/email" | "/sms" | "/voice";
+  to?: "/email" | "/sms" | "/voice" | "/whatsapp";
 };
 
 function InboxLink({ item, className }: { item: InboxItem; className: string }) {
