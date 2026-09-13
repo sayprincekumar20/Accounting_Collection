@@ -37,7 +37,8 @@ function ViberInbox() {
             <thead>
               <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                 <th className="px-4 py-2.5 font-semibold">ID</th>
-                <th className="px-4 py-2.5 font-semibold">Client</th>
+                <th className="px-4 py-2.5 font-semibold">Client name</th>
+                <th className="px-4 py-2.5 font-semibold">Contact person</th>
                 <th className="px-4 py-2.5 font-semibold">Status</th>
                 <th className="px-4 py-2.5 font-semibold">Summary</th>
                 <th className="px-4 py-2.5 font-semibold">Promise date</th>
@@ -47,7 +48,7 @@ function ViberInbox() {
             </thead>
             <tbody>
               <tr>
-                <td colSpan={7} className="px-4 py-10">
+                <td colSpan={8} className="px-4 py-10">
                   <div className="flex flex-col items-center gap-3 text-center">
                     <MessageCircle className="h-8 w-8 text-muted-foreground" />
                     <h3 className="text-sm font-bold">Viber isn't wired up yet</h3>

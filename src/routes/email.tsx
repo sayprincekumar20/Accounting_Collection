@@ -60,6 +60,7 @@ interface ThreadDetail {
 interface ClientRow {
   client_id: string;
   client_name: string;
+  contact_person: string;
   email: string;
   collection_amount: number;
   due_date: string;
@@ -262,7 +263,8 @@ function EmailInbox() {
             <thead>
               <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                 <th className="px-4 py-2.5 font-semibold">ID</th>
-                <th className="px-4 py-2.5 font-semibold">Client</th>
+                <th className="px-4 py-2.5 font-semibold">Client name</th>
+                <th className="px-4 py-2.5 font-semibold">Contact person</th>
                 <th className="px-4 py-2.5 font-semibold">Status</th>
                 <th className="px-4 py-2.5 font-semibold">Summary</th>
                 <th className="px-4 py-2.5 font-semibold">Promise date</th>
@@ -287,7 +289,14 @@ function EmailInbox() {
                       {shortId(t.thread_id)}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="block truncate font-medium">{t.client_name}</span>
+                      <span className="block truncate font-medium">
+                        {client?.client_name || t.client_name}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="block truncate font-medium">
+                        {client?.contact_person || t.client_name}
+                      </span>
                       <span className="block text-[11px] text-muted-foreground">
                         {client?.email || "—"}
                       </span>
@@ -347,21 +356,21 @@ function EmailInbox() {
               })}
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     Loading Gmail threads…
                   </td>
                 </tr>
               ) : null}
               {error ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-destructive">
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-destructive">
                     Could not load Gmail threads from n8n.
                   </td>
                 </tr>
               ) : null}
               {!isLoading && !error && threads.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     No Email activity logged yet.
                   </td>
                 </tr>
@@ -384,7 +393,12 @@ function EmailInbox() {
           >
             <header className="sticky top-0 z-10 flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card px-5 py-4">
               <div>
-                <h2 className="text-base font-bold">{activeItem.client_name}</h2>
+                <h2 className="text-base font-bold">
+                  {activeClient?.client_name || activeItem.client_name}
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Contact: {activeClient?.contact_person || activeItem.client_name}
+                </p>
                 <dl className="mt-2 space-y-1 text-xs text-muted-foreground">
                   {detail?.subject ? (
                     <div>

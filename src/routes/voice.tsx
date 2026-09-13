@@ -140,6 +140,27 @@ function useCallDetail(callId: string | null) {
   });
 }
 
+interface ClientRow {
+  client_id: string;
+  client_name: string;
+  contact_person: string;
+  email: string;
+  phone: string;
+}
+
+function useClientsList() {
+  return useQuery({
+    queryKey: ["clients-list"],
+    queryFn: async () => {
+      const r = await fetch("/api/clients-list");
+      if (!r.ok) throw new Error("Clients fetch failed");
+      const d = await r.json();
+      return (d.clients ?? []) as ClientRow[];
+    },
+    refetchInterval: 30000,
+  });
+}
+
 function usePromisesAndEscalations() {
   return useQuery({
     queryKey: ["voice-promises-escalations"],
@@ -173,9 +194,12 @@ function VoiceLogs() {
   const { data: flags } = usePromisesAndEscalations();
   const promises = flags?.promises ?? [];
   const escalations = flags?.escalations ?? [];
+  const { data: clientsData } = useClientsList();
+  const clients = clientsData ?? [];
 
   const [active, setActive] = useState<string | null>(null);
   const activeItem = calls.find((c) => c.call_id === active) ?? null;
+  const activeClient = activeItem ? clients.find((cl) => cl.client_id === activeItem.client_id) : undefined;
   const { data: detail } = useCallDetail(activeItem?.call_id ?? null);
 
   useEffect(() => {
@@ -209,7 +233,8 @@ function VoiceLogs() {
               <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                 <th className="px-4 py-2.5 font-semibold">Call ID</th>
                 <th className="px-4 py-2.5 font-semibold">Assistant</th>
-                <th className="px-4 py-2.5 font-semibold">Customer</th>
+                <th className="px-4 py-2.5 font-semibold">Client name</th>
+                <th className="px-4 py-2.5 font-semibold">Contact person</th>
                 <th className="px-4 py-2.5 font-semibold">Type</th>
                 <th className="px-4 py-2.5 font-semibold">Ended reason</th>
                 <th className="px-4 py-2.5 font-semibold">Summary</th>
@@ -222,6 +247,7 @@ function VoiceLogs() {
               {calls.map((c) => {
                 const promise = latestFor(promises, c.client_id);
                 const escalation = latestFor(escalations, c.client_id);
+                const client = clients.find((cl) => cl.client_id === c.client_id);
                 return (
                   <tr
                     key={c.call_id}
@@ -238,8 +264,20 @@ function VoiceLogs() {
                       <span className="block text-[11px] text-muted-foreground">RGF Voice · PH</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="block truncate font-medium">{c.client_name}</span>
-                      <span className="block text-[11px] text-muted-foreground">{c.phone || "—"}</span>
+                      <span className="block truncate font-medium">
+                        {client?.client_name || c.client_name}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="block truncate font-medium">
+                        {client?.contact_person || "—"}
+                      </span>
+                      <span className="block text-[11px] text-muted-foreground">
+                        {c.phone || client?.phone || "—"}
+                      </span>
+                      {client?.email ? (
+                        <span className="block text-[11px] text-muted-foreground">{client.email}</span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-semibold">
@@ -296,21 +334,21 @@ function VoiceLogs() {
               })}
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     Loading calls from Vapi…
                   </td>
                 </tr>
               ) : null}
               {error ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-destructive">
+                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-destructive">
                     Could not load calls from Vapi.
                   </td>
                 </tr>
               ) : null}
               {!isLoading && !error && calls.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     No voice calls logged yet.
                   </td>
                 </tr>
@@ -346,8 +384,12 @@ function VoiceLogs() {
                     Assistant
                   </div>
                   <div>
-                    <span className="font-semibold text-foreground">Customer:</span>{" "}
-                    {activeItem.client_name} · {activeItem.phone || "—"}
+                    <span className="font-semibold text-foreground">Client name:</span>{" "}
+                    {activeClient?.client_name || activeItem.client_name}
+                  </div>
+                  <div>
+                    <span className="font-semibold text-foreground">Contact person:</span>{" "}
+                    {activeClient?.contact_person || "—"} · {activeItem.phone || activeClient?.phone || "—"}
                   </div>
                   <div>
                     <span className="font-semibold text-foreground">Ended:</span>{" "}
@@ -404,7 +446,9 @@ function VoiceLogs() {
                         className={`flex flex-col gap-1 ${t.role === "client" ? "items-end" : "items-start"}`}
                       >
                         <div className="text-[11px] text-muted-foreground">
-                          {t.role === "client" ? activeItem.client_name : "Accounting Assistant"}
+                          {t.role === "client"
+                            ? activeClient?.contact_person || activeItem.client_name
+                            : "Accounting Assistant"}
                         </div>
                         <div
                           className={`max-w-[80%] rounded-xl border px-3.5 py-2.5 text-sm ${
