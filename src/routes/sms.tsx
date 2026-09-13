@@ -39,6 +39,7 @@ interface SmsConversation {
 interface ClientRow {
   client_id: string;
   client_name: string;
+  parent_name: string;
   contact_person: string;
   phone: string;
   email: string;
@@ -222,7 +223,7 @@ function SmsInbox() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="block truncate font-medium">
-                        {client?.client_name || c.client_name}
+                        {client?.parent_name || client?.client_name || c.client_name}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -327,7 +328,7 @@ function SmsInbox() {
             <header className="sticky top-0 z-10 flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card px-5 py-4">
               <div>
                 <h2 className="text-base font-bold">
-                  {activeClient?.client_name || activeItem.client_name}
+                  {activeClient?.parent_name || activeClient?.client_name || activeItem.client_name}
                 </h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Contact: {activeClient?.contact_person || activeItem.client_name}

@@ -29,6 +29,7 @@ export const Route = createFileRoute("/email")({
 interface ThreadListItem {
   client_id: string;
   client_name: string;
+  contact_person: string;
   thread_id: string;
   notified_ar: boolean;
   promise_recorded: boolean;
@@ -60,6 +61,7 @@ interface ThreadDetail {
 interface ClientRow {
   client_id: string;
   client_name: string;
+  parent_name: string;
   contact_person: string;
   email: string;
   collection_amount: number;
@@ -217,15 +219,18 @@ function EmailInbox() {
   const { data: detail, isLoading: detailLoading } = useThreadDetail(activeItem?.thread_id ?? null);
   const messages = detail?.messages ?? [];
 
-  function findClient(clientName: string) {
-    return clients.find(
-      (cl) =>
-        cl.client_name.toLowerCase().includes(clientName.toLowerCase()) ||
-        clientName.toLowerCase().includes(cl.client_name.toLowerCase()),
+  function findClient(clientId: string, clientName: string) {
+    return (
+      clients.find((cl) => cl.client_id === clientId) ??
+      clients.find(
+        (cl) =>
+          cl.client_name.toLowerCase().includes(clientName.toLowerCase()) ||
+          clientName.toLowerCase().includes(cl.client_name.toLowerCase()),
+      )
     );
   }
 
-  const activeClient = activeItem ? findClient(activeItem.client_name) : undefined;
+  const activeClient = activeItem ? findClient(activeItem.client_id, activeItem.client_name) : undefined;
   const activePromise =
     activeItem && activeClient ? latestFor(promises, activeClient.client_id, "email") : undefined;
   const activeEscalation =
@@ -274,7 +279,7 @@ function EmailInbox() {
             </thead>
             <tbody className="divide-y divide-border">
               {threads.map((t) => {
-                const client = findClient(t.client_name);
+                const client = findClient(t.client_id, t.client_name);
                 const promise = client ? latestFor(promises, client.client_id, "email") : undefined;
                 const escalation = client ? latestFor(escalations, client.client_id, "email") : undefined;
                 return (
@@ -290,12 +295,12 @@ function EmailInbox() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="block truncate font-medium">
-                        {client?.client_name || t.client_name}
+                        {client?.parent_name || client?.client_name || t.client_name}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <span className="block truncate font-medium">
-                        {client?.contact_person || t.client_name}
+                        {client?.contact_person || t.contact_person || t.client_name}
                       </span>
                       <span className="block text-[11px] text-muted-foreground">
                         {client?.email || "—"}
@@ -394,7 +399,7 @@ function EmailInbox() {
             <header className="sticky top-0 z-10 flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card px-5 py-4">
               <div>
                 <h2 className="text-base font-bold">
-                  {activeClient?.client_name || activeItem.client_name}
+                  {activeClient?.parent_name || activeClient?.client_name || activeItem.client_name}
                 </h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Contact: {activeClient?.contact_person || activeItem.client_name}

@@ -143,6 +143,7 @@ function useCallDetail(callId: string | null) {
 interface ClientRow {
   client_id: string;
   client_name: string;
+  parent_name: string;
   contact_person: string;
   email: string;
   phone: string;
@@ -265,7 +266,7 @@ function VoiceLogs() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="block truncate font-medium">
-                        {client?.client_name || c.client_name}
+                        {client?.parent_name || client?.client_name || c.client_name}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -385,7 +386,7 @@ function VoiceLogs() {
                   </div>
                   <div>
                     <span className="font-semibold text-foreground">Client name:</span>{" "}
-                    {activeClient?.client_name || activeItem.client_name}
+                    {activeClient?.parent_name || activeClient?.client_name || activeItem.client_name}
                   </div>
                   <div>
                     <span className="font-semibold text-foreground">Contact person:</span>{" "}
