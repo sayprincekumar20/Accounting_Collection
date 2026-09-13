@@ -212,6 +212,7 @@ function VoiceLogs() {
                 <th className="px-4 py-2.5 font-semibold">Customer</th>
                 <th className="px-4 py-2.5 font-semibold">Type</th>
                 <th className="px-4 py-2.5 font-semibold">Ended reason</th>
+                <th className="px-4 py-2.5 font-semibold">Summary</th>
                 <th className="px-4 py-2.5 font-semibold">Promise date</th>
                 <th className="px-4 py-2.5 font-semibold">Escalated</th>
                 <th className="px-4 py-2.5 font-semibold">Start time</th>
@@ -253,6 +254,11 @@ function VoiceLogs() {
                         {formatReason(c.endedReason, c.status)}
                       </span>
                     </td>
+                    <td className="px-4 py-3 max-w-[220px]">
+                      <span className="block truncate text-xs text-muted-foreground" title={c.preview}>
+                        {c.preview || "—"}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {promise ? (
                         <span className="inline-flex flex-col">
@@ -290,21 +296,21 @@ function VoiceLogs() {
               })}
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     Loading calls from Vapi…
                   </td>
                 </tr>
               ) : null}
               {error ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-destructive">
+                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-destructive">
                     Could not load calls from Vapi.
                   </td>
                 </tr>
               ) : null}
               {!isLoading && !error && calls.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     No voice calls logged yet.
                   </td>
                 </tr>

@@ -1,6 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
+import { AppShell } from "@/components/AppShell";
+import { StatCard, ChannelBadge } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/email")({
   head: () => ({
@@ -84,9 +87,12 @@ function reasonLabel(reason: string) {
   };
   return map[reason] ?? reason;
 }
-
 function peso(v: number) {
   return "₱" + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+}
+function shortId(id: string) {
+  if (!id) return "—";
+  return id.length > 8 ? `${id.slice(0, 4)}…${id.slice(-4)}` : id;
 }
 function shortDate(value: string | null | undefined) {
   if (!value) return "—";
@@ -109,9 +115,18 @@ function formatTs(ts: string | null | undefined): string {
     return ts;
   }
 }
-
 function isHtmlBody(body: string): boolean {
   return /<html[\s>]/i.test(body) || /<!DOCTYPE html/i.test(body);
+}
+
+function latestFor<T extends { client_id: string; channel: string; recorded_at: string }>(
+  rows: T[],
+  clientId: string,
+  channel: string,
+): T | undefined {
+  return rows
+    .filter((r) => r.client_id === clientId && r.channel === channel)
+    .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())[0];
 }
 
 function useThreadsList() {
@@ -126,7 +141,6 @@ function useThreadsList() {
     refetchInterval: 30000,
   });
 }
-
 function useThreadDetail(threadId: string | null) {
   return useQuery({
     queryKey: ["gmail-thread-detail", threadId],
@@ -138,7 +152,6 @@ function useThreadDetail(threadId: string | null) {
     enabled: !!threadId,
   });
 }
-
 function useEmailSidebar() {
   return useQuery({
     queryKey: ["email-sidebar-data"],
@@ -156,16 +169,6 @@ function useEmailSidebar() {
     },
     refetchInterval: 30000,
   });
-}
-
-function latestFor<T extends { client_id: string; channel: string; recorded_at: string }>(
-  rows: T[],
-  clientId: string,
-  channel: string,
-): T | undefined {
-  return rows
-    .filter((r) => r.client_id === clientId && r.channel === channel)
-    .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())[0];
 }
 
 function MessageBody({ body }: { body: string }) {
@@ -195,254 +198,293 @@ function MessageBody({ body }: { body: string }) {
 function EmailInbox() {
   const { data: threadsData, isLoading, error } = useThreadsList();
   const { data: sidebar } = useEmailSidebar();
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "promise" | "escalated">("all");
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const clients = sidebar?.clients ?? [];
+  const promises = sidebar?.promises ?? [];
+  const escalations = sidebar?.escalations ?? [];
 
-  const threads = useMemo(() => {
-    let all = (threadsData ?? [])
-      .slice()
-      .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
-    if (filter === "promise") all = all.filter((t) => t.promise_recorded);
-    if (filter === "escalated") all = all.filter((t) => t.notified_ar);
-    const q = search.toLowerCase();
-    if (!q) return all;
-    return all.filter((t) => t.client_name.toLowerCase().includes(q));
-  }, [threadsData, search, filter]);
+  const [active, setActive] = useState<string | null>(null);
 
-  const active = threads.find((t) => t.thread_id === activeId) ?? threads[0];
-  const { data: detail, isLoading: detailLoading } = useThreadDetail(active?.thread_id ?? null);
+  const threads = useMemo(
+    () =>
+      (threadsData ?? [])
+        .slice()
+        .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()),
+    [threadsData],
+  );
+
+  const activeItem = threads.find((t) => t.thread_id === active) ?? null;
+  const { data: detail, isLoading: detailLoading } = useThreadDetail(activeItem?.thread_id ?? null);
   const messages = detail?.messages ?? [];
 
-  const activeClient = active
-    ? (sidebar?.clients ?? []).find(
-        (cl) =>
-          cl.client_name.toLowerCase().includes(active.client_name.toLowerCase()) ||
-          active.client_name.toLowerCase().includes(cl.client_name.toLowerCase()),
-      )
-    : undefined;
-  const promise =
-    active && activeClient ? latestFor(sidebar?.promises ?? [], activeClient.client_id, "email") : undefined;
-  const escalation =
-    active && activeClient ? latestFor(sidebar?.escalations ?? [], activeClient.client_id, "email") : undefined;
+  function findClient(clientName: string) {
+    return clients.find(
+      (cl) =>
+        cl.client_name.toLowerCase().includes(clientName.toLowerCase()) ||
+        clientName.toLowerCase().includes(cl.client_name.toLowerCase()),
+    );
+  }
+
+  const activeClient = activeItem ? findClient(activeItem.client_name) : undefined;
+  const activePromise =
+    activeItem && activeClient ? latestFor(promises, activeClient.client_id, "email") : undefined;
+  const activeEscalation =
+    activeItem && activeClient ? latestFor(escalations, activeClient.client_id, "email") : undefined;
+
+  useEffect(() => {
+    if (!activeItem) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActive(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeItem]);
+
+  const replied = threads.filter((t) => t.lastDirection === "inbound").length;
+  const notReplied = threads.length - replied;
+  const promiseCount = threads.filter((t) => t.promise_recorded).length;
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-black">Email Inbox</h1>
-          <p className="text-sm text-muted-foreground">Delivered through Gmail · relayed by n8n</p>
-        </div>
-        <Link
-          to="/"
-          className="rounded-lg border border-input bg-card px-3 py-2 text-sm font-medium hover:bg-muted"
-        >
-          Back to overview
-        </Link>
+    <AppShell title="Logs" subtitle="Email threads · Gmail · relayed by n8n · live">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Total threads" value={String(threads.length)} tone="primary" />
+        <StatCard label="Replied" value={String(replied)} />
+        <StatCard label="Not replied" value={String(notReplied)} />
+        <StatCard label="Promises to pay" value={String(promiseCount)} hint="Confirmed by email" />
       </div>
 
-      <div
-        className="grid grid-cols-1 overflow-hidden rounded-xl border border-border bg-white shadow-sm md:grid-cols-[35%_65%]"
-        style={{ height: "calc(100vh - 11.5rem)" }}
-      >
-        <div className="flex min-h-0 flex-col border-r" style={{ backgroundColor: "#FBE9E7" }}>
-          <div className="shrink-0 border-b px-4 py-3">
-            <div className="text-lg font-black" style={{ color: "#86000B" }}>
-              Email
-            </div>
-          </div>
-          <div className="shrink-0 border-b p-3">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name…"
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none"
-            />
-          </div>
-          <div className="flex shrink-0 gap-1.5 border-b px-3 py-2">
-            {(
-              [
-                { key: "all", label: "All" },
-                { key: "promise", label: "Promised" },
-                { key: "escalated", label: "Escalated" },
-              ] as const
-            ).map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className="rounded-md px-3 py-1 text-xs font-semibold transition-colors"
-                style={{
-                  color: filter === f.key ? "#FFFFFF" : "#1B2419",
-                  backgroundColor: filter === f.key ? "#86000B" : "#FFFFFF",
-                  border: "1px solid #e0d6c8",
-                }}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {isLoading ? <div className="p-4 text-sm text-gray-500">Loading Gmail threads…</div> : null}
-            {error ? (
-              <div className="p-4 text-sm text-red-600">Could not load Gmail threads from n8n.</div>
-            ) : null}
-            {!isLoading && !error && threads.length === 0 ? (
-              <div className="p-8 text-center text-gray-400">
-                <div className="mb-2 text-2xl">✉️</div>
-                <div className="font-medium">No Email activity logged yet</div>
-              </div>
-            ) : null}
-            {threads.map((t) => {
-              const sel = active?.thread_id === t.thread_id;
-              return (
-                <button
-                  key={t.thread_id || t.client_id}
-                  onClick={() => setActiveId(t.thread_id)}
-                  className="w-full border-b px-4 py-3 text-left transition-colors hover:bg-white"
-                  style={{
-                    backgroundColor: sel ? "#FFFFFF" : "transparent",
-                    borderLeft: sel ? "3px solid #86000B" : "3px solid transparent",
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 truncate text-sm font-bold" style={{ color: "#1B2419" }}>
-                      {t.client_name}
-                    </div>
-                    <div className="shrink-0 text-[10px] text-gray-400">{formatTs(t.lastMessageAt)}</div>
-                  </div>
-                  <div className="mt-0.5 truncate text-xs text-gray-500">{t.lastMessagePreview || "—"}</div>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {t.promise_recorded ? (
-                      <span
-                        className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                        style={{ backgroundColor: "#e8f5e9", color: "#2e7d32" }}
-                      >
-                        Promise to Pay
+      <section className="surface-card mt-5 overflow-hidden">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+          <h2 className="text-sm font-bold uppercase tracking-[0.1em]">Threads</h2>
+          <span className="text-xs text-muted-foreground">{threads.length} logged</span>
+        </header>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[920px] text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                <th className="px-4 py-2.5 font-semibold">ID</th>
+                <th className="px-4 py-2.5 font-semibold">Client</th>
+                <th className="px-4 py-2.5 font-semibold">Status</th>
+                <th className="px-4 py-2.5 font-semibold">Summary</th>
+                <th className="px-4 py-2.5 font-semibold">Promise date</th>
+                <th className="px-4 py-2.5 font-semibold">Escalated</th>
+                <th className="px-4 py-2.5 font-semibold">Last activity</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {threads.map((t) => {
+                const client = findClient(t.client_name);
+                const promise = client ? latestFor(promises, client.client_id, "email") : undefined;
+                const escalation = client ? latestFor(escalations, client.client_id, "email") : undefined;
+                return (
+                  <tr
+                    key={t.thread_id || t.client_id}
+                    onClick={() => setActive(t.thread_id)}
+                    className={`cursor-pointer transition-colors ${
+                      t.thread_id === active ? "bg-secondary" : "hover:bg-muted"
+                    }`}
+                  >
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {shortId(t.thread_id)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="block truncate font-medium">{t.client_name}</span>
+                      <span className="block text-[11px] text-muted-foreground">
+                        {client?.email || "—"}
                       </span>
-                    ) : null}
-                    {t.notified_ar ? (
+                    </td>
+                    <td className="px-4 py-3">
                       <span
-                        className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                        style={{ backgroundColor: "#ffebee", color: "#b71c1c" }}
+                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
+                          t.lastDirection === "inbound"
+                            ? "bg-success/12 text-success border-success/30"
+                            : "bg-warning/18 text-warning border-warning/40"
+                        }`}
                       >
-                        AR Notified
+                        {t.lastDirection === "inbound" ? "Replied" : "Awaiting reply"}
                       </span>
-                    ) : null}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                    </td>
+                    <td className="px-4 py-3 max-w-[220px]">
+                      <span className="block truncate text-xs text-muted-foreground" title={t.lastMessagePreview}>
+                        {t.lastMessagePreview || "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {promise ? (
+                        <span className="inline-flex flex-col">
+                          <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
+                            {shortDate(promise.promise_date)}
+                          </span>
+                          <span className="mt-0.5 text-[10px] text-muted-foreground">
+                            {reasonLabel(promise.reason)}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {escalation ? (
+                        <span
+                          title={escalation.reason}
+                          className="inline-block max-w-[160px] truncate rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive"
+                        >
+                          {escalation.reason}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                      {formatTs(t.lastMessageAt)}
+                      {client ? (
+                        <span className="block text-[11px]">
+                          {peso(client.collection_amount)} due {shortDate(client.due_date)}
+                        </span>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    Loading Gmail threads…
+                  </td>
+                </tr>
+              ) : null}
+              {error ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-destructive">
+                    Could not load Gmail threads from n8n.
+                  </td>
+                </tr>
+              ) : null}
+              {!isLoading && !error && threads.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    No Email activity logged yet.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
+      </section>
 
-        <div className="flex min-h-0 flex-col" style={{ backgroundColor: "#FFF8F0" }}>
-          {!active ? (
-            <div className="flex h-full items-center justify-center text-sm text-gray-400">
-              Select a conversation
-            </div>
-          ) : (
-            <>
-              <div className="shrink-0 border-b bg-white px-5 py-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="font-bold" style={{ color: "#1B2419" }}>
-                    {active.client_name}
-                  </div>
+      {activeItem ? (
+        <>
+          <div
+            onClick={() => setActive(null)}
+            className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-[2px] animate-in fade-in"
+          />
+          <aside
+            role="dialog"
+            aria-label="Thread detail"
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col overflow-y-auto border-l border-border bg-card shadow-2xl animate-in slide-in-from-right duration-200"
+          >
+            <header className="sticky top-0 z-10 flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card px-5 py-4">
+              <div>
+                <h2 className="text-base font-bold">{activeItem.client_name}</h2>
+                <dl className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  {detail?.subject ? (
+                    <div>
+                      <span className="font-semibold text-foreground">Subject:</span> {detail.subject}
+                    </div>
+                  ) : null}
                   {activeClient ? (
-                    <Link
-                      to="/clients/$clientId"
-                      params={{ clientId: activeClient.client_id }}
-                      className="shrink-0 text-xs font-semibold"
-                      style={{ color: "#86000B" }}
+                    <div>
+                      <span className="font-semibold text-foreground">Outstanding:</span>{" "}
+                      {peso(activeClient.collection_amount)} · due {shortDate(activeClient.due_date)}
+                    </div>
+                  ) : null}
+                </dl>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <ChannelBadge channel="email" />
+                  <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold tabular-nums">
+                    {messages.length} message{messages.length === 1 ? "" : "s"}
+                  </span>
+                  {activePromise ? (
+                    <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
+                      Promised {shortDate(activePromise.promise_date)} · {reasonLabel(activePromise.reason)}
+                    </span>
+                  ) : null}
+                  {activeEscalation ? (
+                    <span
+                      title={activeEscalation.reason}
+                      className="max-w-[220px] truncate rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive"
                     >
-                      View client
-                    </Link>
+                      Escalated: {activeEscalation.reason}
+                    </span>
                   ) : null}
                 </div>
-                {activeClient ? (
-                  <div className="mt-0.5 text-xs text-gray-500">
-                    {peso(activeClient.collection_amount)} outstanding · due {shortDate(activeClient.due_date)}
-                  </div>
-                ) : null}
-                {detail?.subject ? (
-                  <div className="mt-1 truncate text-xs font-medium text-gray-600">{detail.subject}</div>
-                ) : null}
-                {promise || escalation ? (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {promise ? (
-                      <span
-                        className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-                        style={{ backgroundColor: "#e8f5e9", color: "#2e7d32" }}
-                      >
-                        Promised {shortDate(promise.promise_date)} · {reasonLabel(promise.reason)}
-                      </span>
-                    ) : null}
-                    {escalation ? (
-                      <span
-                        title={escalation.reason}
-                        className="max-w-[260px] truncate rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-                        style={{ backgroundColor: "#ffebee", color: "#b71c1c" }}
-                      >
-                        Escalated: {escalation.reason}
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
               </div>
+              <button
+                onClick={() => setActive(null)}
+                aria-label="Close thread detail"
+                className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </header>
 
-              <div className="flex-1 space-y-3 overflow-y-auto p-5">
-                {messages.map((m) => {
-                  const outbound = m.direction === "outbound";
-                  const name = (m.from.split("<")[0] || m.from).replace(/"/g, "").trim() || m.from;
-                  const initial = name.charAt(0).toUpperCase();
-                  return (
-                    <div key={m.messageId} className="rounded-xl border bg-white p-4 shadow-sm">
-                      <div className="flex items-start gap-3">
-                        <span
-                          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-                          style={{ backgroundColor: outbound ? "#86000B" : "#9c9c9c" }}
-                        >
-                          {initial}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-baseline gap-x-2">
-                            <span className="truncate text-sm font-semibold" style={{ color: "#1B2419" }}>
-                              {name}
-                            </span>
-                            <span className="truncate text-xs text-gray-400">{m.from}</span>
-                            <span className="ml-auto shrink-0 text-xs text-gray-400">{formatTs(m.date)}</span>
-                          </div>
-                          <p className="mt-0.5 text-xs text-gray-400">to {m.to}</p>
-                          <div className="mt-3 text-sm leading-relaxed">
-                            <MessageBody body={m.body} />
-                          </div>
-                          {m.attachments?.length ? (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {m.attachments.map((a) => (
-                                <span
-                                  key={a.filename}
-                                  className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs"
-                                >
-                                  {a.filename}
-                                </span>
-                              ))}
-                            </div>
-                          ) : null}
+            <ol className="divide-y divide-border">
+              {messages.map((m) => {
+                const outbound = m.direction === "outbound";
+                const name = (m.from.split("<")[0] || m.from).replace(/"/g, "").trim() || m.from;
+                const initial = name.charAt(0).toUpperCase();
+                return (
+                  <li key={m.messageId} className="px-5 py-4">
+                    <div className="flex items-start gap-3">
+                      <span
+                        className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                        style={{
+                          color: outbound ? "var(--primary-foreground)" : "var(--foreground)",
+                          backgroundColor: outbound
+                            ? "var(--primary)"
+                            : "color-mix(in oklab, var(--foreground) 10%, transparent)",
+                        }}
+                      >
+                        {initial}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2">
+                          <span className="truncate text-sm font-semibold">{name}</span>
+                          <span className="truncate text-xs text-muted-foreground">{m.from}</span>
+                          <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                            {formatTs(m.date)}
+                          </span>
                         </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">to {m.to}</p>
+                        <div className="mt-3 text-sm leading-relaxed">
+                          <MessageBody body={m.body} />
+                        </div>
+                        {m.attachments?.length ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {m.attachments.map((a) => (
+                              <span
+                                key={a.filename}
+                                className="rounded-lg border border-border bg-muted px-2.5 py-1 text-xs"
+                              >
+                                {a.filename}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
-                  );
-                })}
-                {detailLoading ? (
-                  <div className="py-6 text-center text-sm text-gray-400">Loading thread from Gmail…</div>
-                ) : null}
-                {!detailLoading && messages.length === 0 ? (
-                  <div className="py-6 text-center text-sm text-gray-400">Nothing to show.</div>
-                ) : null}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+                  </li>
+                );
+              })}
+              {detailLoading ? (
+                <li className="px-5 py-6 text-sm text-muted-foreground">Loading thread from Gmail…</li>
+              ) : null}
+              {!detailLoading && messages.length === 0 ? (
+                <li className="px-5 py-6 text-sm text-muted-foreground">Nothing to show.</li>
+              ) : null}
+            </ol>
+          </aside>
+        </>
+      ) : null}
+    </AppShell>
   );
 }

@@ -1,7 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { StatCard, ChannelBadge } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/sms")({
   head: () => ({
@@ -65,18 +67,9 @@ function reasonLabel(reason: string) {
   return map[reason] ?? reason;
 }
 
-function latestFor<T extends { client_id: string; channel: string; recorded_at: string }>(
-  rows: T[],
-  clientId: string,
-  channel: string,
-): T | undefined {
-  return rows
-    .filter((r) => r.client_id === clientId && r.channel === channel)
-    .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())[0];
-}
-
-function peso(v: number) {
-  return "₱" + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+function shortId(id: string) {
+  const clean = id.replace(/\D/g, "") || id;
+  return clean.length > 8 ? `${clean.slice(0, 4)}…${clean.slice(-4)}` : clean;
 }
 function shortDate(v: string | null | undefined) {
   if (!v) return "—";
@@ -106,7 +99,6 @@ function hasReplied(c: SmsConversation) {
   const roles = new Set(c.messages.map((m) => m.role));
   return roles.has("client") && roles.has("ai");
 }
-
 function phoneDigitsFromClientId(clientId: string) {
   const part = clientId.includes("___") ? clientId.split("___")[1] : clientId;
   return digits(part);
@@ -144,256 +136,277 @@ function useSmsConversations() {
 
 function SmsInbox() {
   const { data, isLoading, error } = useSmsConversations();
-  const [search, setSearch] = useState("");
-  const [replyFilter, setReplyFilter] = useState<"all" | "replied" | "not_replied">("all");
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const promises = data?.promises ?? [];
+  const escalations = data?.escalations ?? [];
+  const clients = data?.clients ?? [];
 
-  const conversations = useMemo(() => {
-    let all = (data?.conversations ?? []).slice().sort(
-      (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime(),
-    );
-    if (replyFilter === "replied") all = all.filter((c) => hasReplied(c));
-    if (replyFilter === "not_replied") all = all.filter((c) => !hasReplied(c));
-    const q = search.toLowerCase();
-    if (!q) return all;
-    return all.filter((c) => [c.client_name].join(" ").toLowerCase().includes(q));
-  }, [data, search, replyFilter]);
+  const [active, setActive] = useState<string | null>(null);
 
-  const active = conversations.find((c) => c.client_id === activeId) ?? conversations[0];
-  const activeClient = active
-    ? (data?.clients ?? []).find((cl) => digits(cl.phone) === digits(active.client_id))
+  const conversations = useMemo(
+    () =>
+      (data?.conversations ?? [])
+        .slice()
+        .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()),
+    [data],
+  );
+
+  const activeItem = conversations.find((c) => c.client_id === active) ?? null;
+  const activeClient = activeItem
+    ? clients.find((cl) => digits(cl.phone) === digits(activeItem.client_id))
     : undefined;
-  const activePromise = active
-    ? latestForPhone(data?.promises ?? [], digits(active.client_id), "sms")
+  const activePromise = activeItem
+    ? latestForPhone(promises, digits(activeItem.client_id), "sms")
     : undefined;
-  const activeEscalation = active
-    ? latestForPhone(data?.escalations ?? [], digits(active.client_id), "sms")
+  const activeEscalation = activeItem
+    ? latestForPhone(escalations, digits(activeItem.client_id), "sms")
     : undefined;
+
+  useEffect(() => {
+    if (!activeItem) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActive(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeItem]);
+
+  const replied = conversations.filter((c) => hasReplied(c)).length;
+  const notReplied = conversations.length - replied;
+  const promiseCount = conversations.filter((c) => c.promise_recorded).length;
 
   return (
-    <AppShell title="SMS Inbox" subtitle="Delivered through Telerivet · live from n8n">
-      <div
-        className="bg-white rounded-xl shadow-sm overflow-hidden grid grid-cols-1 md:grid-cols-[35%_65%] border border-border"
-        style={{ height: "calc(100vh - 11.5rem)" }}
-      >
-        <div className="border-r flex flex-col min-h-0" style={{ backgroundColor: "#FFEBCE" }}>
-          <div className="px-4 py-3 border-b shrink-0">
-            <div className="font-black text-lg" style={{ color: "#86000B" }}>
-              SMS
-            </div>
-          </div>
-          <div className="p-3 border-b shrink-0">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name…"
-              className="w-full px-3 py-2 text-sm rounded-md border border-gray-300 bg-white focus:outline-none"
-            />
-          </div>
-          <div className="px-3 py-2 border-b shrink-0 flex gap-1.5">
-            {(
-              [
-                { key: "all", label: "All" },
-                { key: "replied", label: "Replied" },
-                { key: "not_replied", label: "Not Replied" },
-              ] as const
-            ).map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setReplyFilter(f.key)}
-                className="px-3 py-1 text-xs font-semibold rounded-md transition-colors"
-                style={{
-                  color: replyFilter === f.key ? "#FFFFFF" : "#1B2419",
-                  backgroundColor: replyFilter === f.key ? "#86000B" : "#FFFFFF",
-                  border: "1px solid #e0d6c8",
-                }}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <div className="overflow-y-auto flex-1">
-            {isLoading ? <div className="p-4 text-sm text-gray-500">Loading…</div> : null}
-            {error ? <div className="p-4 text-sm text-red-600">Failed to load conversations.</div> : null}
-            {!isLoading && conversations.length === 0 ? (
-              <div className="p-8 text-center text-gray-400">
-                <div className="text-2xl mb-2">💬</div>
-                <div className="font-medium">No SMS activity yet</div>
-              </div>
-            ) : null}
-            {conversations.map((c) => {
-              const sel = active?.client_id === c.client_id;
-              const cPromise = latestForPhone(data?.promises ?? [], digits(c.client_id), "sms");
-              const cEscalation = latestForPhone(data?.escalations ?? [], digits(c.client_id), "sms");
-              return (
-                <button
-                  key={c.client_id}
-                  onClick={() => setActiveId(c.client_id)}
-                  className="w-full text-left px-4 py-3 border-b hover:bg-white transition-colors"
-                  style={{
-                    backgroundColor: sel ? "#FFFFFF" : "transparent",
-                    borderLeft: sel ? "3px solid #86000B" : "3px solid transparent",
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="font-bold text-sm truncate flex-1" style={{ color: "#1B2419" }}>
-                      {c.client_name}
-                    </div>
-                    <div className="text-[10px] text-gray-400 shrink-0">
-                      {formatTs(c.lastMessageAt)}
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-500 truncate mt-0.5">
-                    {c.lastMessagePreview || "—"}
-                  </div>
-                  {cPromise || cEscalation ? (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {cPromise ? (
-                        <span
-                          className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                          style={{ backgroundColor: "#e8f5e9", color: "#2e7d32" }}
-                        >
-                          Pay by {shortDate(cPromise.promise_date)}
-                        </span>
-                      ) : null}
-                      {cEscalation ? (
-                        <span
-                          title={cEscalation.reason}
-                          className="max-w-[140px] truncate rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                          style={{ backgroundColor: "#ffebee", color: "#b71c1c" }}
-                        >
-                          Escalated
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+    <AppShell title="Logs" subtitle="SMS conversations · Telerivet · live from n8n">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Total conversations" value={String(conversations.length)} tone="primary" />
+        <StatCard label="Replied" value={String(replied)} />
+        <StatCard label="Not replied" value={String(notReplied)} />
+        <StatCard label="Promises to pay" value={String(promiseCount)} hint="Confirmed on SMS" />
+      </div>
 
-        <div className="flex flex-col min-h-0" style={{ backgroundColor: "#FFF8F0" }}>
-          {!active ? (
-            <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-              Select a conversation
-            </div>
-          ) : (
-            <>
-              <div className="px-5 py-3 border-b bg-white shrink-0">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="font-bold" style={{ color: "#1B2419" }}>
-                    {active.client_name}
+      <section className="surface-card mt-5 overflow-hidden">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+          <h2 className="text-sm font-bold uppercase tracking-[0.1em]">Conversations</h2>
+          <span className="text-xs text-muted-foreground">{conversations.length} logged</span>
+        </header>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[920px] text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                <th className="px-4 py-2.5 font-semibold">ID</th>
+                <th className="px-4 py-2.5 font-semibold">Client</th>
+                <th className="px-4 py-2.5 font-semibold">Status</th>
+                <th className="px-4 py-2.5 font-semibold">Summary</th>
+                <th className="px-4 py-2.5 font-semibold">Promise date</th>
+                <th className="px-4 py-2.5 font-semibold">Escalated</th>
+                <th className="px-4 py-2.5 font-semibold">Last activity</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {conversations.map((c) => {
+                const promise = latestForPhone(promises, digits(c.client_id), "sms");
+                const escalation = latestForPhone(escalations, digits(c.client_id), "sms");
+                const client = clients.find((cl) => digits(cl.phone) === digits(c.client_id));
+                return (
+                  <tr
+                    key={c.client_id}
+                    onClick={() => setActive(c.client_id)}
+                    className={`cursor-pointer transition-colors ${
+                      c.client_id === active ? "bg-secondary" : "hover:bg-muted"
+                    }`}
+                  >
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {shortId(c.client_id)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="block truncate font-medium">{c.client_name}</span>
+                      <span className="block text-[11px] text-muted-foreground">{c.client_id}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
+                          hasReplied(c)
+                            ? "bg-success/12 text-success border-success/30"
+                            : "bg-warning/18 text-warning border-warning/40"
+                        }`}
+                      >
+                        {hasReplied(c) ? "Replied" : "Awaiting reply"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 max-w-[220px]">
+                      <span className="block truncate text-xs text-muted-foreground" title={c.lastMessagePreview}>
+                        {c.lastMessagePreview || "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {promise ? (
+                        <span className="inline-flex flex-col">
+                          <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
+                            {shortDate(promise.promise_date)}
+                          </span>
+                          <span className="mt-0.5 text-[10px] text-muted-foreground">
+                            {reasonLabel(promise.reason)}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {escalation ? (
+                        <span
+                          title={escalation.reason}
+                          className="inline-block max-w-[160px] truncate rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive"
+                        >
+                          {escalation.reason}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                      {formatTs(c.lastMessageAt)}
+                      {client ? (
+                        <span className="block text-[11px]">
+                          {peso(client.collection_amount)} due {shortDate(client.due_date)}
+                        </span>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    Loading SMS conversations…
+                  </td>
+                </tr>
+              ) : null}
+              {error ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-destructive">
+                    Could not load SMS conversations.
+                  </td>
+                </tr>
+              ) : null}
+              {!isLoading && !error && conversations.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    No SMS activity logged yet.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {activeItem ? (
+        <>
+          <div
+            onClick={() => setActive(null)}
+            className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-[2px] animate-in fade-in"
+          />
+          <aside
+            role="dialog"
+            aria-label="Conversation detail"
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col overflow-y-auto border-l border-border bg-card shadow-2xl animate-in slide-in-from-right duration-200"
+          >
+            <header className="sticky top-0 z-10 flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card px-5 py-4">
+              <div>
+                <h2 className="text-base font-bold">{activeItem.client_name}</h2>
+                <dl className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  <div>
+                    <span className="font-semibold text-foreground">Phone:</span> {activeItem.client_id}
                   </div>
                   {activeClient ? (
-                    <Link
-                      to="/clients/$clientId"
-                      params={{ clientId: activeClient.client_id }}
-                      className="text-xs font-semibold shrink-0"
-                      style={{ color: "#86000B" }}
+                    <div>
+                      <span className="font-semibold text-foreground">Outstanding:</span>{" "}
+                      {peso(activeClient.collection_amount)} · due {shortDate(activeClient.due_date)}
+                    </div>
+                  ) : null}
+                </dl>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <ChannelBadge channel="sms" />
+                  {activePromise ? (
+                    <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
+                      Promised {shortDate(activePromise.promise_date)} · {reasonLabel(activePromise.reason)}
+                    </span>
+                  ) : null}
+                  {activeEscalation ? (
+                    <span
+                      title={activeEscalation.reason}
+                      className="max-w-[220px] truncate rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive"
                     >
-                      View client
-                    </Link>
+                      Escalated: {activeEscalation.reason}
+                    </span>
                   ) : null}
                 </div>
-                {activeClient ? (
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    {peso(activeClient.collection_amount)} outstanding · due{" "}
-                    {shortDate(activeClient.due_date)}
-                  </div>
-                ) : null}
-                {activePromise || activeEscalation ? (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {activePromise ? (
-                      <span
-                        className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-                        style={{ backgroundColor: "#e8f5e9", color: "#2e7d32" }}
-                      >
-                        Promised {shortDate(activePromise.promise_date)} ·{" "}
-                        {reasonLabel(activePromise.reason)}
-                      </span>
-                    ) : null}
-                    {activeEscalation ? (
-                      <span
-                        title={activeEscalation.reason}
-                        className="max-w-[260px] truncate rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-                        style={{ backgroundColor: "#ffebee", color: "#b71c1c" }}
-                      >
-                        Escalated: {activeEscalation.reason}
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
               </div>
+              <button
+                onClick={() => setActive(null)}
+                aria-label="Close conversation detail"
+                className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </header>
 
-              <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-3">
-                {active.messages.length === 0 ? (
-                  <div className="text-center text-sm text-gray-400 mt-8">No messages yet.</div>
-                ) : null}
-                {active.messages.map((m, i) => {
-                  const out = m.role === "ai";
-                  return (
-                    <div key={i} className={`flex flex-col ${out ? "items-end" : "items-start"}`}>
-                      {out ? (
-                        <div className="flex items-center gap-2 mb-1">
-                          <span
-                            className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
-                            style={{ backgroundColor: "#e6f4ea", color: "#1a7f37" }}
-                          >
-                            SMS
-                          </span>
-                          <span className="text-[10px] text-gray-400">twilio · {formatTs(m.ts)}</span>
-                        </div>
-                      ) : null}
-                      <div className="max-w-[70%]">
-                        <div
-                          className={`rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-sm ${
-                            out ? "rounded-br-sm text-white" : "rounded-bl-sm bg-white"
-                          }`}
-                          style={out ? { backgroundColor: "#86000B" } : { color: "#1B2419" }}
-                        >
-                          <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
-                        </div>
-                        <div
-                          className={`flex flex-wrap items-center gap-1.5 mt-1 ${out ? "justify-end" : "justify-start"}`}
-                        >
-                          {!out ? (
-                            <span className="text-[10px] text-gray-500">{formatTs(m.ts)}</span>
-                          ) : null}
-                          {out && m.status ? (
-                            <span
-                              className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                              style={{ backgroundColor: "#f0ead6", color: "#8a6d1a" }}
-                            >
-                              {m.status}
-                            </span>
-                          ) : null}
-                          {m.promise_recorded ? (
-                            <span
-                              className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                              style={{ backgroundColor: "#e8f5e9", color: "#2e7d32" }}
-                            >
-                              Promise to Pay
-                            </span>
-                          ) : null}
-                          {m.notified_ar ? (
-                            <span
-                              className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                              style={{ backgroundColor: "#ffebee", color: "#b71c1c" }}
-                            >
-                              AR Notified
-                            </span>
-                          ) : null}
-                        </div>
+            <div className="space-y-4 p-5">
+              <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                Full conversation
+              </h3>
+              {activeItem.messages.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No messages yet.</p>
+              ) : (
+                <ol className="space-y-4">
+                  {activeItem.messages.map((m, i) => (
+                    <li
+                      key={i}
+                      className={`flex flex-col gap-1 ${m.role === "ai" ? "items-end" : "items-start"}`}
+                    >
+                      <div className="text-[11px] text-muted-foreground">
+                        {m.role === "ai" ? "Accounting Assistant" : activeItem.client_name}
+                        {" · "}
+                        {formatTs(m.ts)}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+                      <div
+                        className={`max-w-[80%] rounded-xl border px-3.5 py-2.5 text-sm ${
+                          m.role === "ai"
+                            ? "border-transparent bg-primary text-primary-foreground"
+                            : "border-border bg-muted"
+                        }`}
+                      >
+                        <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {m.status ? (
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                            {m.status}
+                          </span>
+                        ) : null}
+                        {m.promise_recorded ? (
+                          <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
+                            Promise to Pay
+                          </span>
+                        ) : null}
+                        {m.notified_ar ? (
+                          <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-[10px] font-semibold text-destructive">
+                            AR Notified
+                          </span>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          </aside>
+        </>
+      ) : null}
     </AppShell>
   );
+}
+
+function peso(v: number) {
+  return "₱" + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
 }
