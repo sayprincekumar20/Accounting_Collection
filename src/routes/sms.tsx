@@ -41,6 +41,39 @@ interface ClientRow {
   collection_amount: number;
   due_date: string;
 }
+interface PromiseRow {
+  client_id: string;
+  channel: string;
+  promise_date: string;
+  reason: string;
+  recorded_at: string;
+}
+interface EscalationRow {
+  client_id: string;
+  channel: string;
+  reason: string;
+  recorded_at: string;
+}
+
+function reasonLabel(reason: string) {
+  const map: Record<string, string> = {
+    payment_promise: "Promise to Pay",
+    investigation_hold: "Investigation Hold",
+    client_unavailable: "Client Unavailable",
+    business_closed_pending_review: "Business Closed (Pending Review)",
+  };
+  return map[reason] ?? reason;
+}
+
+function latestFor<T extends { client_id: string; channel: string; recorded_at: string }>(
+  rows: T[],
+  clientId: string,
+  channel: string,
+): T | undefined {
+  return rows
+    .filter((r) => r.client_id === clientId && r.channel === channel)
+    .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())[0];
+}
 
 function peso(v: number) {
   return "₱" + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
@@ -74,17 +107,35 @@ function hasReplied(c: SmsConversation) {
   return roles.has("client") && roles.has("ai");
 }
 
+function phoneDigitsFromClientId(clientId: string) {
+  const part = clientId.includes("___") ? clientId.split("___")[1] : clientId;
+  return digits(part);
+}
+function latestForPhone<T extends { client_id: string; channel: string; recorded_at: string }>(
+  rows: T[],
+  phoneDigits: string,
+  channel: string,
+): T | undefined {
+  return rows
+    .filter((r) => phoneDigitsFromClientId(r.client_id) === phoneDigits && r.channel === channel)
+    .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())[0];
+}
+
 function useSmsConversations() {
   return useQuery({
     queryKey: ["sms-conversations"],
     queryFn: async () => {
-      const [smsRes, clientsRes] = await Promise.all([
+      const [smsRes, clientsRes, pRes, eRes] = await Promise.all([
         fetch("/api/sms-conversations").then((r) => r.json()),
         fetch("/api/clients-list").then((r) => r.json()),
+        fetch("/api/promise-history").then((r) => r.json()),
+        fetch("/api/escalations").then((r) => r.json()),
       ]);
       return {
         conversations: (smsRes.conversations ?? []) as SmsConversation[],
         clients: (clientsRes.clients ?? []) as ClientRow[],
+        promises: (pRes.promises ?? []) as PromiseRow[],
+        escalations: (eRes.escalations ?? []) as EscalationRow[],
       };
     },
     refetchInterval: 30000,
@@ -111,6 +162,12 @@ function SmsInbox() {
   const active = conversations.find((c) => c.client_id === activeId) ?? conversations[0];
   const activeClient = active
     ? (data?.clients ?? []).find((cl) => digits(cl.phone) === digits(active.client_id))
+    : undefined;
+  const activePromise = active
+    ? latestForPhone(data?.promises ?? [], digits(active.client_id), "sms")
+    : undefined;
+  const activeEscalation = active
+    ? latestForPhone(data?.escalations ?? [], digits(active.client_id), "sms")
     : undefined;
 
   return (
@@ -166,6 +223,8 @@ function SmsInbox() {
             ) : null}
             {conversations.map((c) => {
               const sel = active?.client_id === c.client_id;
+              const cPromise = latestForPhone(data?.promises ?? [], digits(c.client_id), "sms");
+              const cEscalation = latestForPhone(data?.escalations ?? [], digits(c.client_id), "sms");
               return (
                 <button
                   key={c.client_id}
@@ -187,6 +246,27 @@ function SmsInbox() {
                   <div className="text-xs text-gray-500 truncate mt-0.5">
                     {c.lastMessagePreview || "—"}
                   </div>
+                  {cPromise || cEscalation ? (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {cPromise ? (
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                          style={{ backgroundColor: "#e8f5e9", color: "#2e7d32" }}
+                        >
+                          Pay by {shortDate(cPromise.promise_date)}
+                        </span>
+                      ) : null}
+                      {cEscalation ? (
+                        <span
+                          title={cEscalation.reason}
+                          className="max-w-[140px] truncate rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                          style={{ backgroundColor: "#ffebee", color: "#b71c1c" }}
+                        >
+                          Escalated
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </button>
               );
             })}
@@ -220,6 +300,28 @@ function SmsInbox() {
                   <div className="text-xs text-gray-500 mt-0.5">
                     {peso(activeClient.collection_amount)} outstanding · due{" "}
                     {shortDate(activeClient.due_date)}
+                  </div>
+                ) : null}
+                {activePromise || activeEscalation ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {activePromise ? (
+                      <span
+                        className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                        style={{ backgroundColor: "#e8f5e9", color: "#2e7d32" }}
+                      >
+                        Promised {shortDate(activePromise.promise_date)} ·{" "}
+                        {reasonLabel(activePromise.reason)}
+                      </span>
+                    ) : null}
+                    {activeEscalation ? (
+                      <span
+                        title={activeEscalation.reason}
+                        className="max-w-[260px] truncate rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                        style={{ backgroundColor: "#ffebee", color: "#b71c1c" }}
+                      >
+                        Escalated: {activeEscalation.reason}
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
