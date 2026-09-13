@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { PhoneOutgoing, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { StatCard, ChannelBadge, StatusPill } from "@/components/collections/Bits";
+import { StatCard, ChannelBadge } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/voice")({
   head: () => ({
@@ -88,18 +88,90 @@ function shortId(id: string | null) {
   return `${id.slice(0, 4)}…${id.slice(-4)}`;
 }
 
-function formatReason(raw: string, status: string) {
-  if (!raw) return status === "completed" ? "Customer" : status.replace(/_/g, " ");
-  return raw
-    .replace(/^customer-/, "customer ")
-    .replace(/-/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+// Vapi's own endedReason taxonomy (https://docs.vapi.ai/calls/call-ended-reason) -
+// `status` is almost always just "ended" once a call finishes, so it can't tell you
+// whether the customer actually answered. endedReason is the real signal.
+const ENDED_REASON_LABELS: Record<string, string> = {
+  "assistant-ended-call": "Ended by Assistant",
+  "assistant-ended-call-after-message-spoken": "Ended by Assistant",
+  "assistant-ended-call-with-hangup-task": "Ended by Assistant",
+  "assistant-said-end-call-phrase": "Ended by Assistant",
+  "assistant-forwarded-call": "Transferred",
+  "assistant-join-timed-out": "Assistant Failed to Join",
+  "customer-ended-call": "Customer Ended Call",
+  "customer-busy": "Line Busy",
+  "customer-did-not-answer": "No Answer",
+  "customer-did-not-give-microphone-permission": "Mic Permission Denied",
+  "customer-ended-call-before-warm-transfer": "Hung Up Before Transfer",
+  "customer-ended-call-after-warm-transfer-attempt": "Hung Up After Transfer Attempt",
+  "customer-ended-call-during-transfer": "Hung Up During Transfer",
+  "exceeded-max-duration": "Max Duration Reached",
+  "silence-timed-out": "No Response (Silence)",
+  voicemail: "Reached Voicemail",
+  "manually-canceled": "Manually Canceled",
+  "worker-shutdown": "System Restarted (Retry)",
+  "call-deleted": "Deleted",
+  "scheduled-call-deleted": "Scheduled Call Canceled",
+  "assistant-not-found": "Assistant Not Found",
+  "assistant-not-valid": "Assistant Misconfigured",
+  "assistant-request-failed": "Assistant Setup Failed",
+  "phone-call-provider-closed-websocket": "Call Dropped (Connection Lost)",
+  "twilio-failed-to-connect-call": "Failed to Connect",
+  "twilio-reported-customer-misdialed": "Invalid Number",
+  "vonage-failed-to-connect-call": "Failed to Connect",
+  "vonage-rejected": "Call Rejected",
+  "vonage-disconnected": "Disconnected",
+};
+
+const NOT_ANSWERED_REASONS = new Set([
+  "customer-did-not-answer",
+  "customer-busy",
+  "voicemail",
+  "customer-did-not-give-microphone-permission",
+]);
+
+const FAILED_REASONS = new Set([
+  "assistant-not-found",
+  "assistant-not-valid",
+  "assistant-request-failed",
+  "assistant-join-timed-out",
+  "phone-call-provider-closed-websocket",
+  "twilio-failed-to-connect-call",
+  "twilio-reported-customer-misdialed",
+  "vonage-failed-to-connect-call",
+  "vonage-rejected",
+  "vonage-disconnected",
+  "worker-shutdown",
+  "manually-canceled",
+  "call-deleted",
+  "scheduled-call-deleted",
+]);
+
+/** The real connection outcome for this call, based on Vapi's endedReason - not status. */
+function callOutcome(endedReason: string, status: string): "connected" | "not_answered" | "failed" {
+  const r = endedReason || "";
+  if (NOT_ANSWERED_REASONS.has(r)) return "not_answered";
+  if (FAILED_REASONS.has(r)) return "failed";
+  if (r.includes("error") || r.startsWith("call.")) return "failed";
+  if (!r) return status === "ended" || status === "completed" ? "connected" : "failed";
+  return "connected";
 }
 
-function reasonTone(status: string) {
-  if (status === "completed" || status === "ended") return "bg-success/12 text-success border-success/30";
-  if (status === "failed") return "bg-destructive/12 text-destructive border-destructive/30";
-  return "bg-warning/18 text-warning border-warning/40";
+function endedReasonLabel(raw: string, status: string): string {
+  if (!raw) return status === "ended" || status === "completed" ? "Call Ended" : status || "Unknown";
+  return (
+    ENDED_REASON_LABELS[raw] ??
+    raw
+      .replace(/^call\.[a-z.-]+\./, "")
+      .replace(/-/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
+
+function outcomeTone(outcome: "connected" | "not_answered" | "failed") {
+  if (outcome === "connected") return "bg-success/12 text-success border-success/30";
+  if (outcome === "not_answered") return "bg-warning/18 text-warning border-warning/40";
+  return "bg-destructive/12 text-destructive border-destructive/30";
 }
 
 function formatClientTime(iso: string) {
@@ -212,15 +284,15 @@ function VoiceLogs() {
     return () => window.removeEventListener("keydown", onKey);
   }, [activeItem]);
 
-  const completed = calls.filter((c) => c.status === "completed" || c.status === "ended").length;
-  const noAnswer = calls.length - completed;
+  const connected = calls.filter((c) => callOutcome(c.endedReason, c.status) === "connected").length;
+  const notConnected = calls.length - connected;
 
   return (
     <AppShell title="Logs" subtitle="AI voice calls · Vapi · Accounting Assistant · live">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total calls" value={String(calls.length)} tone="primary" />
-        <StatCard label="Connected" value={String(completed)} />
-        <StatCard label="Not answered / failed" value={String(noAnswer)} />
+        <StatCard label="Connected" value={String(connected)} />
+        <StatCard label="Not answered / failed" value={String(notConnected)} />
         <StatCard
           label="Promises to pay"
           value={String(calls.filter((c) => latestFor(promises, c.client_id)).length)}
@@ -293,9 +365,9 @@ function VoiceLogs() {
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${reasonTone(c.status)}`}
+                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${outcomeTone(callOutcome(c.endedReason, c.status))}`}
                       >
-                        {formatReason(c.endedReason, c.status)}
+                        {endedReasonLabel(c.endedReason, c.status)}
                       </span>
                     </td>
                     <td className="px-4 py-3 max-w-[220px]">
@@ -399,12 +471,16 @@ function VoiceLogs() {
                   </div>
                   <div>
                     <span className="font-semibold text-foreground">Ended:</span>{" "}
-                    {formatReason(activeItem.endedReason, activeItem.status)}
+                    {endedReasonLabel(activeItem.endedReason, activeItem.status)}
                   </div>
                 </dl>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <ChannelBadge channel="voice" />
-                  <StatusPill status={activeItem.status} />
+                  <span
+                    className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${outcomeTone(callOutcome(activeItem.endedReason, activeItem.status))}`}
+                  >
+                    {endedReasonLabel(activeItem.endedReason, activeItem.status)}
+                  </span>
                   {detail ? (
                     <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold tabular-nums">
                       {formatDuration(detail.durationSeconds)}
