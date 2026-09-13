@@ -217,10 +217,15 @@ function VoiceLogs() {
 
   return (
     <AppShell title="Logs" subtitle="AI voice calls · Vapi · Accounting Assistant · live">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total calls" value={String(calls.length)} tone="primary" />
         <StatCard label="Connected" value={String(completed)} />
         <StatCard label="Not answered / failed" value={String(noAnswer)} />
+        <StatCard
+          label="Promises to pay"
+          value={String(calls.filter((c) => latestFor(promises, c.client_id)).length)}
+          hint="Confirmed on a call"
+        />
       </div>
 
       <section className="surface-card mt-5 overflow-hidden">
