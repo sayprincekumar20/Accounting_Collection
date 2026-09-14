@@ -90,17 +90,31 @@ function reasonLabel(reason: string) {
   return map[reason] ?? reason;
 }
 
+async function safeFetchJson<T>(url: string, fallback: T): Promise<T> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error(`[client-detail] ${url} returned ${res.status}`);
+      return fallback;
+    }
+    return (await res.json()) as T;
+  } catch (err) {
+    console.error(`[client-detail] ${url} failed:`, err);
+    return fallback;
+  }
+}
+
 function useClientDetail(clientId: string) {
   return useQuery({
     queryKey: ["client-detail", clientId],
     queryFn: async () => {
       const [clientsRes, queueRes, smsRes, voiceRes, gmailRes, promisesRes] = await Promise.all([
-        fetch("/api/clients-list").then((r) => r.json()),
-        fetch("/api/reminder-queue-list").then((r) => r.json()),
-        fetch("/api/sms-conversations").then((r) => r.json()),
-        fetch("/api/vapi-calls-list").then((r) => r.json()),
-        fetch("/api/gmail-threads-list").then((r) => r.json()),
-        fetch("/api/promise-history").then((r) => r.json()),
+        safeFetchJson("/api/clients-list", { clients: [] as ClientRow[] }),
+        safeFetchJson("/api/reminder-queue-list", { queue: [] as QueueRow[] }),
+        safeFetchJson("/api/sms-conversations", { conversations: [] as { client_id: string; messages: any[] }[] }),
+        safeFetchJson("/api/vapi-calls-list", { calls: [] as any[] }),
+        safeFetchJson("/api/gmail-threads-list", { threads: [] as any[] }),
+        safeFetchJson("/api/promise-history", { promises: [] as PromiseRow[] }),
       ]);
 
       const client = (clientsRes.clients as ClientRow[]).find((c) => c.client_id === clientId);
@@ -172,7 +186,7 @@ function useClientDetail(clientId: string) {
 
 function ClientDetail() {
   const { clientId } = Route.useParams();
-  const { data, isLoading } = useClientDetail(clientId);
+  const { data, isLoading, isError, error } = useClientDetail(clientId);
 
   if (isLoading) {
     return (
@@ -181,6 +195,24 @@ function ClientDetail() {
       </AppShell>
     );
   }
+  if (isError) {
+    return (
+      <AppShell title="Couldn't load this client" subtitle="">
+        <div className="surface-card p-6 text-sm">
+          <p className="font-semibold text-destructive">Something went wrong loading this client's data.</p>
+          <p className="mt-1 text-muted-foreground">
+            {error instanceof Error ? error.message : "Unknown error. Check the server logs."}
+          </p>
+          <p className="mt-3 text-xs text-muted-foreground">
+            This is usually a backend connectivity issue (e.g. a missing or incorrect
+            N8N_WEBHOOK_BASE_URL environment variable), not a missing client record.
+          </p>
+        </div>
+      </AppShell>
+    );
+  }
+  // Only throw a real 404 once the query actually succeeded and no matching client exists -
+  // never conflate "the data fetch failed" with "this client doesn't exist".
   if (!data?.client) throw notFound();
   const { client, queue, timeline, promises } = data;
 
