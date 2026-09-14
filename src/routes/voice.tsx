@@ -31,11 +31,20 @@ interface CallListItem {
   cost: number;
   hasContent: boolean;
   preview: string;
+  callSummary?: string;
+  satisfactionOverall?: number | null;
 }
 
 interface CallTurn {
   role: "assistant" | "client";
   text: string;
+}
+
+interface CallSatisfaction {
+  clarity: number | null;
+  tone: number | null;
+  resolution: number | null;
+  overall: number | null;
 }
 
 interface CallDetail {
@@ -48,6 +57,8 @@ interface CallDetail {
   durationSeconds: number;
   cost: number;
   recordingUrl: string;
+  callSummary?: string;
+  satisfaction?: CallSatisfaction | null;
   turns: CallTurn[];
 }
 
@@ -221,6 +232,13 @@ interface ClientRow {
   phone: string;
 }
 
+function satisfactionTone(score: number | null | undefined) {
+  if (score == null) return "bg-muted text-muted-foreground";
+  if (score >= 8) return "bg-success/12 text-success";
+  if (score >= 5) return "bg-warning/18 text-warning";
+  return "bg-destructive/12 text-destructive";
+}
+
 function useClientsList() {
   return useQuery({
     queryKey: ["clients-list"],
@@ -370,10 +388,20 @@ function VoiceLogs() {
                         {endedReasonLabel(c.endedReason, c.status)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 max-w-[220px]">
-                      <span className="block truncate text-xs text-muted-foreground" title={c.preview}>
-                        {c.preview || "—"}
+                    <td className="px-4 py-3 max-w-[240px]">
+                      <span
+                        className="block truncate text-xs text-muted-foreground"
+                        title={c.callSummary || c.preview}
+                      >
+                        {c.callSummary || c.preview || "—"}
                       </span>
+                      {c.satisfactionOverall != null ? (
+                        <span
+                          className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${satisfactionTone(c.satisfactionOverall)}`}
+                        >
+                          {c.satisfactionOverall}/10 satisfaction
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {promise ? (
@@ -498,6 +526,43 @@ function VoiceLogs() {
             </header>
 
             <div className="space-y-5 p-5">
+              {detail?.callSummary || detail?.satisfaction ? (
+                <div>
+                  <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                    Call Summary
+                  </h3>
+                  {detail?.callSummary ? (
+                    <p className="mb-3 text-sm">{detail.callSummary}</p>
+                  ) : (
+                    <p className="mb-3 text-xs text-muted-foreground">
+                      Not available for this call (analysis wasn't enabled yet when it happened).
+                    </p>
+                  )}
+                  {detail?.satisfaction ? (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {(
+                        [
+                          { label: "Clarity", value: detail.satisfaction.clarity },
+                          { label: "Tone", value: detail.satisfaction.tone },
+                          { label: "Resolution", value: detail.satisfaction.resolution },
+                          { label: "Overall", value: detail.satisfaction.overall },
+                        ] as const
+                      ).map((s) => (
+                        <div
+                          key={s.label}
+                          className={`rounded-lg px-3 py-2 text-center ${satisfactionTone(s.value)}`}
+                        >
+                          <div className="text-lg font-black">{s.value ?? "—"}</div>
+                          <div className="text-[10px] font-semibold uppercase tracking-wide">
+                            {s.label}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div>
                 <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
                   Recording
