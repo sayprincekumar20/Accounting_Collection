@@ -113,10 +113,16 @@ export function parseTranscript(call: any): { role: "assistant" | "client"; text
   if (Array.isArray(messages) && messages.length > 0) {
     return messages
       .filter((m: any) => m?.message && typeof m.message === "string" && m.message.trim().length > 0)
+      // "system" is the instructions given TO the assistant, not something spoken during
+      // the call - it must never appear in the transcript. Same for tool/function call
+      // messages, which aren't spoken dialogue either.
+      .filter((m: any) => {
+        const roleRaw = String(m.role || "").toLowerCase();
+        return roleRaw !== "system" && roleRaw !== "tool" && roleRaw !== "function" && roleRaw !== "tool_calls";
+      })
       .map((m: any) => {
         const roleRaw = String(m.role || "").toLowerCase();
-        const role: "assistant" | "client" =
-          roleRaw === "bot" || roleRaw === "assistant" || roleRaw === "system" ? "assistant" : "client";
+        const role: "assistant" | "client" = roleRaw === "bot" || roleRaw === "assistant" ? "assistant" : "client";
         return { role, text: m.message.trim() };
       });
   }
@@ -124,6 +130,7 @@ export function parseTranscript(call: any): { role: "assistant" | "client"; text
   // Fallback: some older calls may only have the flat transcript string.
   const transcript: string | undefined = call?.transcript || call?.artifact?.transcript;
   if (!transcript) return [];
+
   const lines = transcript.split("\n").filter((l: string) => l.trim().length > 0);
   const turns: { role: "assistant" | "client"; text: string }[] = [];
   for (const line of lines) {
