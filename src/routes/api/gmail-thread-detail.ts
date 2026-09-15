@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getAccessToken, gmailFetch, getHeader, extractHtmlBody, GMAIL_BUSINESS_EMAIL } from "@/lib/gmail-server";
+import { getAccessToken, gmailFetch, getHeader, extractBody, extractAttachments, GMAIL_BUSINESS_EMAIL } from "@/lib/gmail-server";
 
 // Direct Gmail API call — replaces the old N8N_WEBHOOK_BASE_URL proxy.
-// Full-body fetch, only ever called on-demand when a thread is opened.
+// Matches the real ThreadDetail / ThreadMessage contract from email.tsx:
+//   { threadId, subject, messages: [{ messageId, from, to, subject, date,
+//     body, attachments, direction }] }
 
 export const Route = createFileRoute("/api/gmail-thread-detail")({
   server: {
@@ -20,6 +22,8 @@ export const Route = createFileRoute("/api/gmail-thread-detail")({
           const accessToken = await getAccessToken();
           const thread = await gmailFetch<any>(`/threads/${threadId}?format=full`, accessToken);
 
+          const threadSubject = getHeader(thread.messages?.[0]?.payload?.headers, "Subject") || "(no subject)";
+
           const messages = (thread.messages || [])
             .map((m: any) => {
               const headers = m.payload?.headers;
@@ -27,18 +31,19 @@ export const Route = createFileRoute("/api/gmail-thread-detail")({
               const isOutbound = fromRaw.toLowerCase().includes(GMAIL_BUSINESS_EMAIL.toLowerCase());
 
               return {
-                id: m.id,
+                messageId: m.id,
                 from: fromRaw,
                 to: getHeader(headers, "To"),
+                subject: getHeader(headers, "Subject") || threadSubject,
                 date: getHeader(headers, "Date"),
+                body: extractBody(m.payload),
+                attachments: extractAttachments(m.payload),
                 direction: isOutbound ? "outbound" : "inbound",
-                htmlBody: extractHtmlBody(m.payload),
-                hasAttachments: !!m.payload?.parts?.some((p: any) => p.filename && p.filename.length > 0),
               };
             })
             .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-          return new Response(JSON.stringify({ threadId, messages }), {
+          return new Response(JSON.stringify({ threadId, subject: threadSubject, messages }), {
             headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
           });
         } catch (err) {
