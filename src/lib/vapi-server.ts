@@ -49,33 +49,51 @@ export function extractClientName(call: any): string {
 }
 
 /**
- * The "Setup - Call Summary + Satisfaction Structured Output" workflow linked
- * a Vapi Structured Output resource to the assistant. Vapi attaches the result
- * under call.analysis.structuredData keyed by the schema name, OR under
- * call.artifact.structuredOutputs depending on API version — try both.
- * VERIFY the actual key against a real completed call before relying on this.
- */
-/**
- * Confirmed against Vapi's official docs (docs.vapi.ai/assistants/call-analysis):
- * call.analysis.summary is the plain call summary, and call.analysis.structuredData
- * holds whatever fields were configured in assistant.analysisPlan.structuredDataPlan
- * (or a linked Structured Output resource) — in this case the satisfaction
- * sub-scores. There is no artifact.structuredOutputs field; that was an earlier
- * unverified guess and has been removed.
+ * Vapi has TWO separate systems that can produce this data, and which one
+ * is active depends entirely on how the assistant was configured:
+ *
+ * 1. Legacy `assistant.analysisPlan` -> call.analysis.summary (plain string)
+ *    and call.analysis.structuredData (flat object, single schema).
+ * 2. Newer named "Structured Outputs" resources (confirmed at
+ *    docs.vapi.ai/assistants/structured-outputs-quickstart) -> each one's
+ *    result lands at call.artifact.structuredOutputs[outputId].result,
+ *    keyed by the output's ID, which we don't know in advance.
+ *
+ * The n8n workflow that set this up was literally named "Call Summary +
+ * Satisfaction Structured Output" (capital S, matching system 2's naming),
+ * so that's checked first, with system 1 as a fallback.
  */
 export function extractSummaryAndSatisfaction(call: any): {
   callSummary: string | undefined;
   satisfaction: { clarity: number | null; tone: number | null; resolution: number | null; overall: number | null } | null;
 } {
-  const summary: string | undefined = call?.analysis?.summary;
-  const structuredData = call?.analysis?.structuredData;
+  // System 2: newer Structured Outputs, keyed by an output ID we don't know —
+  // take the first result that actually looks like a satisfaction payload.
+  const structuredOutputs = call?.artifact?.structuredOutputs;
+  let outputResult: any = null;
+  if (structuredOutputs && typeof structuredOutputs === "object") {
+    for (const value of Object.values(structuredOutputs)) {
+      const result = (value as any)?.result;
+      if (result && typeof result === "object") {
+        outputResult = result;
+        break;
+      }
+    }
+  }
 
-  const satisfaction = structuredData
+  // System 1: legacy analysisPlan structured data
+  const legacyStructuredData = call?.analysis?.structuredData;
+
+  const structured = outputResult || legacyStructuredData;
+
+  const summary: string | undefined = call?.analysis?.summary || structured?.summary;
+
+  const satisfaction = structured
     ? {
-        clarity: structuredData.clarity ?? null,
-        tone: structuredData.tone ?? null,
-        resolution: structuredData.resolution ?? null,
-        overall: structuredData.overall ?? structuredData.overall_score ?? null,
+        clarity: structured.clarity ?? null,
+        tone: structured.tone ?? null,
+        resolution: structured.resolution ?? null,
+        overall: structured.overall ?? structured.overall_score ?? null,
       }
     : null;
 
@@ -83,23 +101,38 @@ export function extractSummaryAndSatisfaction(call: any): {
 }
 
 /**
- * Vapi's transcript comes back as one plain-text block with "AI: ..." /
- * "User: ..." (or "Assistant:"/"Customer:") line prefixes. Split it into
- * the { role, text }[] shape the dashboard's transcript viewer expects.
+ * Confirmed against Vapi's List Calls API reference: call.artifact.messages
+ * is a structured array with a `role` and `message` (not `content`) field
+ * per turn, plus secondsFromStart/time. This is far more reliable than
+ * regex-parsing the flat call.transcript text block, which was the
+ * earlier (unverified) approach and is why the transcript viewer was
+ * coming back empty.
  */
-export function parseTranscript(transcript: string | undefined): { role: "assistant" | "client"; text: string }[] {
-  if (!transcript) return [];
-  const lines = transcript.split("\n").filter((l) => l.trim().length > 0);
-  const turns: { role: "assistant" | "client"; text: string }[] = [];
+export function parseTranscript(call: any): { role: "assistant" | "client"; text: string }[] {
+  const messages = call?.artifact?.messages;
+  if (Array.isArray(messages) && messages.length > 0) {
+    return messages
+      .filter((m: any) => m?.message && typeof m.message === "string" && m.message.trim().length > 0)
+      .map((m: any) => {
+        const roleRaw = String(m.role || "").toLowerCase();
+        const role: "assistant" | "client" =
+          roleRaw === "bot" || roleRaw === "assistant" || roleRaw === "system" ? "assistant" : "client";
+        return { role, text: m.message.trim() };
+      });
+  }
 
+  // Fallback: some older calls may only have the flat transcript string.
+  const transcript: string | undefined = call?.transcript || call?.artifact?.transcript;
+  if (!transcript) return [];
+  const lines = transcript.split("\n").filter((l: string) => l.trim().length > 0);
+  const turns: { role: "assistant" | "client"; text: string }[] = [];
   for (const line of lines) {
-    const match = line.match(/^(AI|Assistant|User|Customer|Client)\s*:\s*(.*)$/i);
+    const match = line.match(/^(AI|Assistant|User|Customer|Client|Bot)\s*:\s*(.*)$/i);
     if (match) {
       const roleRaw = match[1]?.toLowerCase() || "";
-      const role: "assistant" | "client" = roleRaw === "ai" || roleRaw === "assistant" ? "assistant" : "client";
+      const role: "assistant" | "client" = roleRaw === "ai" || roleRaw === "assistant" || roleRaw === "bot" ? "assistant" : "client";
       turns.push({ role, text: (match[2] || "").trim() });
     } else if (turns.length > 0) {
-      // Continuation of the previous turn (no new speaker prefix on this line)
       const last = turns[turns.length - 1];
       if (last) last.text += " " + line.trim();
     }

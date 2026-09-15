@@ -47,7 +47,7 @@ export const Route = createFileRoute("/api/vapi-call-detail")({
             recordingUrl: `/api/vapi-call-audio?callId=${encodeURIComponent(call.id)}`,
             callSummary,
             satisfaction,
-            turns: parseTranscript(call.transcript || call.artifact?.transcript),
+            turns: parseTranscript(call),
           };
 
           return new Response(JSON.stringify(detail), {
