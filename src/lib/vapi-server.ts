@@ -49,53 +49,50 @@ export function extractClientName(call: any): string {
 }
 
 /**
- * Vapi has TWO separate systems that can produce this data, and which one
- * is active depends entirely on how the assistant was configured:
- *
- * 1. Legacy `assistant.analysisPlan` -> call.analysis.summary (plain string)
- *    and call.analysis.structuredData (flat object, single schema).
- * 2. Newer named "Structured Outputs" resources (confirmed at
- *    docs.vapi.ai/assistants/structured-outputs-quickstart) -> each one's
- *    result lands at call.artifact.structuredOutputs[outputId].result,
- *    keyed by the output's ID, which we don't know in advance.
- *
- * The n8n workflow that set this up was literally named "Call Summary +
- * Satisfaction Structured Output" (capital S, matching system 2's naming),
- * so that's checked first, with system 1 as a fallback.
+ * CONFIRMED against real call data from the Vapi dashboard (structured output
+ * named "Voice Call Summary and Satisfaction"): the result object has
+ * `summary`, `satisfaction_tone`, `satisfaction_clarity`, `satisfaction_overall`,
+ * `satisfaction_resolution` - all nested inside
+ * call.artifact.structuredOutputs[outputId].result. There is no
+ * call.analysis.summary for these calls; the summary lives inside this same
+ * structured output alongside the scores, not on the analysis object at all.
  */
 export function extractSummaryAndSatisfaction(call: any): {
   callSummary: string | undefined;
   satisfaction: { clarity: number | null; tone: number | null; resolution: number | null; overall: number | null } | null;
 } {
-  // System 2: newer Structured Outputs, keyed by an output ID we don't know —
-  // take the first result that actually looks like a satisfaction payload.
   const structuredOutputs = call?.artifact?.structuredOutputs;
-  let outputResult: any = null;
+  let result: any = null;
   if (structuredOutputs && typeof structuredOutputs === "object") {
     for (const value of Object.values(structuredOutputs)) {
-      const result = (value as any)?.result;
-      if (result && typeof result === "object") {
-        outputResult = result;
+      const r = (value as any)?.result;
+      if (r && typeof r === "object") {
+        result = r;
         break;
       }
     }
   }
 
-  // System 1: legacy analysisPlan structured data
-  const legacyStructuredData = call?.analysis?.structuredData;
+  // Fallback for calls that might use the legacy analysisPlan instead
+  const legacy = call?.analysis?.structuredData;
 
-  const structured = outputResult || legacyStructuredData;
+  const summary: string | undefined = result?.summary || call?.analysis?.summary || legacy?.summary;
 
-  const summary: string | undefined = call?.analysis?.summary || structured?.summary;
-
-  const satisfaction = structured
+  const satisfaction = result
     ? {
-        clarity: structured.clarity ?? null,
-        tone: structured.tone ?? null,
-        resolution: structured.resolution ?? null,
-        overall: structured.overall ?? structured.overall_score ?? null,
+        clarity: result.satisfaction_clarity ?? null,
+        tone: result.satisfaction_tone ?? null,
+        resolution: result.satisfaction_resolution ?? null,
+        overall: result.satisfaction_overall ?? null,
       }
-    : null;
+    : legacy
+      ? {
+          clarity: legacy.clarity ?? null,
+          tone: legacy.tone ?? null,
+          resolution: legacy.resolution ?? null,
+          overall: legacy.overall ?? null,
+        }
+      : null;
 
   return { callSummary: summary, satisfaction };
 }
