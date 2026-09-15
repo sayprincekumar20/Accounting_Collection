@@ -1,11 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { vapiFetch } from "@/lib/vapi-server";
 
-// Direct Vapi API call — replaces the old N8N_WEBHOOK_BASE_URL proxy
-// (n8n's "voice-recording-proxy" webhook). Same behavior: fetch the call
-// detail server-side (with our auth), pull the recording URL, download the
-// bytes server-side, and stream them back — the browser never touches
-// Vapi's locked-down R2 URL directly.
+// Fetches the call recording via Vapi's authenticated download endpoint.
+//
+// IMPORTANT (verified against docs.vapi.ai/security-and-privacy/retrieve-call-artifacts):
+// call.artifact.recordingUrl / stereoRecordingUrl are DEPRECATED as of Vapi's
+// August 2025 changelog. Recordings now live behind:
+//   GET https://api.vapi.ai/call/{id}/mono-recording
+//   GET https://api.vapi.ai/call/{id}/stereo-recording
+// sent with `Authorization: Bearer <VAPI_PRIVATE_KEY>`, which responds with a
+// 302 redirect to a short-lived signed URL. fetch() follows redirects by
+// default, so this just streams whatever comes back.
 
 export const Route = createFileRoute("/api/vapi-call-audio")({
   server: {
@@ -21,24 +25,10 @@ export const Route = createFileRoute("/api/vapi-call-audio")({
             });
           }
 
-          const call = await vapiFetch<any>(`/call/${encodeURIComponent(callId)}`);
-          // VERIFY against a real completed call: Vapi has used different keys
-          // across API versions for this (recordingUrl at the top level vs.
-          // nested under artifact). Try the common ones in order.
-          const recordingUrl: string | undefined =
-            call?.artifact?.recordingUrl ||
-            call?.artifact?.stereoRecordingUrl ||
-            call?.recordingUrl ||
-            call?.artifact?.mono?.recordingUrl;
+          const audioRes = await fetch(`https://api.vapi.ai/call/${encodeURIComponent(callId)}/mono-recording`, {
+            headers: { Authorization: `Bearer ${process.env["VAPI_PRIVATE_KEY"] || ""}` },
+          });
 
-          if (!recordingUrl) {
-            return new Response(JSON.stringify({ error: "Recording not available" }), {
-              status: 404,
-              headers: { "Content-Type": "application/json" },
-            });
-          }
-
-          const audioRes = await fetch(recordingUrl);
           if (!audioRes.ok || !audioRes.body) {
             return new Response(JSON.stringify({ error: "Recording not available" }), {
               status: audioRes.status || 502,

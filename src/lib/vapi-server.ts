@@ -55,26 +55,27 @@ export function extractClientName(call: any): string {
  * call.artifact.structuredOutputs depending on API version — try both.
  * VERIFY the actual key against a real completed call before relying on this.
  */
+/**
+ * Confirmed against Vapi's official docs (docs.vapi.ai/assistants/call-analysis):
+ * call.analysis.summary is the plain call summary, and call.analysis.structuredData
+ * holds whatever fields were configured in assistant.analysisPlan.structuredDataPlan
+ * (or a linked Structured Output resource) — in this case the satisfaction
+ * sub-scores. There is no artifact.structuredOutputs field; that was an earlier
+ * unverified guess and has been removed.
+ */
 export function extractSummaryAndSatisfaction(call: any): {
   callSummary: string | undefined;
   satisfaction: { clarity: number | null; tone: number | null; resolution: number | null; overall: number | null } | null;
 } {
-  const structured =
-    call?.analysis?.structuredData ||
-    call?.artifact?.structuredOutputs ||
-    call?.analysis?.summary
-      ? call?.analysis
-      : null;
+  const summary: string | undefined = call?.analysis?.summary;
+  const structuredData = call?.analysis?.structuredData;
 
-  const summary: string | undefined = call?.analysis?.summary || structured?.summary;
-
-  const satisfactionSrc = structured?.satisfaction || structured;
-  const satisfaction = satisfactionSrc
+  const satisfaction = structuredData
     ? {
-        clarity: satisfactionSrc.clarity ?? null,
-        tone: satisfactionSrc.tone ?? null,
-        resolution: satisfactionSrc.resolution ?? null,
-        overall: satisfactionSrc.overall ?? satisfactionSrc.overall_score ?? null,
+        clarity: structuredData.clarity ?? null,
+        tone: structuredData.tone ?? null,
+        resolution: structuredData.resolution ?? null,
+        overall: structuredData.overall ?? structuredData.overall_score ?? null,
       }
     : null;
 
