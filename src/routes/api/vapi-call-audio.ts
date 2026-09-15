@@ -1,15 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// Fetches the call recording via Vapi's authenticated download endpoint.
-//
-// IMPORTANT (verified against docs.vapi.ai/security-and-privacy/retrieve-call-artifacts):
-// call.artifact.recordingUrl / stereoRecordingUrl are DEPRECATED as of Vapi's
-// August 2025 changelog. Recordings now live behind:
+// Fetches the call recording via Vapi's authenticated download endpoint,
+// per docs.vapi.ai/security-and-privacy/retrieve-call-artifacts:
 //   GET https://api.vapi.ai/call/{id}/mono-recording
-//   GET https://api.vapi.ai/call/{id}/stereo-recording
-// sent with `Authorization: Bearer <VAPI_PRIVATE_KEY>`, which responds with a
-// 302 redirect to a short-lived signed URL. fetch() follows redirects by
-// default, so this just streams whatever comes back.
+//   Authorization: Bearer <VAPI_PRIVATE_KEY>
+// -> responds with a 302 redirect to a short-lived signed URL. fetch()
+// follows redirects by default (explicit here for clarity), so this
+// should transparently receive the actual audio bytes.
+//
+// If this still fails, the JSON error body now includes Vapi's real
+// upstream status and response text (visible in the Network tab or by
+// hitting this route directly in the browser) instead of a generic
+// message, so the actual cause is visible without a separate curl test.
 
 export const Route = createFileRoute("/api/vapi-call-audio")({
   server: {
@@ -25,15 +27,35 @@ export const Route = createFileRoute("/api/vapi-call-audio")({
             });
           }
 
+          const privateKey = (process.env["VAPI_PRIVATE_KEY"] || "").trim();
+          if (!privateKey) {
+            return new Response(JSON.stringify({ error: "VAPI_PRIVATE_KEY is not set on the server" }), {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+
           const audioRes = await fetch(`https://api.vapi.ai/call/${encodeURIComponent(callId)}/mono-recording`, {
-            headers: { Authorization: `Bearer ${process.env["VAPI_PRIVATE_KEY"] || ""}` },
+            headers: { Authorization: `Bearer ${privateKey}` },
+            redirect: "follow",
           });
 
           if (!audioRes.ok || !audioRes.body) {
-            return new Response(JSON.stringify({ error: "Recording not available" }), {
-              status: audioRes.status || 502,
-              headers: { "Content-Type": "application/json" },
-            });
+            const upstreamBody = await audioRes.text().catch(() => "");
+            console.error(
+              `[vapi-call-audio] Vapi returned ${audioRes.status} for call ${callId}. Body: ${upstreamBody.slice(0, 500)}`,
+            );
+            return new Response(
+              JSON.stringify({
+                error: "Recording not available",
+                vapiStatus: audioRes.status,
+                vapiResponse: upstreamBody.slice(0, 500),
+              }),
+              {
+                status: audioRes.status || 502,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
           }
 
           return new Response(audioRes.body, {
@@ -45,7 +67,7 @@ export const Route = createFileRoute("/api/vapi-call-audio")({
           });
         } catch (err) {
           console.error("[vapi-call-audio] fetch error:", err);
-          return new Response(JSON.stringify({ error: "Failed to fetch call recording" }), {
+          return new Response(JSON.stringify({ error: "Failed to fetch call recording", detail: String(err) }), {
             status: 500,
             headers: { "Content-Type": "application/json" },
           });
