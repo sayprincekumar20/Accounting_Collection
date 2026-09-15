@@ -94,31 +94,34 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
             rawThreads.push(...chunkResults.filter(Boolean));
           }
 
-          const threads = rawThreads.map((thread) => {
-            const lastMessage = thread.messages[thread.messages.length - 1];
-            const headers = lastMessage.payload?.headers;
-            const fromRaw = getHeader(headers, "From");
-            const toRaw = getHeader(headers, "To");
-            const fromParsed = parseSender(fromRaw);
-            const toParsed = parseSender(toRaw);
-            const isOutbound = fromParsed.email === GMAIL_BUSINESS_EMAIL.toLowerCase();
-            const otherPartyEmail = isOutbound ? toParsed.email : fromParsed.email;
+          const threads = rawThreads
+            .map((thread) => {
+              const lastMessage = thread.messages[thread.messages.length - 1];
+              const headers = lastMessage.payload?.headers;
+              const fromRaw = getHeader(headers, "From");
+              const toRaw = getHeader(headers, "To");
+              const fromParsed = parseSender(fromRaw);
+              const toParsed = parseSender(toRaw);
+              const isOutbound = fromParsed.email === GMAIL_BUSINESS_EMAIL.toLowerCase();
+              const otherPartyEmail = isOutbound ? toParsed.email : fromParsed.email;
 
-            const client = clients.find((c) => (c.email || "").toLowerCase() === otherPartyEmail);
+              const client = clients.find((c) => (c.email || "").toLowerCase() === otherPartyEmail);
+              if (!client) return null; // not a known client — drop unrelated inbox mail (newsletters, personal, etc.)
 
-            return {
-              client_id: client?.client_id ?? otherPartyEmail,
-              client_name: client?.client_name ?? (isOutbound ? toParsed.name : fromParsed.name) ?? otherPartyEmail,
-              contact_person: client?.contact_person ?? "",
-              thread_id: thread.id,
-              notified_ar: client ? escalatedClientIds.has(client.client_id) : false,
-              promise_recorded: client ? promisedClientIds.has(client.client_id) : false,
-              message_count: thread.messages.length,
-              lastMessagePreview: lastMessage.snippet || "",
-              lastDirection: isOutbound ? "outbound" : "inbound",
-              lastMessageAt: getHeader(headers, "Date"),
-            };
-          });
+              return {
+                client_id: client.client_id,
+                client_name: client.client_name,
+                contact_person: client.contact_person ?? "",
+                thread_id: thread.id,
+                notified_ar: escalatedClientIds.has(client.client_id),
+                promise_recorded: promisedClientIds.has(client.client_id),
+                message_count: thread.messages.length,
+                lastMessagePreview: lastMessage.snippet || "",
+                lastDirection: isOutbound ? "outbound" : "inbound",
+                lastMessageAt: getHeader(headers, "Date"),
+              };
+            })
+            .filter((t): t is NonNullable<typeof t> => t !== null);
 
           threads.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
 
