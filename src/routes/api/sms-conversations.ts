@@ -12,23 +12,15 @@ import { fetchRecentMessages } from "@/lib/telerivet-server";
 // own bookkeeping, written to n8n's promise_history / escalations tables
 // only. We fetch those two (same webhooks /api/promise-history and
 // /api/escalations already call) and match them onto conversations by
-// phone number.
-//
-// PER-MESSAGE correlation: both n8n subworkflows (Record Payment Promise /
-// Log Escalation) stamp an exact `recorded_at` timestamp at the moment
-// AR_Reply_Agent made the call — which happens synchronously, within
-// seconds of the triggering message. So each promise/escalation entry is
-// matched to whichever message in that phone's thread is closest in time,
-// within a tolerance window. Outside that window it still counts at the
-// CONVERSATION level (stat card, list badge) even if no single message
-// can be confidently pinned.
-
-const CORRELATION_WINDOW_MS = 3 * 60 * 1000; // 3 minutes
+// phone number / client_id — the same identity key used to group the
+// conversation in the first place. This is a hard identity match, not a
+// timestamp-proximity guess, so there's no tolerance window to tune or
+// get wrong. Per-message flags are intentionally left unset — only the
+// conversation-level badge and stat count are populated.
 
 interface HistoryEntry {
   client_id: string;
   channel: string;
-  recorded_at: string;
 }
 
 interface ConversationOut {
@@ -36,36 +28,13 @@ interface ConversationOut {
   client_name: string;
   notified_ar: boolean;
   promise_recorded: boolean;
-  messages: { role: "ai" | "client"; content: string; ts: string; promise_recorded?: boolean; notified_ar?: boolean }[];
+  messages: { role: "ai" | "client"; content: string; ts: string }[];
   lastMessageAt: string;
   lastMessagePreview: string;
 }
 
 function digits(v: string | null | undefined) {
   return (v || "").replace(/\D/g, "");
-}
-
-/** Marks the message closest in time to `at`, if within CORRELATION_WINDOW_MS. */
-function markNearestMessage(
-  messages: ConversationOut["messages"],
-  at: string,
-  flag: "promise_recorded" | "notified_ar",
-) {
-  const target = new Date(at).getTime();
-  if (Number.isNaN(target) || messages.length === 0) return;
-
-  let closest = messages[0]!;
-  let closestDelta = Math.abs(new Date(closest.ts).getTime() - target);
-  for (const m of messages) {
-    const delta = Math.abs(new Date(m.ts).getTime() - target);
-    if (delta < closestDelta) {
-      closest = m;
-      closestDelta = delta;
-    }
-  }
-  if (closestDelta <= CORRELATION_WINDOW_MS) {
-    closest[flag] = true;
-  }
 }
 
 export const Route = createFileRoute("/api/sms-conversations")({
@@ -83,22 +52,13 @@ export const Route = createFileRoute("/api/sms-conversations")({
           const promises: HistoryEntry[] = promisesRes.promises ?? [];
           const escalations: HistoryEntry[] = escalationsRes.escalations ?? [];
 
-          const smsPromisesByPhone = new Map<string, HistoryEntry[]>();
-          for (const p of promises) {
-            if (p.channel !== "sms") continue;
-            const phoneDigits = digits(p.client_id.split("___").pop());
-            if (!phoneDigits) continue;
-            if (!smsPromisesByPhone.has(phoneDigits)) smsPromisesByPhone.set(phoneDigits, []);
-            smsPromisesByPhone.get(phoneDigits)!.push(p);
-          }
-          const smsEscalationsByPhone = new Map<string, HistoryEntry[]>();
-          for (const e of escalations) {
-            if (e.channel !== "sms") continue;
-            const phoneDigits = digits(e.client_id.split("___").pop());
-            if (!phoneDigits) continue;
-            if (!smsEscalationsByPhone.has(phoneDigits)) smsEscalationsByPhone.set(phoneDigits, []);
-            smsEscalationsByPhone.get(phoneDigits)!.push(e);
-          }
+          // Match by phone digits pulled out of client_id ("parent___phone" or bare phone)
+          const promisedPhones = new Set(
+            promises.filter((p) => p.channel === "sms").map((p) => digits(p.client_id.split("___").pop())),
+          );
+          const escalatedPhones = new Set(
+            escalations.filter((e) => e.channel === "sms").map((e) => digits(e.client_id.split("___").pop())),
+          );
 
           const byPhone = new Map<string, ConversationOut>();
 
@@ -114,8 +74,8 @@ export const Route = createFileRoute("/api/sms-conversations")({
               byPhone.set(phoneDigits, {
                 client_id: phoneDigits,
                 client_name: "",
-                notified_ar: smsEscalationsByPhone.has(phoneDigits),
-                promise_recorded: smsPromisesByPhone.has(phoneDigits),
+                notified_ar: escalatedPhones.has(phoneDigits),
+                promise_recorded: promisedPhones.has(phoneDigits),
                 messages: [],
                 lastMessageAt: "",
                 lastMessagePreview: "",
@@ -131,16 +91,6 @@ export const Route = createFileRoute("/api/sms-conversations")({
             });
             convo.lastMessageAt = ts;
             convo.lastMessagePreview = (m.content || "").slice(0, 140);
-          }
-
-          // Correlate each promise/escalation entry to its nearest message by timestamp
-          for (const [phoneDigits, convo] of byPhone) {
-            for (const p of smsPromisesByPhone.get(phoneDigits) || []) {
-              markNearestMessage(convo.messages, p.recorded_at, "promise_recorded");
-            }
-            for (const e of smsEscalationsByPhone.get(phoneDigits) || []) {
-              markNearestMessage(convo.messages, e.recorded_at, "notified_ar");
-            }
           }
 
           const conversations = Array.from(byPhone.values()).sort(
