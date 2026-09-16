@@ -102,17 +102,19 @@ export interface Attachment {
   filename: string;
   mimeType: string;
   size: number;
+  attachmentId: string;
 }
 
 export function extractAttachments(payload: any): Attachment[] {
   const out: Attachment[] = [];
   function walk(part: any) {
     if (!part) return;
-    if (part.filename && part.filename.length > 0) {
+    if (part.filename && part.filename.length > 0 && part.body?.attachmentId) {
       out.push({
         filename: part.filename,
         mimeType: part.mimeType || "application/octet-stream",
         size: part.body?.size ?? 0,
+        attachmentId: part.body.attachmentId,
       });
     }
     if (part.parts) for (const p of part.parts) walk(p);

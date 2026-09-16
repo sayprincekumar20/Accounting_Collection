@@ -42,6 +42,8 @@ interface ThreadAttachment {
   filename: string;
   mimeType: string;
   size: number;
+  attachmentId: string;
+  messageId: string;
 }
 interface ThreadMessage {
   messageId: string;
@@ -480,12 +482,15 @@ function EmailInbox() {
                         {m.attachments?.length ? (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {m.attachments.map((a) => (
-                              <span
-                                key={a.filename}
-                                className="rounded-lg border border-border bg-muted px-2.5 py-1 text-xs"
+                              <a
+                                key={a.attachmentId}
+                                href={`/api/gmail-attachment?messageId=${encodeURIComponent(a.messageId)}&attachmentId=${encodeURIComponent(a.attachmentId)}&filename=${encodeURIComponent(a.filename)}&mimeType=${encodeURIComponent(a.mimeType)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="rounded-lg border border-border bg-muted px-2.5 py-1 text-xs hover:bg-accent hover:underline"
                               >
-                                {a.filename}
-                              </span>
+                                📎 {a.filename}
+                              </a>
                             ))}
                           </div>
                         ) : null}

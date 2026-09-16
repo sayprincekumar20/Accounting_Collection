@@ -37,7 +37,7 @@ export const Route = createFileRoute("/api/gmail-thread-detail")({
                 subject: getHeader(headers, "Subject") || threadSubject,
                 date: getHeader(headers, "Date"),
                 body: extractBody(m.payload),
-                attachments: extractAttachments(m.payload),
+                attachments: extractAttachments(m.payload).map((a) => ({ ...a, messageId: m.id })),
                 direction: isOutbound ? "outbound" : "inbound",
               };
             })
