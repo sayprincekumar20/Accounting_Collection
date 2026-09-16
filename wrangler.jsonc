@@ -1,0 +1,16 @@
+{
+  "name": "accounting-collection-dashboard",
+  "main": "./.output/server/index.mjs",
+  "compatibility_date": "2025-01-01",
+  // Required: several routes use Node's Buffer (gmail-server.ts, telerivet-server.ts,
+  // vapi-call-audio.ts, gmail-attachment.ts). Without this flag those crash at runtime
+  // even though the build succeeds.
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./.output/public",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

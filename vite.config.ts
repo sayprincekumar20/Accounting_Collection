@@ -6,9 +6,8 @@ import tailwindcss from "@tailwindcss/vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 
 // Plain TanStack Start + Nitro config (no platform-specific wrapper).
-// preset: "node-server" builds a native Node.js server - the format Render
-// (and most non-serverless hosts) expects. Switch this if you ever deploy
-// elsewhere: "cloudflare-module" for Cloudflare Workers, "vercel" for Vercel, etc.
+// preset: "cloudflare-module" builds a Cloudflare Workers-compatible bundle.
+// Switch back to "node-server" if you ever return to Render, or "vercel" for Vercel.
 export default defineConfig({
   plugins: [
     tsConfigPaths({ projects: ["./tsconfig.json"] }),
@@ -16,7 +15,7 @@ export default defineConfig({
     tanstackStart(),
     // Redirect the generated server entry to our own src/server.ts, which wraps
     // TanStack Start's handler with SSR error handling (see that file for why).
-    nitro({ preset: "node-server" }),
+    nitro({ preset: "cloudflare-module" }),
     viteReact(),
   ],
   environments: {
