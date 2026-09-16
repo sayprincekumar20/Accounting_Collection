@@ -11,7 +11,18 @@
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1";
 
-export const GMAIL_BUSINESS_EMAIL = process.env["GMAIL_BUSINESS_EMAIL"] || "";
+/**
+ * IMPORTANT: this must be a function, not a module-level constant. Per
+ * Nitro's own Cloudflare docs: "Make sure to only access environment
+ * variables within the event lifecycle and not in global contexts, since
+ * Cloudflare only makes them available during the request lifecycle and
+ * not before." A `const X = process.env.X` at module scope evaluates once
+ * at cold start / import time, before any request exists, and silently
+ * gets an empty string on Workers - this was a real, confirmed bug.
+ */
+export function getGmailBusinessEmail(): string {
+  return process.env["GMAIL_BUSINESS_EMAIL"] || "";
+}
 
 let cachedToken: { accessToken: string; expiresAt: number } | null = null;
 

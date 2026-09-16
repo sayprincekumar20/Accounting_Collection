@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getAccessToken, gmailFetch, getHeader, parseSender, GMAIL_BUSINESS_EMAIL } from "@/lib/gmail-server";
+import { getAccessToken, gmailFetch, getHeader, parseSender, getGmailBusinessEmail } from "@/lib/gmail-server";
 
 // Direct Gmail API call — replaces the old N8N_WEBHOOK_BASE_URL proxy.
 // Matches the real ThreadListItem contract from email.tsx exactly:
@@ -102,7 +102,7 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
               const toRaw = getHeader(headers, "To");
               const fromParsed = parseSender(fromRaw);
               const toParsed = parseSender(toRaw);
-              const isOutbound = fromParsed.email === GMAIL_BUSINESS_EMAIL.toLowerCase();
+              const isOutbound = fromParsed.email === getGmailBusinessEmail().toLowerCase();
               const otherPartyEmail = isOutbound ? toParsed.email : fromParsed.email;
 
               const client = clients.find((c) => (c.email || "").toLowerCase() === otherPartyEmail);
