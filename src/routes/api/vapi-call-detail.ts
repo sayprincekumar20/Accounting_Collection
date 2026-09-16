@@ -42,9 +42,17 @@ export const Route = createFileRoute("/api/vapi-call-detail")({
             startedAt,
             durationSeconds,
             cost: call.cost ?? 0,
-            // recordingUrl deliberately points at OUR proxy route, not Vapi's raw
-            // R2 URL — vapi-call-audio.ts is what actually streams the bytes.
-            recordingUrl: `/api/vapi-call-audio?callId=${encodeURIComponent(call.id)}`,
+            // recordingUrl points at OUR proxy route, not Vapi's raw R2 URL —
+            // vapi-call-audio.ts is what actually streams the bytes. Only set
+            // it when Vapi actually reports a recording exists for this call
+            // (call.recordingUrl or call.artifact.recordingUrl) — this was
+            // previously hardcoded to always be truthy, so the player showed
+            // up (and silently failed to load) even for calls with no
+            // recording at all (e.g. never connected).
+            recordingUrl:
+              call.recordingUrl || call.artifact?.recordingUrl
+                ? `/api/vapi-call-audio?callId=${encodeURIComponent(call.id)}`
+                : null,
             callSummary,
             satisfaction,
             turns: parseTranscript(call),

@@ -21,6 +21,12 @@ interface HistoryEntry {
   channel: string;
 }
 
+interface ClientRow {
+  client_id: string;
+  client_name: string;
+  phone: string;
+}
+
 interface ConversationOut {
   client_id: string; // phone digits — matches page's phoneDigitsFromClientId() expectation
   client_name: string;
@@ -42,14 +48,22 @@ export const Route = createFileRoute("/api/whatsapp-conversations")({
         try {
           const ourNumber = digits(process.env["TWILIO_WHATSAPP_NUMBER"]);
 
-          const [messages, promisesRes, escalationsRes] = await Promise.all([
+          const [messages, promisesRes, escalationsRes, clientsRes] = await Promise.all([
             fetchRecentWhatsAppMessages({}),
             fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/promise-history-list`).then((r) => r.json()),
             fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/escalations-list`).then((r) => r.json()),
+            fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/clients-list`).then((r) => r.json()),
           ]);
 
           const promises: HistoryEntry[] = promisesRes.promises ?? [];
           const escalations: HistoryEntry[] = escalationsRes.escalations ?? [];
+          const clients: ClientRow[] = clientsRes.clients ?? [];
+
+          const nameByPhone = new Map<string, string>();
+          for (const c of clients) {
+            const d = digits(c.phone).slice(-10);
+            if (d) nameByPhone.set(d, c.client_name);
+          }
 
           // Match by phone digits pulled out of client_id ("parent___phone" or bare phone)
           const promisedPhones = new Set(
@@ -80,7 +94,7 @@ export const Route = createFileRoute("/api/whatsapp-conversations")({
             if (!byPhone.has(otherPartyDigits)) {
               byPhone.set(otherPartyDigits, {
                 client_id: otherPartyDigits,
-                client_name: "",
+                client_name: nameByPhone.get(otherPartyDigits.slice(-10)) || "",
                 notified_ar: escalatedPhones.has(otherPartyDigits),
                 promise_recorded: promisedPhones.has(otherPartyDigits),
                 messages: [],

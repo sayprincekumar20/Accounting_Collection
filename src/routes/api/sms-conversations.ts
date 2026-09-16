@@ -23,6 +23,12 @@ interface HistoryEntry {
   channel: string;
 }
 
+interface ClientRow {
+  client_id: string;
+  client_name: string;
+  phone: string;
+}
+
 interface ConversationOut {
   client_id: string; // matches page's phoneDigitsFromClientId() expectation — no "parent___" prefix needed, just the phone
   client_name: string;
@@ -43,14 +49,26 @@ export const Route = createFileRoute("/api/sms-conversations")({
       GET: async () => {
         try {
           const phoneId = process.env["TELERIVET_SMS_PHONE_ID"]; // optional but recommended
-          const [messages, promisesRes, escalationsRes] = await Promise.all([
+          const [messages, promisesRes, escalationsRes, clientsRes] = await Promise.all([
             fetchRecentMessages(phoneId ? { phoneId } : {}),
             fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/promise-history-list`).then((r) => r.json()),
             fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/escalations-list`).then((r) => r.json()),
+            fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/clients-list`).then((r) => r.json()),
           ]);
 
           const promises: HistoryEntry[] = promisesRes.promises ?? [];
           const escalations: HistoryEntry[] = escalationsRes.escalations ?? [];
+          const clients: ClientRow[] = clientsRes.clients ?? [];
+
+          // Build a phone-digits -> client_name lookup once, same normalization
+          // used everywhere else in this file (last-10-digits match, so it's
+          // tolerant of country-code prefix differences between Telerivet's
+          // numbers and however the Clients table stores phone).
+          const nameByPhone = new Map<string, string>();
+          for (const c of clients) {
+            const d = digits(c.phone).slice(-10);
+            if (d) nameByPhone.set(d, c.client_name);
+          }
 
           // Match by phone digits pulled out of client_id ("parent___phone" or bare phone)
           const promisedPhones = new Set(
@@ -73,7 +91,7 @@ export const Route = createFileRoute("/api/sms-conversations")({
             if (!byPhone.has(phoneDigits)) {
               byPhone.set(phoneDigits, {
                 client_id: phoneDigits,
-                client_name: "",
+                client_name: nameByPhone.get(phoneDigits.slice(-10)) || "",
                 notified_ar: escalatedPhones.has(phoneDigits),
                 promise_recorded: promisedPhones.has(phoneDigits),
                 messages: [],
