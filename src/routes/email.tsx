@@ -252,7 +252,7 @@ function EmailInbox() {
   const promiseCount = threads.filter((t) => t.promise_recorded).length;
 
   return (
-    <AppShell title="Logs" subtitle="Email threads · Gmail · relayed by n8n · live">
+    <AppShell title="Logs" subtitle="Email threads · Gmail · live">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total threads" value={String(threads.length)} tone="primary" />
         <StatCard label="Replied" value={String(replied)} />
@@ -371,7 +371,7 @@ function EmailInbox() {
               {error ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-sm text-destructive">
-                    Could not load Gmail threads from n8n.
+                    Could not load Gmail threads.
                   </td>
                 </tr>
               ) : null}
