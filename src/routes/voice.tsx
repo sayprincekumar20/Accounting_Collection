@@ -289,9 +289,14 @@ function VoiceLogs() {
   const clients = clientsData ?? [];
 
   const [active, setActive] = useState<string | null>(null);
+  const [audioFailed, setAudioFailed] = useState(false);
   const activeItem = calls.find((c) => c.call_id === active) ?? null;
   const activeClient = activeItem ? clients.find((cl) => cl.client_id === activeItem.client_id) : undefined;
   const { data: detail } = useCallDetail(activeItem?.call_id ?? null);
+
+  useEffect(() => {
+    setAudioFailed(false);
+  }, [activeItem?.call_id]);
 
   useEffect(() => {
     if (!activeItem) return;
@@ -567,12 +572,13 @@ function VoiceLogs() {
                 <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
                   Recording
                 </h3>
-                {detail?.recordingUrl ? (
+                {detail?.recordingUrl && !audioFailed ? (
                   <audio
                     controls
                     preload="none"
                     src={`/api/vapi-call-audio?callId=${encodeURIComponent(activeItem.call_id)}`}
                     className="w-full"
+                    onError={() => setAudioFailed(true)}
                   />
                 ) : (
                   <p className="rounded-lg border border-dashed border-border px-4 py-3 text-xs text-muted-foreground">
