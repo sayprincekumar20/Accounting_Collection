@@ -1,3 +1,4 @@
+import { getEnv } from "@/lib/env";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/api/promise-history")({
@@ -5,7 +6,7 @@ export const Route = createFileRoute("/api/promise-history")({
     handlers: {
       GET: async () => {
         try {
-          const res = await fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/promise-history-list`);
+          const res = await fetch(`${await getEnv("N8N_WEBHOOK_BASE_URL")}/promise-history-list`);
           const body = await res.text();
           return new Response(body, {
             status: res.status,

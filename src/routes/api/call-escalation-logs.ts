@@ -1,3 +1,4 @@
+import { getEnv } from "@/lib/env";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/api/call-escalation-logs")({
@@ -14,7 +15,7 @@ export const Route = createFileRoute("/api/call-escalation-logs")({
             });
           }
           const res = await fetch(
-            `${process.env["N8N_WEBHOOK_BASE_URL"]}/call-escalation-logs?callId=${encodeURIComponent(callId)}`,
+            `${await getEnv("N8N_WEBHOOK_BASE_URL")}/call-escalation-logs?callId=${encodeURIComponent(callId)}`,
           );
           
           // If 404, return empty logs instead of error

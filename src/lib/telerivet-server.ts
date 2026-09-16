@@ -9,10 +9,12 @@
 //                            don't mix the two channels' messages together. Find it
 //                            in Telerivet dashboard -> Phones -> the SMS route's ID.
 
+import { getEnv } from "@/lib/env";
+
 const TELERIVET_API = "https://api.telerivet.com/v1";
 
-function authHeader() {
-  const key = process.env["TELERIVET_API_KEY"] || "";
+async function authHeader() {
+  const key = (await getEnv("TELERIVET_API_KEY")) || "";
   // Telerivet uses HTTP Basic auth: API key as username, empty password.
   return { Authorization: `Basic ${Buffer.from(`${key}:`).toString("base64")}` };
 }
@@ -39,7 +41,7 @@ export async function fetchRecentMessages(opts: {
   pageSize?: number;
   maxPages?: number;
 }): Promise<TelerivetMessage[]> {
-  const projectId = process.env["TELERIVET_PROJECT_ID"] || "";
+  const projectId = (await getEnv("TELERIVET_PROJECT_ID")) || "";
   const pageSize = opts.pageSize ?? 200;
   const maxPages = opts.maxPages ?? 5;
 
@@ -56,7 +58,7 @@ export async function fetchRecentMessages(opts: {
     if (cursor) params.set("cursor", cursor);
 
     const res = await fetch(`${TELERIVET_API}/projects/${projectId}/messages?${params.toString()}`, {
-      headers: authHeader(),
+      headers: await authHeader(),
     });
     if (!res.ok) {
       const body = await res.text();

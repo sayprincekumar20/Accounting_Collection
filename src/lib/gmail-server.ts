@@ -8,20 +8,22 @@
 //   GMAIL_REFRESH_TOKEN
 //   GMAIL_BUSINESS_EMAIL   e.g. "prince@rareglobalfood.com"
 
+import { getEnv } from "@/lib/env";
+
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1";
 
 /**
- * IMPORTANT: this must be a function, not a module-level constant. Per
- * Nitro's own Cloudflare docs: "Make sure to only access environment
- * variables within the event lifecycle and not in global contexts, since
- * Cloudflare only makes them available during the request lifecycle and
- * not before." A `const X = process.env.X` at module scope evaluates once
- * at cold start / import time, before any request exists, and silently
- * gets an empty string on Workers - this was a real, confirmed bug.
+ * IMPORTANT: this must be a function, not a module-level constant - AND it
+ * must read through getEnv() (the cloudflare:workers env binding), not
+ * plain process.env directly. On Cloudflare Workers, process.env is not
+ * reliably populated from the Worker's own "Variables and Secrets" unless
+ * something explicitly bridges Cloudflare's env into it, which this project
+ * doesn't have configured - this was a real, confirmed bug (every route
+ * failed with things like `Invalid URL: undefined/clients-list`).
  */
-export function getGmailBusinessEmail(): string {
-  return process.env["GMAIL_BUSINESS_EMAIL"] || "";
+export async function getGmailBusinessEmail(): Promise<string> {
+  return (await getEnv("GMAIL_BUSINESS_EMAIL")) || "";
 }
 
 let cachedToken: { accessToken: string; expiresAt: number } | null = null;
@@ -36,9 +38,9 @@ export async function getAccessToken(): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: process.env["GMAIL_CLIENT_ID"] || "",
-      client_secret: process.env["GMAIL_CLIENT_SECRET"] || "",
-      refresh_token: process.env["GMAIL_REFRESH_TOKEN"] || "",
+      client_id: (await getEnv("GMAIL_CLIENT_ID")) || "",
+      client_secret: (await getEnv("GMAIL_CLIENT_SECRET")) || "",
+      refresh_token: (await getEnv("GMAIL_REFRESH_TOKEN")) || "",
       grant_type: "refresh_token",
     }),
   });

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchRecentMessages } from "@/lib/telerivet-server";
+import { getEnv } from "@/lib/env";
 
 // Direct Telerivet API call — replaces the old N8N_WEBHOOK_BASE_URL proxy
 // to n8n's internal `conversations` table.
@@ -48,12 +49,13 @@ export const Route = createFileRoute("/api/sms-conversations")({
     handlers: {
       GET: async () => {
         try {
-          const phoneId = process.env["TELERIVET_SMS_PHONE_ID"]; // optional but recommended
+          const phoneId = await getEnv("TELERIVET_SMS_PHONE_ID"); // optional but recommended
+          const n8nBase = await getEnv("N8N_WEBHOOK_BASE_URL");
           const [messages, promisesRes, escalationsRes, clientsRes] = await Promise.all([
             fetchRecentMessages(phoneId ? { phoneId } : {}),
-            fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/promise-history-list`).then((r) => r.json()),
-            fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/escalations-list`).then((r) => r.json()),
-            fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/clients-list`).then((r) => r.json()),
+            fetch(`${n8nBase}/promise-history-list`).then((r) => r.json()),
+            fetch(`${n8nBase}/escalations-list`).then((r) => r.json()),
+            fetch(`${n8nBase}/clients-list`).then((r) => r.json()),
           ]);
 
           const promises: HistoryEntry[] = promisesRes.promises ?? [];

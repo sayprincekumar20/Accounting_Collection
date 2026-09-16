@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getAccessToken, gmailFetch, getHeader, parseSender, getGmailBusinessEmail } from "@/lib/gmail-server";
+import { getEnv } from "@/lib/env";
 
 // Direct Gmail API call — replaces the old N8N_WEBHOOK_BASE_URL proxy.
 // Matches the real ThreadListItem contract from email.tsx exactly:
@@ -60,11 +61,12 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
           const maxResults = url.searchParams.get("maxResults") || "40";
           const pageToken = url.searchParams.get("pageToken");
 
+          const n8nBase = await getEnv("N8N_WEBHOOK_BASE_URL");
           const [accessToken, clientsRes, promisesRes, escalationsRes] = await Promise.all([
             getAccessToken(),
-            fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/clients-list`).then((r) => r.json()),
-            fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/promise-history-list`).then((r) => r.json()),
-            fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/escalations-list`).then((r) => r.json()),
+            fetch(`${n8nBase}/clients-list`).then((r) => r.json()),
+            fetch(`${n8nBase}/promise-history-list`).then((r) => r.json()),
+            fetch(`${n8nBase}/escalations-list`).then((r) => r.json()),
           ]);
 
           const clients: ClientRow[] = clientsRes.clients ?? [];
@@ -94,6 +96,8 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
             rawThreads.push(...chunkResults.filter(Boolean));
           }
 
+          const businessEmail = (await getGmailBusinessEmail()).toLowerCase();
+
           const threads = rawThreads
             .map((thread) => {
               const lastMessage = thread.messages[thread.messages.length - 1];
@@ -102,7 +106,7 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
               const toRaw = getHeader(headers, "To");
               const fromParsed = parseSender(fromRaw);
               const toParsed = parseSender(toRaw);
-              const isOutbound = fromParsed.email === getGmailBusinessEmail().toLowerCase();
+              const isOutbound = fromParsed.email === businessEmail;
               const otherPartyEmail = isOutbound ? toParsed.email : fromParsed.email;
 
               const client = clients.find((c) => (c.email || "").toLowerCase() === otherPartyEmail);

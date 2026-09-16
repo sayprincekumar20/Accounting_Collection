@@ -7,11 +7,13 @@
 //   TWILIO_WHATSAPP_NUMBER   your WhatsApp-enabled Twilio number, e.g. "whatsapp:+1415XXXXXXX"
 //                            used to filter Messages.json to just this channel
 
+import { getEnv } from "@/lib/env";
+
 const TWILIO_API = "https://api.twilio.com/2010-04-01";
 
-function authHeader() {
-  const sid = process.env["TWILIO_ACCOUNT_SID"] || "";
-  const token = process.env["TWILIO_AUTH_TOKEN"] || "";
+async function authHeader() {
+  const sid = (await getEnv("TWILIO_ACCOUNT_SID")) || "";
+  const token = (await getEnv("TWILIO_AUTH_TOKEN")) || "";
   return { Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}` };
 }
 
@@ -35,7 +37,7 @@ export async function fetchRecentWhatsAppMessages(opts: {
   pageSize?: number;
   maxPages?: number;
 }): Promise<TwilioMessage[]> {
-  const sid = process.env["TWILIO_ACCOUNT_SID"] || "";
+  const sid = (await getEnv("TWILIO_ACCOUNT_SID")) || "";
   const pageSize = opts.pageSize ?? 200;
   const maxPages = opts.maxPages ?? 5;
 
@@ -44,7 +46,7 @@ export async function fetchRecentWhatsAppMessages(opts: {
     `${TWILIO_API}/Accounts/${sid}/Messages.json?PageSize=${pageSize}`;
 
   for (let page = 0; page < maxPages && nextUrl; page++) {
-    const res = await fetch(nextUrl, { headers: authHeader() });
+    const res = await fetch(nextUrl, { headers: await authHeader() });
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`Twilio messages fetch failed (${res.status}): ${body}`);

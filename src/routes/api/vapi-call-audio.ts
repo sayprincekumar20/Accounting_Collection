@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { getEnv } from "@/lib/env";
 
 // Fetches the call recording via Vapi's authenticated download endpoint,
 // per docs.vapi.ai/security-and-privacy/retrieve-call-artifacts:
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/api/vapi-call-audio")({
             });
           }
 
-          const privateKey = (process.env["VAPI_PRIVATE_KEY"] || "").trim();
+          const privateKey = ((await getEnv("VAPI_PRIVATE_KEY")) || "").trim();
           if (!privateKey) {
             return new Response(JSON.stringify({ error: "VAPI_PRIVATE_KEY is not set on the server" }), {
               status: 500,

@@ -1,3 +1,4 @@
+import { getEnv } from "@/lib/env";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/api/client-call-summary")({
@@ -14,7 +15,7 @@ export const Route = createFileRoute("/api/client-call-summary")({
             });
           }
           const res = await fetch(
-            `${process.env["N8N_WEBHOOK_BASE_URL"]}/client-call-summary?clientId=${encodeURIComponent(clientId)}`,
+            `${await getEnv("N8N_WEBHOOK_BASE_URL")}/client-call-summary?clientId=${encodeURIComponent(clientId)}`,
           );
           
           // If 404, return empty summary instead of error

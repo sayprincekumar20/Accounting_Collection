@@ -5,16 +5,18 @@
 //   VAPI_PRIVATE_KEY
 //   VAPI_ASSISTANT_ID   (optional filter — omit to list calls across all assistants)
 
+import { getEnv } from "@/lib/env";
+
 const VAPI_API = "https://api.vapi.ai";
 
-function authHeaders() {
-  return { Authorization: `Bearer ${process.env["VAPI_PRIVATE_KEY"] || ""}` };
+async function authHeaders() {
+  return { Authorization: `Bearer ${(await getEnv("VAPI_PRIVATE_KEY")) || ""}` };
 }
 
 export async function vapiFetch<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${VAPI_API}${path}`, {
     ...init,
-    headers: { ...authHeaders(), ...(init.headers || {}) },
+    headers: { ...(await authHeaders()), ...(init.headers || {}) },
   });
   if (!res.ok) {
     const body = await res.text();

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchRecentWhatsAppMessages } from "@/lib/twilio-server";
+import { getEnv } from "@/lib/env";
 
 // Direct Twilio API call — replaces the old N8N_WEBHOOK_BASE_URL proxy.
 //
@@ -46,13 +47,14 @@ export const Route = createFileRoute("/api/whatsapp-conversations")({
     handlers: {
       GET: async () => {
         try {
-          const ourNumber = digits(process.env["TWILIO_WHATSAPP_NUMBER"]);
+          const ourNumber = digits(await getEnv("TWILIO_WHATSAPP_NUMBER"));
+          const n8nBase = await getEnv("N8N_WEBHOOK_BASE_URL");
 
           const [messages, promisesRes, escalationsRes, clientsRes] = await Promise.all([
             fetchRecentWhatsAppMessages({}),
-            fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/promise-history-list`).then((r) => r.json()),
-            fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/escalations-list`).then((r) => r.json()),
-            fetch(`${process.env["N8N_WEBHOOK_BASE_URL"]}/clients-list`).then((r) => r.json()),
+            fetch(`${n8nBase}/promise-history-list`).then((r) => r.json()),
+            fetch(`${n8nBase}/escalations-list`).then((r) => r.json()),
+            fetch(`${n8nBase}/clients-list`).then((r) => r.json()),
           ]);
 
           const promises: HistoryEntry[] = promisesRes.promises ?? [];

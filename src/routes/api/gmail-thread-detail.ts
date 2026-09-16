@@ -23,12 +23,13 @@ export const Route = createFileRoute("/api/gmail-thread-detail")({
           const thread = await gmailFetch<any>(`/threads/${threadId}?format=full`, accessToken);
 
           const threadSubject = getHeader(thread.messages?.[0]?.payload?.headers, "Subject") || "(no subject)";
+          const businessEmail = (await getGmailBusinessEmail()).toLowerCase();
 
           const messages = (thread.messages || [])
             .map((m: any) => {
               const headers = m.payload?.headers;
               const fromRaw = getHeader(headers, "From");
-              const isOutbound = fromRaw.toLowerCase().includes(getGmailBusinessEmail().toLowerCase());
+              const isOutbound = fromRaw.toLowerCase().includes(businessEmail);
 
               return {
                 messageId: m.id,

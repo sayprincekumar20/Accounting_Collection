@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { vapiFetch, extractClientId, extractClientName, extractSummaryAndSatisfaction } from "@/lib/vapi-server";
+import { getEnv } from "@/lib/env";
 
 // Direct Vapi API call — replaces the old N8N_WEBHOOK_BASE_URL proxy.
 // Same response shape as before: { calls: CallListItem[] }
@@ -9,7 +10,7 @@ export const Route = createFileRoute("/api/vapi-calls-list")({
     handlers: {
       GET: async () => {
         try {
-          const assistantId = process.env["VAPI_ASSISTANT_ID"];
+          const assistantId = await getEnv("VAPI_ASSISTANT_ID");
           const qs = new URLSearchParams({ limit: "100" });
           if (assistantId) qs.set("assistantId", assistantId);
 
