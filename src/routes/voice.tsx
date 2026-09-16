@@ -56,7 +56,7 @@ interface CallDetail {
   startedAt: string;
   durationSeconds: number;
   cost: number;
-  recordingUrl: string;
+  recordingUrl: string | null;
   callSummary?: string;
   satisfaction?: CallSatisfaction | null;
   turns: CallTurn[];
