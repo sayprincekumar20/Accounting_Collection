@@ -1,5 +1,5 @@
 {
-  "name": "accounting-collection-dashboard",
+  "name": "accounting-collection",
   "main": "./.output/server/index.mjs",
   "compatibility_date": "2025-01-01",
   // Required: several routes use Node's Buffer (gmail-server.ts, telerivet-server.ts,
