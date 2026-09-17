@@ -24,6 +24,7 @@ import { Route as ApiClientCallSummaryRouteImport } from './routes/api/client-ca
 import { Route as ApiClientsListRouteImport } from './routes/api/clients-list'
 import { Route as ApiDailyRunLogsRouteImport } from './routes/api/daily-run-logs'
 import { Route as ApiEscalationsRouteImport } from './routes/api/escalations'
+import { Route as ApiGmailAttachmentRouteImport } from './routes/api/gmail-attachment'
 import { Route as ApiGmailThreadDetailRouteImport } from './routes/api/gmail-thread-detail'
 import { Route as ApiGmailThreadsListRouteImport } from './routes/api/gmail-threads-list'
 import { Route as ApiPromiseHistoryRouteImport } from './routes/api/promise-history'
@@ -111,6 +112,11 @@ const ApiEscalationsRoute = ApiEscalationsRouteImport.update({
   path: '/api/escalations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGmailAttachmentRoute = ApiGmailAttachmentRouteImport.update({
+  id: '/api/gmail-attachment',
+  path: '/api/gmail-attachment',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGmailThreadDetailRoute = ApiGmailThreadDetailRouteImport.update({
   id: '/api/gmail-thread-detail',
   path: '/api/gmail-thread-detail',
@@ -184,6 +190,7 @@ export interface FileRoutesByFullPath {
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/escalations': typeof ApiEscalationsRoute
+  '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
@@ -212,6 +219,7 @@ export interface FileRoutesByTo {
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/escalations': typeof ApiEscalationsRoute
+  '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
@@ -241,6 +249,7 @@ export interface FileRoutesById {
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/escalations': typeof ApiEscalationsRoute
+  '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
@@ -271,6 +280,7 @@ export interface FileRouteTypes {
     | '/api/clients-list'
     | '/api/daily-run-logs'
     | '/api/escalations'
+    | '/api/gmail-attachment'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
     | '/api/promise-history'
@@ -299,6 +309,7 @@ export interface FileRouteTypes {
     | '/api/clients-list'
     | '/api/daily-run-logs'
     | '/api/escalations'
+    | '/api/gmail-attachment'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
     | '/api/promise-history'
@@ -327,6 +338,7 @@ export interface FileRouteTypes {
     | '/api/clients-list'
     | '/api/daily-run-logs'
     | '/api/escalations'
+    | '/api/gmail-attachment'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
     | '/api/promise-history'
@@ -356,6 +368,7 @@ export interface RootRouteChildren {
   ApiClientsListRoute: typeof ApiClientsListRoute
   ApiDailyRunLogsRoute: typeof ApiDailyRunLogsRoute
   ApiEscalationsRoute: typeof ApiEscalationsRoute
+  ApiGmailAttachmentRoute: typeof ApiGmailAttachmentRoute
   ApiGmailThreadDetailRoute: typeof ApiGmailThreadDetailRoute
   ApiGmailThreadsListRoute: typeof ApiGmailThreadsListRoute
   ApiPromiseHistoryRoute: typeof ApiPromiseHistoryRoute
@@ -476,6 +489,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiEscalationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/gmail-attachment': {
+      id: '/api/gmail-attachment'
+      path: '/api/gmail-attachment'
+      fullPath: '/api/gmail-attachment'
+      preLoaderRoute: typeof ApiGmailAttachmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/gmail-thread-detail': {
       id: '/api/gmail-thread-detail'
       path: '/api/gmail-thread-detail'
@@ -572,6 +592,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiClientsListRoute: ApiClientsListRoute,
   ApiDailyRunLogsRoute: ApiDailyRunLogsRoute,
   ApiEscalationsRoute: ApiEscalationsRoute,
+  ApiGmailAttachmentRoute: ApiGmailAttachmentRoute,
   ApiGmailThreadDetailRoute: ApiGmailThreadDetailRoute,
   ApiGmailThreadsListRoute: ApiGmailThreadsListRoute,
   ApiPromiseHistoryRoute: ApiPromiseHistoryRoute,
