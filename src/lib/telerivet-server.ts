@@ -54,9 +54,15 @@ export async function fetchRecentMessages(opts: {
   let cursor: string | undefined;
 
   for (let page = 0; page < maxPages; page++) {
+    // NOTE: for Telerivet's messages.query endpoint specifically, "sort" only
+    // accepts the literal value "default" (unlike contacts.query, where
+    // "time_created" etc. are valid). "time_created" here was silently causing
+    // every request to be rejected by Telerivet -- confirmed root cause of the
+    // SMS tab's persistent failure. Messages already come back newest-first by
+    // default, and sort_dir still controls that ordering correctly.
     const params = new URLSearchParams({
       page_size: String(pageSize),
-      sort: "time_created",
+      sort: "default",
       sort_dir: "desc",
     });
     if (opts.phoneId) params.set("phone_id", opts.phoneId);
