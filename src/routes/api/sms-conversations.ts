@@ -66,10 +66,16 @@ export const Route = createFileRoute("/api/sms-conversations")({
 
           if (results[0].status === "rejected") {
             console.error("[sms-conversations] Telerivet fetch failed:", results[0].reason);
-            return new Response(JSON.stringify({ error: "Failed to fetch SMS conversations from Telerivet" }), {
-              status: 502,
-              headers: { "Content-Type": "application/json" },
-            });
+            // TEMPORARY: surfacing the real error message directly in the response
+            // body for debugging (no Workers Logs access in this session). Revert
+            // once root cause is confirmed and fixed.
+            return new Response(
+              JSON.stringify({
+                error: "Failed to fetch SMS conversations from Telerivet",
+                debug_message: results[0].reason instanceof Error ? results[0].reason.message : String(results[0].reason),
+              }),
+              { status: 502, headers: { "Content-Type": "application/json" } },
+            );
           }
           const messages = results[0].value;
 
