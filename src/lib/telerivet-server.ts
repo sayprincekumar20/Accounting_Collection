@@ -43,7 +43,12 @@ export async function fetchRecentMessages(opts: {
 }): Promise<TelerivetMessage[]> {
   const projectId = (await getEnv("TELERIVET_PROJECT_ID")) || "";
   const pageSize = opts.pageSize ?? 200;
-  const maxPages = opts.maxPages ?? 5;
+  // Reduced from 5: this is a "recent activity" view, not a full export, and each
+  // extra page is another sequential Telerivet call inside a route that already
+  // fires 3 other concurrent requests (promise-history, escalations, clients) --
+  // more pages means more chances for one transient failure to 500 the whole
+  // combined endpoint. 200 recent messages is already generous for this view.
+  const maxPages = opts.maxPages ?? 1;
 
   const all: TelerivetMessage[] = [];
   let cursor: string | undefined;

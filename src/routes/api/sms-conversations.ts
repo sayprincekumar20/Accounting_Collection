@@ -51,12 +51,38 @@ export const Route = createFileRoute("/api/sms-conversations")({
         try {
           const phoneId = await getEnv("TELERIVET_SMS_PHONE_ID"); // optional but recommended
           const n8nBase = await getEnv("N8N_WEBHOOK_BASE_URL");
-          const [messages, promisesRes, escalationsRes, clientsRes] = await Promise.all([
+
+          // Use allSettled, not all: this endpoint combines 4 independent sources
+          // (Telerivet + 3 n8n webhooks). A promise/escalation/client lookup failing
+          // is a real but secondary problem -- it should degrade to missing badges,
+          // not take down the whole SMS tab. Telerivet itself is the one source
+          // where a genuine failure means we truly have nothing to show.
+          const results = await Promise.allSettled([
             fetchRecentMessages(phoneId ? { phoneId } : {}),
             fetch(`${n8nBase}/promise-history-list`).then((r) => r.json()),
             fetch(`${n8nBase}/escalations-list`).then((r) => r.json()),
             fetch(`${n8nBase}/clients-list`).then((r) => r.json()),
           ]);
+
+          if (results[0].status === "rejected") {
+            console.error("[sms-conversations] Telerivet fetch failed:", results[0].reason);
+            return new Response(JSON.stringify({ error: "Failed to fetch SMS conversations from Telerivet" }), {
+              status: 502,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          const messages = results[0].value;
+
+          const logSoft = (label: string, r: PromiseSettledResult<any>) => {
+            if (r.status === "rejected") console.error(`[sms-conversations] ${label} fetch failed (non-fatal):`, r.reason);
+          };
+          logSoft("promise-history", results[1]);
+          logSoft("escalations", results[2]);
+          logSoft("clients", results[3]);
+
+          const promisesRes = results[1].status === "fulfilled" ? results[1].value : {};
+          const escalationsRes = results[2].status === "fulfilled" ? results[2].value : {};
+          const clientsRes = results[3].status === "fulfilled" ? results[3].value : {};
 
           const promises: HistoryEntry[] = promisesRes.promises ?? [];
           const escalations: HistoryEntry[] = escalationsRes.escalations ?? [];
@@ -86,31 +112,37 @@ export const Route = createFileRoute("/api/sms-conversations")({
           const sorted = [...messages].sort((a, b) => a.time_created - b.time_created);
 
           for (const m of sorted) {
-            const otherParty = m.direction === "incoming" ? m.from_number : m.to_number;
-            const phoneDigits = digits(otherParty);
-            if (!phoneDigits) continue;
+            try {
+              const otherParty = m.direction === "incoming" ? m.from_number : m.to_number;
+              const phoneDigits = digits(otherParty);
+              if (!phoneDigits) continue;
 
-            if (!byPhone.has(phoneDigits)) {
-              byPhone.set(phoneDigits, {
-                client_id: phoneDigits,
-                client_name: nameByPhone.get(phoneDigits.slice(-10)) || "",
-                notified_ar: escalatedPhones.has(phoneDigits),
-                promise_recorded: promisedPhones.has(phoneDigits),
-                messages: [],
-                lastMessageAt: "",
-                lastMessagePreview: "",
+              if (!byPhone.has(phoneDigits)) {
+                byPhone.set(phoneDigits, {
+                  client_id: phoneDigits,
+                  client_name: nameByPhone.get(phoneDigits.slice(-10)) || "",
+                  notified_ar: escalatedPhones.has(phoneDigits),
+                  promise_recorded: promisedPhones.has(phoneDigits),
+                  messages: [],
+                  lastMessageAt: "",
+                  lastMessagePreview: "",
+                });
+              }
+
+              const convo = byPhone.get(phoneDigits)!;
+              const ts = new Date((m.time_created || 0) * 1000).toISOString();
+              convo.messages.push({
+                role: m.direction === "outgoing" ? "ai" : "client",
+                content: m.content || "",
+                ts,
               });
+              convo.lastMessageAt = ts;
+              convo.lastMessagePreview = (m.content || "").slice(0, 140);
+            } catch (msgErr) {
+              // One malformed message entry should never take down the whole
+              // conversation list -- skip it and keep going.
+              console.error("[sms-conversations] skipped malformed message:", msgErr, m);
             }
-
-            const convo = byPhone.get(phoneDigits)!;
-            const ts = new Date(m.time_created * 1000).toISOString();
-            convo.messages.push({
-              role: m.direction === "outgoing" ? "ai" : "client",
-              content: m.content || "",
-              ts,
-            });
-            convo.lastMessageAt = ts;
-            convo.lastMessagePreview = (m.content || "").slice(0, 140);
           }
 
           const conversations = Array.from(byPhone.values()).sort(

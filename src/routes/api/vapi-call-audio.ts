@@ -135,13 +135,41 @@ export const Route = createFileRoute("/api/vapi-call-audio")({
           }
 
           const vapiKey = await getEnv("VAPI_PRIVATE_KEY");
-          const audioRes = await fetch(
+
+          // redirect: "manual" (not "follow") is deliberate. With "follow", the
+          // runtime auto-fetches the Location target and MAY carry this request's
+          // Authorization header along to that new origin (R2) -- which R2's
+          // presigned-URL auth (via query string, not headers) does not expect and
+          // can reject. Confirmed by direct testing: calling mono-recording with no
+          // header-forwarding concerns (a clean external test) returns a valid 302
+          // + signed URL every time, yet the identical call from inside this Worker
+          // 400s -- pointing at exactly this kind of redirect/header interaction.
+          // Handling the redirect ourselves guarantees the R2 request carries
+          // nothing but its own presigned query-string auth.
+          const redirectRes = await fetch(
             `https://api.vapi.ai/call/${encodeURIComponent(callId)}/mono-recording`,
             {
               headers: { Authorization: `Bearer ${vapiKey || ""}` },
-              redirect: "follow",
+              redirect: "manual",
             },
           );
+
+          let audioRes: Response;
+          if (redirectRes.status >= 300 && redirectRes.status < 400) {
+            const location = redirectRes.headers.get("location");
+            if (!location) {
+              console.error(`[vapi-call-audio] mono-recording returned ${redirectRes.status} with no Location header for call ${callId}`);
+              return new Response(
+                JSON.stringify({ error: "Recording not available", upstreamStatus: redirectRes.status }),
+                { status: 502, headers: { "Content-Type": "application/json" } },
+              );
+            }
+            // Deliberately no headers at all here -- the signed URL's own query
+            // string is the only auth R2 expects or wants.
+            audioRes = await fetch(location);
+          } else {
+            audioRes = redirectRes;
+          }
 
           if (!audioRes.ok) {
             const upstreamBody = await audioRes.text().catch(() => "");
