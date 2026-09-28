@@ -80,15 +80,51 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
             escalations.filter((e) => e.channel === "email").map((e) => e.client_id),
           );
 
-          const listParams = new URLSearchParams({ q: "-in:chats -in:draft", maxResults });
+          const listParams = new URLSearchParams({ maxResults });
           if (pageToken) listParams.set("pageToken", pageToken);
 
-          const list = await gmailFetch<{ threads?: { id: string }[]; nextPageToken?: string }>(
-            `/threads?${listParams.toString()}`,
-            accessToken,
-          );
+          // This is a real, actively-used personal inbox (tens of thousands of
+          // messages), not a dedicated clean business mailbox -- searching
+          // "-in:chats -in:draft" with no further scope just returns the most
+          // recent threads overall, and any client thread can easily get
+          // pushed past the first page by ordinary personal mail arriving in
+          // between. Instead, search Gmail directly for known client email
+          // addresses, so only genuinely relevant threads are ever considered,
+          // regardless of how much unrelated mail exists in between.
+          const clientEmails = clients.map((c) => (c.email || "").trim()).filter(Boolean);
+          if (clientEmails.length === 0) {
+            return new Response(JSON.stringify({ threads: [], nextPageToken: null }), {
+              headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+            });
+          }
+          // Gmail search queries have a practical length limit -- chunk the OR
+          // list so this still works as the client roster grows, merging
+          // results from each chunk's search.
+          const EMAIL_CHUNK_SIZE = 40;
+          const emailChunks: string[][] = [];
+          for (let i = 0; i < clientEmails.length; i += EMAIL_CHUNK_SIZE) {
+            emailChunks.push(clientEmails.slice(i, i + EMAIL_CHUNK_SIZE));
+          }
 
-          const threadIds = (list.threads || []).map((t) => t.id);
+          const seenThreadIds = new Set<string>();
+          let nextPageTokenOut: string | null = null;
+          for (const chunk of emailChunks) {
+            const emailQuery = chunk.map((e) => `from:${e} OR to:${e}`).join(" OR ");
+            const chunkParams = new URLSearchParams(listParams);
+            chunkParams.set("q", `-in:chats -in:draft (${emailQuery})`);
+            const chunkList = await gmailFetch<{ threads?: { id: string }[]; nextPageToken?: string }>(
+              `/threads?${chunkParams.toString()}`,
+              accessToken,
+            );
+            for (const t of chunkList.threads || []) seenThreadIds.add(t.id);
+            // Only meaningful to report a next page when there's a single
+            // email chunk (the common case); with multiple chunks, each has
+            // its own independent pagination cursor that doesn't compose
+            // cleanly into one token, so pagination is disabled in that case
+            // rather than silently dropping threads.
+            if (emailChunks.length === 1) nextPageTokenOut = chunkList.nextPageToken || null;
+          }
+          const threadIds = Array.from(seenThreadIds);
           const rawThreads: any[] = [];
           for (let i = 0; i < threadIds.length; i += CHUNK_SIZE) {
             const chunk = threadIds.slice(i, i + CHUNK_SIZE);
@@ -129,7 +165,7 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
 
           threads.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
 
-          return new Response(JSON.stringify({ threads, nextPageToken: list.nextPageToken || null }), {
+          return new Response(JSON.stringify({ threads, nextPageToken: nextPageTokenOut }), {
             headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
           });
         } catch (err) {
