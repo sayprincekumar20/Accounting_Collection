@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { StatCard, ChannelBadge } from "@/components/collections/Bits";
+import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/email")({
   head: () => ({
@@ -140,7 +140,7 @@ function useThreadsList() {
       const d = await r.json();
       return (d.threads ?? []) as ThreadListItem[];
     },
-    refetchInterval: 30000,
+    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
 }
 function useThreadDetail(threadId: string | null) {
@@ -169,7 +169,7 @@ function useEmailSidebar() {
         escalations: (eRes.escalations ?? []) as EscalationRow[],
       };
     },
-    refetchInterval: 30000,
+    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
 }
 
@@ -222,8 +222,8 @@ function QuotedText({ quotedBody }: { quotedBody: string }) {
 }
 
 function EmailInbox() {
-  const { data: threadsData, isLoading, error } = useThreadsList();
-  const { data: sidebar } = useEmailSidebar();
+  const { data: threadsData, isLoading, isFetching, error, refetch } = useThreadsList();
+  const { data: sidebar, refetch: refetchSidebar } = useEmailSidebar();
   const clients = sidebar?.clients ?? [];
   const promises = sidebar?.promises ?? [];
   const escalations = sidebar?.escalations ?? [];
@@ -273,7 +273,19 @@ function EmailInbox() {
   const promiseCount = threads.filter((t) => t.promise_recorded).length;
 
   return (
-    <AppShell title="Logs" subtitle="Email threads · Gmail · live">
+    <AppShell
+      title="Logs"
+      subtitle="Email threads · Gmail · live"
+      actions={
+        <RefreshButton
+          isFetching={isFetching}
+          onRefresh={() => {
+            refetch();
+            refetchSidebar();
+          }}
+        />
+      }
+    >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total threads" value={String(threads.length)} tone="primary" />
         <StatCard label="Replied" value={String(replied)} />

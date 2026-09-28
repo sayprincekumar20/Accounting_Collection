@@ -1,5 +1,26 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { RefreshCw } from "lucide-react";
 import { channelMeta, peso, timeAgo } from "@/lib/collections";
+
+export function RefreshButton({
+  onRefresh,
+  isFetching,
+}: {
+  onRefresh: () => void;
+  isFetching: boolean;
+}) {
+  return (
+    <button
+      onClick={onRefresh}
+      disabled={isFetching}
+      className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-60"
+      title="Data auto-refreshes every 4 hours. Click to refresh now."
+    >
+      <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+      {isFetching ? "Refreshing…" : "Refresh"}
+    </button>
+  );
+}
 
 export function StatCard({
   label,

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { Panel, ChannelBadge, StatusPill, StatCard } from "@/components/collections/Bits";
+import { Panel, ChannelBadge, StatusPill, StatCard, RefreshButton } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/queue")({
   head: () => ({
@@ -56,18 +56,22 @@ function useQueue() {
       const d = await r.json();
       return (d.queue ?? []) as QueueRow[];
     },
-    refetchInterval: 30000,
+    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
 }
 
 function QueuePage() {
-  const { data, isLoading, error } = useQueue();
+  const { data, isLoading, isFetching, error, refetch } = useQueue();
   const queue = data ?? [];
   const sent = queue.filter((q) => q.queue_status.toUpperCase() === "SENT");
   const waiting = queue.filter((q) => q.queue_status.toUpperCase() === "WAITING_QUOTA");
 
   return (
-    <AppShell title="Reminder Queue" subtitle="Built by the n8n daily overdue run · live">
+    <AppShell
+      title="Reminder Queue"
+      subtitle="Built by the n8n daily overdue run · live"
+      actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
+    >
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Queued today" value={String(queue.length)} tone="primary" />
         <StatCard label="Sent" value={String(sent.length)} />

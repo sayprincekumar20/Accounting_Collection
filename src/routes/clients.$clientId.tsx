@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { Panel, ChannelBadge, StatusPill, StatCard } from "@/components/collections/Bits";
+import { Panel, ChannelBadge, StatusPill, StatCard, RefreshButton } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/clients/$clientId")({
   head: () => ({
@@ -180,13 +180,13 @@ function useClientDetail(clientId: string) {
 
       return { client, queue, timeline, promises };
     },
-    refetchInterval: 30000,
+    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
 }
 
 function ClientDetail() {
   const { clientId } = Route.useParams();
-  const { data, isLoading, isError, error } = useClientDetail(clientId);
+  const { data, isLoading, isFetching, isError, error, refetch } = useClientDetail(clientId);
 
   if (isLoading) {
     return (
@@ -221,12 +221,15 @@ function ClientDetail() {
       title={client.client_name}
       subtitle={`${client.parent_name ?? "Direct account"} · live`}
       actions={
-        <Link
-          to="/clients"
-          className="rounded-lg border border-input bg-card px-3 py-2 text-sm font-medium hover:bg-muted"
-        >
-          Back to clients
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/clients"
+            className="rounded-lg border border-input bg-card px-3 py-2 text-sm font-medium hover:bg-muted"
+          >
+            Back to clients
+          </Link>
+          <RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />
+        </div>
       }
     >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

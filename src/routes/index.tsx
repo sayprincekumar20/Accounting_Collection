@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { StatCard, Panel, ChannelBadge, StatusPill } from "@/components/collections/Bits";
+import { StatCard, Panel, ChannelBadge, StatusPill, RefreshButton } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -124,12 +124,12 @@ function useOverviewData() {
 
       return { clients, queue, counters, latestRun, recent: recent.slice(0, 8), promises };
     },
-    refetchInterval: 30000,
+    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
 }
 
 function Overview() {
-  const { data, isLoading, error } = useOverviewData();
+  const { data, isLoading, isFetching, error, refetch } = useOverviewData();
   const clients = data?.clients ?? [];
   const queue = data?.queue ?? [];
   const counters = data?.counters ?? [];
@@ -144,6 +144,7 @@ function Overview() {
     <AppShell
       title="Collections Overview"
       subtitle={`Daily overdue run · ${latestRun ? shortDate(latestRun.run_date) : "no runs yet"} · live`}
+      actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
     >
       {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
       {error ? <p className="text-sm text-destructive">Could not load overview data.</p> : null}

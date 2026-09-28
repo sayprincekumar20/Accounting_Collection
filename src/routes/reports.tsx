@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { Panel, StatCard } from "@/components/collections/Bits";
+import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({
@@ -53,18 +53,22 @@ function useRunLogs() {
       const d = await r.json();
       return (d.runs ?? []) as RunLog[];
     },
-    refetchInterval: 60000,
+    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
 }
 
 function ReportsPage() {
-  const { data, isLoading, error } = useRunLogs();
+  const { data, isLoading, isFetching, error, refetch } = useRunLogs();
   const runs = data ?? [];
   const latest = runs[0];
   const max = Math.max(...runs.map((r) => r.total_processed), 1);
 
   return (
-    <AppShell title="Reports" subtitle="Daily overdue run history and exception lists · live">
+    <AppShell
+      title="Reports"
+      subtitle="Daily overdue run history and exception lists · live"
+      actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
+    >
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Runs logged" value={String(runs.length)} tone="primary" />
         <StatCard

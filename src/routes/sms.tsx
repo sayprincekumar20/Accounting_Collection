@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { StatCard, ChannelBadge } from "@/components/collections/Bits";
+import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/sms")({
   head: () => ({
@@ -133,12 +133,12 @@ function useSmsConversations() {
         escalations: (eRes.escalations ?? []) as EscalationRow[],
       };
     },
-    refetchInterval: 30000,
+    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
 }
 
 function SmsInbox() {
-  const { data, isLoading, error } = useSmsConversations();
+  const { data, isLoading, isFetching, error, refetch } = useSmsConversations();
   const promises = data?.promises ?? [];
   const escalations = data?.escalations ?? [];
   const clients = data?.clients ?? [];
@@ -178,7 +178,11 @@ function SmsInbox() {
   const promiseCount = conversations.filter((c) => c.promise_recorded).length;
 
   return (
-    <AppShell title="Logs" subtitle="SMS conversations · Telerivet · live from n8n">
+    <AppShell
+      title="Logs"
+      subtitle="SMS conversations · Telerivet · live from n8n"
+      actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
+    >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total conversations" value={String(conversations.length)} tone="primary" />
         <StatCard label="Replied" value={String(replied)} />

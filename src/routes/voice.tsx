@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { PhoneOutgoing, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { StatCard, ChannelBadge } from "@/components/collections/Bits";
+import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/voice")({
   head: () => ({
@@ -207,7 +207,7 @@ function useCallsList() {
       const d = await r.json();
       return (d.calls ?? []) as CallListItem[];
     },
-    refetchInterval: 30000,
+    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
 }
 
@@ -248,7 +248,7 @@ function useClientsList() {
       const d = await r.json();
       return (d.clients ?? []) as ClientRow[];
     },
-    refetchInterval: 30000,
+    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
 }
 
@@ -265,7 +265,7 @@ function usePromisesAndEscalations() {
         escalations: (eRes.escalations ?? []) as EscalationRow[],
       };
     },
-    refetchInterval: 30000,
+    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
 }
 
@@ -280,7 +280,7 @@ function latestFor<T extends { client_id: string; channel: string; recorded_at: 
 }
 
 function VoiceLogs() {
-  const { data: callsData, isLoading, error } = useCallsList();
+  const { data: callsData, isLoading, isFetching, error, refetch } = useCallsList();
   const calls = callsData ?? [];
   const { data: flags } = usePromisesAndEscalations();
   const promises = flags?.promises ?? [];
@@ -311,7 +311,11 @@ function VoiceLogs() {
   const notConnected = calls.length - connected;
 
   return (
-    <AppShell title="Logs" subtitle="AI voice calls · Vapi · Accounting Assistant · live">
+    <AppShell
+      title="Logs"
+      subtitle="AI voice calls · Vapi · Accounting Assistant · live"
+      actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
+    >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total calls" value={String(calls.length)} tone="primary" />
         <StatCard label="Connected" value={String(connected)} />

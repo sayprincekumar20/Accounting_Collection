@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { Panel, StatusPill } from "@/components/collections/Bits";
+import { Panel, StatusPill, RefreshButton } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/clients/")({
   head: () => ({
@@ -63,12 +63,12 @@ function useClients() {
       const d = await r.json();
       return (d.clients ?? []) as ClientRow[];
     },
-    refetchInterval: 30000,
+    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
 }
 
 function ClientsPage() {
-  const { data, isLoading, error } = useClients();
+  const { data, isLoading, isFetching, error, refetch } = useClients();
   const clients = data ?? [];
   const [search, setSearch] = useState("");
 
@@ -83,12 +83,15 @@ function ClientsPage() {
       title="Clients"
       subtitle="Overdue accounts and the channels we can reach them on · live"
       actions={
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search client, invoice or email…"
-          className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40 sm:w-72"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search client, invoice or email…"
+            className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40 sm:w-72"
+          />
+          <RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />
+        </div>
       }
     >
       <Panel title="Client ledger" description={`${filtered.length} accounts`}>
