@@ -80,7 +80,7 @@ export function parseSender(raw: string): { name: string; email: string } {
   return { name: raw.trim(), email: raw.trim().toLowerCase() };
 }
 
-export function extractBody(payload: any): string {
+export function extractBody(payload: any): { body: string; quotedBody: string | null } {
   const decode = (data: string) =>
     Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8");
   const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -105,10 +105,48 @@ export function extractBody(payload: any): string {
     return {};
   }
 
+  // Gmail (and most clients that interop with it) wrap the entire quoted
+  // history of a reply in a container carrying one of these markers, right
+  // after the new content. Splitting there and rendering the quoted part
+  // collapsed-by-default (a real "Show quoted text" toggle) is exactly how
+  // Gmail's own UI behaves -- previously the whole thing was rendered
+  // unfolded every time, so every reply visually duplicated the entire prior
+  // message underneath it.
+  function splitQuote(html: string): { body: string; quotedBody: string | null } {
+    const markers = [
+      /<div[^>]*class="[^"]*gmail_quote[^"]*"/i,
+      /<blockquote[^>]*class="[^"]*gmail_quote[^"]*"/i,
+      /<div[^>]*class="[^"]*yahoo_quoted[^"]*"/i,
+      /<div[^>]*id="[^"]*divRplyFwdMsg[^"]*"/i, // Outlook
+      /<hr[^>]*id="[^"]*stopSpelling[^"]*"/i, // Outlook plain-text style
+    ];
+    let splitAt = -1;
+    for (const re of markers) {
+      const m = html.match(re);
+      if (m && m.index !== undefined && (splitAt === -1 || m.index < splitAt)) splitAt = m.index;
+    }
+    if (splitAt === -1) return { body: html, quotedBody: null };
+    return { body: html.slice(0, splitAt), quotedBody: html.slice(splitAt) };
+  }
+
   const { html, text } = walk(payload);
-  if (html) return html;
-  if (text) return `<pre>${escapeHtml(text)}</pre>`;
-  return "<em>(no body)</em>";
+  if (html) return splitQuote(html);
+  if (text) {
+    // Plain-text replies quote with a leading "On ... wrote:" line followed by
+    // "> " prefixed lines. Split there the same way.
+    const lines = text.split("\n");
+    const quoteStart = lines.findIndex((l) => /^On .+wrote:\s*$/.test(l.trim()) || /^>/.test(l.trim()));
+    if (quoteStart > 0) {
+      const bodyText = lines.slice(0, quoteStart).join("\n").trim();
+      const quotedText = lines.slice(quoteStart).join("\n").trim();
+      return {
+        body: `<pre>${escapeHtml(bodyText)}</pre>`,
+        quotedBody: quotedText ? `<pre>${escapeHtml(quotedText)}</pre>` : null,
+      };
+    }
+    return { body: `<pre>${escapeHtml(text)}</pre>`, quotedBody: null };
+  }
+  return { body: "<em>(no body)</em>", quotedBody: null };
 }
 
 export interface Attachment {

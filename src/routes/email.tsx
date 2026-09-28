@@ -52,6 +52,7 @@ interface ThreadMessage {
   subject: string;
   date: string;
   body: string;
+  quotedBody: string | null;
   attachments: ThreadAttachment[];
   direction: "inbound" | "outbound";
 }
@@ -120,10 +121,6 @@ function formatTs(ts: string | null | undefined): string {
     return ts;
   }
 }
-function isHtmlBody(body: string): boolean {
-  return /<html[\s>]/i.test(body) || /<!DOCTYPE html/i.test(body);
-}
-
 function latestFor<T extends { client_id: string; channel: string; recorded_at: string }>(
   rows: T[],
   clientId: string,
@@ -177,27 +174,51 @@ function useEmailSidebar() {
 }
 
 function MessageBody({ body }: { body: string }) {
-  if (isHtmlBody(body)) {
-    return (
-      <iframe
-        title="email-body"
-        srcDoc={body}
-        sandbox=""
-        className="w-full border-0"
-        style={{ minHeight: "140px" }}
-        onLoad={(e) => {
-          const el = e.currentTarget;
-          try {
-            const h = el.contentWindow?.document.body.scrollHeight;
-            if (h) el.style.height = h + 20 + "px";
-          } catch {
-            /* ignore */
-          }
-        }}
-      />
-    );
-  }
-  return <p className="whitespace-pre-wrap">{body}</p>;
+  // extractBody (backend) always returns safe-to-render markup: either genuine
+  // HTML from a text/html MIME part (typically a fragment like <div>...</div>,
+  // never a full document with <html>/<!DOCTYPE> -- which is exactly what the
+  // old isHtmlBody() check required, causing it to fail for nearly every real
+  // email and fall through to a plain <p> that showed raw HTML tags as
+  // visible text), or pre-escaped plain text wrapped in <pre>. Always
+  // rendering through the sandboxed iframe is correct for both cases.
+  return (
+    <iframe
+      title="email-body"
+      srcDoc={body}
+      sandbox=""
+      className="w-full border-0"
+      style={{ minHeight: "40px" }}
+      onLoad={(e) => {
+        const el = e.currentTarget;
+        try {
+          const h = el.contentWindow?.document.body.scrollHeight;
+          if (h) el.style.height = h + 20 + "px";
+        } catch {
+          /* ignore */
+        }
+      }}
+    />
+  );
+}
+
+function QuotedText({ quotedBody }: { quotedBody: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="rounded border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent"
+        aria-expanded={open}
+      >
+        {open ? "Hide quoted text" : "•••"}
+      </button>
+      {open ? (
+        <div className="mt-2 border-l-2 border-border pl-3">
+          <MessageBody body={quotedBody} />
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function EmailInbox() {
@@ -478,6 +499,7 @@ function EmailInbox() {
                         <p className="mt-0.5 text-xs text-muted-foreground">to {m.to}</p>
                         <div className="mt-3 text-sm leading-relaxed">
                           <MessageBody body={m.body} />
+                          {m.quotedBody ? <QuotedText quotedBody={m.quotedBody} /> : null}
                         </div>
                         {m.attachments?.length ? (
                           <div className="mt-3 flex flex-wrap gap-2">
