@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getAccessToken, gmailFetch, getHeader, parseSender, getGmailBusinessEmail } from "@/lib/gmail-server";
-import { getEnv } from "@/lib/env";
+import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
 
 // Direct Gmail API call — replaces the old N8N_WEBHOOK_BASE_URL proxy.
 // Matches the real ThreadListItem contract from email.tsx exactly:
@@ -61,17 +61,18 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
           const maxResults = url.searchParams.get("maxResults") || "40";
           const pageToken = url.searchParams.get("pageToken");
 
-          const n8nBase = await getEnv("N8N_WEBHOOK_BASE_URL");
-          const [accessToken, clientsRes, promisesRes, escalationsRes] = await Promise.all([
+          const [accessToken, clientRows, promiseRows, escalationRows] = await Promise.all([
             getAccessToken(),
-            fetch(`${n8nBase}/clients-list`).then((r) => r.json()),
-            fetch(`${n8nBase}/promise-history-list`).then((r) => r.json()),
-            fetch(`${n8nBase}/escalations-list`).then((r) => r.json()),
+            fetchAllDataTableRows<{ client_id: string; client_name: string; contact_person: string; email: string }>(
+              "rJpqXxmxhqJnlLrJ",
+            ),
+            fetchAllDataTableRows<{ client_id: string; channel: string }>("JyGFOqTqI3QXHJbb"),
+            fetchAllDataTableRows<{ client_id: string; channel: string }>("ANfkZZDIrDuC4RjK"),
           ]);
 
-          const clients: ClientRow[] = clientsRes.clients ?? [];
-          const promises: HistoryEntry[] = promisesRes.promises ?? [];
-          const escalations: HistoryEntry[] = escalationsRes.escalations ?? [];
+          const clients: ClientRow[] = clientRows;
+          const promises: HistoryEntry[] = promiseRows;
+          const escalations: HistoryEntry[] = escalationRows;
 
           const promisedClientIds = new Set(
             promises.filter((p) => p.channel === "email").map((p) => p.client_id),
