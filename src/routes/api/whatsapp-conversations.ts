@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchRecentWhatsAppMessages } from "@/lib/twilio-server";
-import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { getEnv } from "@/lib/env";
 
 // Direct Twilio API call — replaces the old N8N_WEBHOOK_BASE_URL proxy.
@@ -49,13 +48,18 @@ export const Route = createFileRoute("/api/whatsapp-conversations")({
       GET: async () => {
         try {
           const ourNumber = digits(await getEnv("TWILIO_WHATSAPP_NUMBER"));
+          const n8nBase = await getEnv("N8N_WEBHOOK_BASE_URL");
 
-          const [messages, promises, escalations, clients] = await Promise.all([
+          const [messages, promisesRes, escalationsRes, clientsRes] = await Promise.all([
             fetchRecentWhatsAppMessages({}),
-            fetchAllDataTableRows<HistoryEntry>("JyGFOqTqI3QXHJbb"),
-            fetchAllDataTableRows<HistoryEntry>("ANfkZZDIrDuC4RjK"),
-            fetchAllDataTableRows<ClientRow>("rJpqXxmxhqJnlLrJ"),
+            fetch(`${n8nBase}/promise-history-list`).then((r) => r.json()),
+            fetch(`${n8nBase}/escalations-list`).then((r) => r.json()),
+            fetch(`${n8nBase}/clients-list`).then((r) => r.json()),
           ]);
+
+          const promises: HistoryEntry[] = promisesRes.promises ?? [];
+          const escalations: HistoryEntry[] = escalationsRes.escalations ?? [];
+          const clients: ClientRow[] = clientsRes.clients ?? [];
 
           const nameByPhone = new Map<string, string>();
           for (const c of clients) {

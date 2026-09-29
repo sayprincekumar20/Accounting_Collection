@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchRecentMessages } from "@/lib/telerivet-server";
-import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { getEnv } from "@/lib/env";
 
 // Direct Telerivet API call — replaces the old N8N_WEBHOOK_BASE_URL proxy
@@ -51,20 +50,18 @@ export const Route = createFileRoute("/api/sms-conversations")({
       GET: async () => {
         try {
           const phoneId = await getEnv("TELERIVET_SMS_PHONE_ID"); // optional but recommended
+          const n8nBase = await getEnv("N8N_WEBHOOK_BASE_URL");
 
           // Use allSettled, not all: this endpoint combines 4 independent sources
-          // (Telerivet + 3 n8n Data Table reads). A promise/escalation/client
-          // lookup failing is a real but secondary problem -- it should degrade
-          // to missing badges, not take down the whole SMS tab. Telerivet itself
-          // is the one source where a genuine failure means we truly have
-          // nothing to show. The 3 Data Table reads are direct REST calls (not
-          // webhook-triggered workflow executions), so they don't consume n8n's
-          // execution quota the way the old webhook proxies did.
+          // (Telerivet + 3 n8n webhooks). A promise/escalation/client lookup failing
+          // is a real but secondary problem -- it should degrade to missing badges,
+          // not take down the whole SMS tab. Telerivet itself is the one source
+          // where a genuine failure means we truly have nothing to show.
           const results = await Promise.allSettled([
             fetchRecentMessages(phoneId ? { phoneId } : {}),
-            fetchAllDataTableRows<HistoryEntry>("JyGFOqTqI3QXHJbb"),
-            fetchAllDataTableRows<HistoryEntry>("ANfkZZDIrDuC4RjK"),
-            fetchAllDataTableRows<ClientRow>("rJpqXxmxhqJnlLrJ"),
+            fetch(`${n8nBase}/promise-history-list`).then((r) => r.json()),
+            fetch(`${n8nBase}/escalations-list`).then((r) => r.json()),
+            fetch(`${n8nBase}/clients-list`).then((r) => r.json()),
           ]);
 
           if (results[0].status === "rejected") {
@@ -83,9 +80,13 @@ export const Route = createFileRoute("/api/sms-conversations")({
           logSoft("escalations", results[2]);
           logSoft("clients", results[3]);
 
-          const promises: HistoryEntry[] = results[1].status === "fulfilled" ? results[1].value : [];
-          const escalations: HistoryEntry[] = results[2].status === "fulfilled" ? results[2].value : [];
-          const clients: ClientRow[] = results[3].status === "fulfilled" ? results[3].value : [];
+          const promisesRes = results[1].status === "fulfilled" ? results[1].value : {};
+          const escalationsRes = results[2].status === "fulfilled" ? results[2].value : {};
+          const clientsRes = results[3].status === "fulfilled" ? results[3].value : {};
+
+          const promises: HistoryEntry[] = promisesRes.promises ?? [];
+          const escalations: HistoryEntry[] = escalationsRes.escalations ?? [];
+          const clients: ClientRow[] = clientsRes.clients ?? [];
 
           // Build a phone-digits -> client_name lookup once, same normalization
           // used everywhere else in this file (last-10-digits match, so it's
