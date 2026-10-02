@@ -35,26 +35,30 @@ export const Route = createFileRoute("/api/clients-list")({
         try {
           const rows = await fetchAllDataTableRows<ClientTableRow>(CLIENTS_DATA_TABLE_ID);
 
-          const clients = rows.map((r) => ({
-            client_id: r.client_id,
-            client_name: r.client_name,
-            parent_name: r.parent_name,
-            contact_person: r.contact_person || "",
-            email: r.email || "",
-            phone: r.phone || "",
-            gmail_available: !!r.gmail_available,
-            sms_available: !!r.phone,
-            voice_available: !!r.phone,
-            whatsapp_available: !!r.whatsapp_available,
-            viber_available: !!r.viber_available,
-            collection_amount: Number(r.collection_amount || 0),
-            due_date: r.due_date || "",
-            status: r.status || "",
-            invoice_numbers: r.invoice_numbers || "",
-            credit_terms: r.credit_terms || "",
-            credit_limit: r.credit_limit != null ? Number(r.credit_limit) : null,
-            source: r.source || "",
-          }));
+          // v3 retires stale duplicate rows (e.g. after a CRM contact change) as
+          // INACTIVE; hide them so each customer appears once with current data.
+          const clients = rows
+            .filter((r) => (r.status || "").toUpperCase() !== "INACTIVE")
+            .map((r) => ({
+              client_id: r.client_id,
+              client_name: r.client_name,
+              parent_name: r.parent_name,
+              contact_person: r.contact_person || "",
+              email: r.email || "",
+              phone: r.phone || "",
+              gmail_available: !!r.gmail_available,
+              sms_available: !!r.phone,
+              voice_available: !!r.phone,
+              whatsapp_available: !!r.whatsapp_available,
+              viber_available: !!r.viber_available,
+              collection_amount: Number(r.collection_amount || 0),
+              due_date: r.due_date || "",
+              status: r.status || "",
+              invoice_numbers: r.invoice_numbers || "",
+              credit_terms: r.credit_terms || "",
+              credit_limit: r.credit_limit != null ? Number(r.credit_limit) : null,
+              source: r.source || "",
+            }));
 
           return new Response(JSON.stringify({ clients }), {
             headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
