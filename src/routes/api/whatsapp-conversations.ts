@@ -117,6 +117,10 @@ export const Route = createFileRoute("/api/whatsapp-conversations")({
             // The "other party" is whichever side isn't our own WhatsApp number
             const otherPartyDigits = fromDigits === ourNumber ? toDigits : fromDigits;
             if (!otherPartyDigits) continue;
+            // Collections inbox: only conversations with numbers in the Clients table.
+            // Skips e.g. old test chats between this sender and other business numbers
+            // on the same Twilio account (if the Clients read failed, show everything).
+            if (nameByPhone.size > 0 && !nameByPhone.has(otherPartyDigits.slice(-10))) continue;
 
             if (!byPhone.has(otherPartyDigits)) {
               byPhone.set(otherPartyDigits, {
