@@ -27,6 +27,7 @@ interface ClientRow {
   client_id: string;
   client_name: string;
   phone: string;
+  status?: string | null;
 }
 
 interface ConversationOut {
@@ -48,32 +49,60 @@ export const Route = createFileRoute("/api/whatsapp-conversations")({
     handlers: {
       GET: async () => {
         try {
+          // Only this project's WhatsApp sender. The Twilio account is shared with
+          // another project's sender, so never list the whole account.
           const ourNumber = digits(await getEnv("TWILIO_WHATSAPP_NUMBER"));
+          const ourAddr = ourNumber ? `whatsapp:+${ourNumber}` : "";
 
-          const [messages, promises, escalations, clients] = await Promise.all([
-            fetchRecentWhatsAppMessages({}),
+          const [sentByUs, sentToUs] = ourAddr
+            ? await Promise.all([
+                fetchRecentWhatsAppMessages({ from: ourAddr }),
+                fetchRecentWhatsAppMessages({ to: ourAddr }),
+              ])
+            : [
+                await fetchRecentWhatsAppMessages({}),
+                [] as Awaited<ReturnType<typeof fetchRecentWhatsAppMessages>>,
+              ];
+          const seen = new Set<string>();
+          const messages = [...sentByUs, ...sentToUs].filter((m) =>
+            seen.has(m.sid) ? false : (seen.add(m.sid), true),
+          );
+
+          // Badge data is optional: a failure here must not blank the whole inbox.
+          const settled = await Promise.allSettled([
             fetchAllDataTableRows<HistoryEntry>("JyGFOqTqI3QXHJbb"),
             fetchAllDataTableRows<HistoryEntry>("ANfkZZDIrDuC4RjK"),
             fetchAllDataTableRows<ClientRow>("rJpqXxmxhqJnlLrJ"),
           ]);
+          const [promises, escalations, clients] = settled.map((r) =>
+            r.status === "fulfilled" ? r.value : [],
+          ) as [HistoryEntry[], HistoryEntry[], ClientRow[]];
 
           const nameByPhone = new Map<string, string>();
+          const phoneByClientId = new Map<string, string>();
           for (const c of clients) {
             const d = digits(c.phone).slice(-10);
-            if (d) nameByPhone.set(d, c.client_name);
+            if (!d) continue;
+            if ((c.status || "").toUpperCase() !== "INACTIVE" || !nameByPhone.has(d))
+              nameByPhone.set(d, c.client_name);
+            phoneByClientId.set(c.client_id, d);
           }
 
-          // Match by phone digits pulled out of client_id ("parent___phone" or bare phone)
-          const promisedPhones = new Set(
-            promises
-              .filter((p) => p.channel === "whatsapp")
-              .map((p) => digits(p.client_id.split("___").pop())),
-          );
-          const escalatedPhones = new Set(
-            escalations
-              .filter((e) => e.channel === "whatsapp")
-              .map((e) => digits(e.client_id.split("___").pop())),
-          );
+          // client_id is "PARENT___email" (or phone); resolve to the client's phone via the
+          // Clients table. Channel is stored upper-case ("WHATSAPP").
+          const phonesFor = (rows: HistoryEntry[]) =>
+            new Set(
+              rows
+                .filter((r) => (r.channel || "").toLowerCase() === "whatsapp")
+                .map(
+                  (r) =>
+                    phoneByClientId.get(r.client_id) ||
+                    digits(r.client_id.split("___").pop()).slice(-10),
+                )
+                .filter(Boolean),
+            );
+          const promisedPhones = phonesFor(promises);
+          const escalatedPhones = phonesFor(escalations);
 
           const byPhone = new Map<string, ConversationOut>();
 
@@ -93,8 +122,8 @@ export const Route = createFileRoute("/api/whatsapp-conversations")({
               byPhone.set(otherPartyDigits, {
                 client_id: otherPartyDigits,
                 client_name: nameByPhone.get(otherPartyDigits.slice(-10)) || "",
-                notified_ar: escalatedPhones.has(otherPartyDigits),
-                promise_recorded: promisedPhones.has(otherPartyDigits),
+                notified_ar: escalatedPhones.has(otherPartyDigits.slice(-10)),
+                promise_recorded: promisedPhones.has(otherPartyDigits.slice(-10)),
                 messages: [],
                 lastMessageAt: "",
                 lastMessagePreview: "",
@@ -121,10 +150,14 @@ export const Route = createFileRoute("/api/whatsapp-conversations")({
           });
         } catch (err) {
           console.error("[whatsapp-conversations] fetch error:", err);
-          return new Response(JSON.stringify({ error: "Failed to fetch WhatsApp conversations" }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          });
+          const detail = err instanceof Error ? err.message.slice(0, 300) : String(err);
+          return new Response(
+            JSON.stringify({ error: "Failed to fetch WhatsApp conversations", detail }),
+            {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
         }
       },
     },

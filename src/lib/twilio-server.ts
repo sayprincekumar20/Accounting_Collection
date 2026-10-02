@@ -36,20 +36,26 @@ export interface TwilioMessage {
 export async function fetchRecentWhatsAppMessages(opts: {
   pageSize?: number;
   maxPages?: number;
+  from?: string; // e.g. "whatsapp:+639453450025" -- Twilio-side filter
+  to?: string;
 }): Promise<TwilioMessage[]> {
   const sid = (await getEnv("TWILIO_ACCOUNT_SID")) || "";
+  if (!sid) throw new Error("TWILIO_ACCOUNT_SID is not configured");
   const pageSize = opts.pageSize ?? 200;
   const maxPages = opts.maxPages ?? 5;
 
+  const params = new URLSearchParams({ PageSize: String(pageSize) });
+  if (opts.from) params.set("From", opts.from);
+  if (opts.to) params.set("To", opts.to);
+
   const all: TwilioMessage[] = [];
-  let nextUrl: string | null =
-    `${TWILIO_API}/Accounts/${sid}/Messages.json?PageSize=${pageSize}`;
+  let nextUrl: string | null = `${TWILIO_API}/Accounts/${sid}/Messages.json?${params.toString()}`;
 
   for (let page = 0; page < maxPages && nextUrl; page++) {
     const res = await fetch(nextUrl, { headers: await authHeader() });
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`Twilio messages fetch failed (${res.status}): ${body}`);
+      throw new Error(`Twilio messages fetch failed (${res.status}): ${body.slice(0, 300)}`);
     }
     const data = (await res.json()) as { messages: TwilioMessage[]; next_page_uri: string | null };
     all.push(...(data.messages || []));
