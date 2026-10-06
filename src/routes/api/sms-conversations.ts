@@ -29,6 +29,7 @@ interface ClientRow {
   client_id: string;
   client_name: string;
   phone: string;
+  status?: string | null;
 }
 
 interface ConversationOut {
@@ -69,22 +70,28 @@ export const Route = createFileRoute("/api/sms-conversations")({
 
           if (results[0].status === "rejected") {
             console.error("[sms-conversations] Telerivet fetch failed:", results[0].reason);
-            return new Response(JSON.stringify({ error: "Failed to fetch SMS conversations from Telerivet" }), {
-              status: 502,
-              headers: { "Content-Type": "application/json" },
-            });
+            return new Response(
+              JSON.stringify({ error: "Failed to fetch SMS conversations from Telerivet" }),
+              {
+                status: 502,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
           }
           const messages = results[0].value;
 
-          const logSoft = (label: string, r: PromiseSettledResult<any>) => {
-            if (r.status === "rejected") console.error(`[sms-conversations] ${label} fetch failed (non-fatal):`, r.reason);
+          const logSoft = (label: string, r: PromiseSettledResult<unknown>) => {
+            if (r.status === "rejected")
+              console.error(`[sms-conversations] ${label} fetch failed (non-fatal):`, r.reason);
           };
           logSoft("promise-history", results[1]);
           logSoft("escalations", results[2]);
           logSoft("clients", results[3]);
 
-          const promises: HistoryEntry[] = results[1].status === "fulfilled" ? results[1].value : [];
-          const escalations: HistoryEntry[] = results[2].status === "fulfilled" ? results[2].value : [];
+          const promises: HistoryEntry[] =
+            results[1].status === "fulfilled" ? results[1].value : [];
+          const escalations: HistoryEntry[] =
+            results[2].status === "fulfilled" ? results[2].value : [];
           const clients: ClientRow[] = results[3].status === "fulfilled" ? results[3].value : [];
 
           // Build a phone-digits -> client_name lookup once, same normalization
@@ -92,18 +99,30 @@ export const Route = createFileRoute("/api/sms-conversations")({
           // tolerant of country-code prefix differences between Telerivet's
           // numbers and however the Clients table stores phone).
           const nameByPhone = new Map<string, string>();
+          const phoneByClientId = new Map<string, string>();
           for (const c of clients) {
             const d = digits(c.phone).slice(-10);
-            if (d) nameByPhone.set(d, c.client_name);
+            if (!d) continue;
+            if ((c.status || "").toUpperCase() !== "INACTIVE" || !nameByPhone.has(d))
+              nameByPhone.set(d, c.client_name);
+            phoneByClientId.set(c.client_id, d);
           }
 
-          // Match by phone digits pulled out of client_id ("parent___phone" or bare phone)
-          const promisedPhones = new Set(
-            promises.filter((p) => p.channel === "sms").map((p) => digits(p.client_id.split("___").pop())),
-          );
-          const escalatedPhones = new Set(
-            escalations.filter((e) => e.channel === "sms").map((e) => digits(e.client_id.split("___").pop())),
-          );
+          // client_id is "PARENT___email" (or phone); resolve to the client's phone via the
+          // Clients table. Channel is stored upper-case ("SMS").
+          const phonesFor = (rows: HistoryEntry[]) =>
+            new Set(
+              rows
+                .filter((r) => (r.channel || "").toLowerCase() === "sms")
+                .map(
+                  (r) =>
+                    phoneByClientId.get(r.client_id) ||
+                    digits(r.client_id.split("___").pop()).slice(-10),
+                )
+                .filter(Boolean),
+            );
+          const promisedPhones = phonesFor(promises);
+          const escalatedPhones = phonesFor(escalations);
 
           const byPhone = new Map<string, ConversationOut>();
 
@@ -115,13 +134,17 @@ export const Route = createFileRoute("/api/sms-conversations")({
               const otherParty = m.direction === "incoming" ? m.from_number : m.to_number;
               const phoneDigits = digits(otherParty);
               if (!phoneDigits) continue;
+              // Collections inbox: only conversations with numbers in the Clients table
+              // (skips test numbers and the gateway's own number). If the Clients read
+              // failed, show everything rather than an empty inbox.
+              if (nameByPhone.size > 0 && !nameByPhone.has(phoneDigits.slice(-10))) continue;
 
               if (!byPhone.has(phoneDigits)) {
                 byPhone.set(phoneDigits, {
                   client_id: phoneDigits,
                   client_name: nameByPhone.get(phoneDigits.slice(-10)) || "",
-                  notified_ar: escalatedPhones.has(phoneDigits),
-                  promise_recorded: promisedPhones.has(phoneDigits),
+                  notified_ar: escalatedPhones.has(phoneDigits.slice(-10)),
+                  promise_recorded: promisedPhones.has(phoneDigits.slice(-10)),
                   messages: [],
                   lastMessageAt: "",
                   lastMessagePreview: "",
