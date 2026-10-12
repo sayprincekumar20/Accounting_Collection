@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
+import { fetchDataTable, truncationHeaders } from "@/lib/n8n-datatable";
 
 // Direct n8n Data Table REST API call -- replaces the old N8N_WEBHOOK_BASE_URL
 // webhook proxy. This is a pure read, so it no longer counts against n8n's
@@ -31,9 +31,11 @@ interface ClientTableRow {
 export const Route = createFileRoute("/api/clients-list")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
         try {
-          const rows = await fetchAllDataTableRows<ClientTableRow>(CLIENTS_DATA_TABLE_ID);
+          const fresh = new URL(request.url).searchParams.get("fresh") === "1";
+          const result = await fetchDataTable<ClientTableRow>(CLIENTS_DATA_TABLE_ID, { fresh });
+          const rows = result.rows;
 
           // v3 retires stale duplicate rows (e.g. after a CRM contact change) as
           // INACTIVE; hide them so each customer appears once with current data.
@@ -60,8 +62,12 @@ export const Route = createFileRoute("/api/clients-list")({
               source: r.source || "",
             }));
 
-          return new Response(JSON.stringify({ clients }), {
-            headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+          return new Response(JSON.stringify({ clients, truncated: result.truncated }), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "no-store",
+              ...truncationHeaders(result),
+            },
           });
         } catch (err) {
           console.error("[clients-list] fetch error:", err);

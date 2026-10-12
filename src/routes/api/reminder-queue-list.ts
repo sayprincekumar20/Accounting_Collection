@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
+import { fetchDataTable, truncationHeaders } from "@/lib/n8n-datatable";
 
 // Direct read of n8n's Reminder Queue Data Table (no workflow execution, so it
 // does not count against the n8n Cloud execution quota). Same response shape as
@@ -27,9 +27,11 @@ const s = (v: unknown) => (v == null ? "" : String(v));
 export const Route = createFileRoute("/api/reminder-queue-list")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
         try {
-          const rows = await fetchAllDataTableRows<QueueRow>(REMINDER_QUEUE_TABLE_ID);
+          const fresh = new URL(request.url).searchParams.get("fresh") === "1";
+          const result = await fetchDataTable<QueueRow>(REMINDER_QUEUE_TABLE_ID, { fresh });
+          const rows = result.rows;
           const queue = rows.map((r) => ({
             queue_id: s(r.queue_id),
             client_id: s(r.client_id),
@@ -49,8 +51,12 @@ export const Route = createFileRoute("/api/reminder-queue-list")({
           queue.sort(
             (a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
           );
-          return new Response(JSON.stringify({ queue }), {
-            headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+          return new Response(JSON.stringify({ queue, truncated: result.truncated }), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "no-store",
+              ...truncationHeaders(result),
+            },
           });
         } catch (err) {
           console.error("[reminder-queue-list] fetch error:", err);
