@@ -275,7 +275,7 @@ function latestFor<T extends { client_id: string; channel: string; recorded_at: 
   clientId: string,
 ): T | undefined {
   return rows
-    .filter((r) => r.client_id === clientId && r.channel === "voice")
+    .filter((r) => r.client_id === clientId && String(r.channel).toLowerCase() === "voice")
     .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())[0];
 }
 
