@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { PhoneOutgoing, X } from "lucide-react";
+import { PhoneIncoming, PhoneOutgoing, Globe, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
+import { SummaryCell, PromiseCell, EscalatedCell } from "@/components/collections/LogCells";
 
 export const Route = createFileRoute("/voice")({
   head: () => ({
@@ -33,6 +34,10 @@ interface CallListItem {
   preview: string;
   callSummary?: string;
   satisfactionOverall?: number | null;
+  type?: string;
+  endedAt?: string;
+  assistantName?: string;
+  phoneNumberName?: string;
 }
 
 interface CallTurn {
@@ -333,19 +338,20 @@ function VoiceLogs() {
           <span className="text-xs text-muted-foreground">{calls.length} logged</span>
         </header>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[880px] text-sm">
+          <table className="w-full min-w-[1280px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                <th className="px-4 py-2.5 font-semibold">Call ID</th>
-                <th className="px-4 py-2.5 font-semibold">Assistant</th>
                 <th className="px-4 py-2.5 font-semibold">Client name</th>
                 <th className="px-4 py-2.5 font-semibold">Contact person</th>
-                <th className="px-4 py-2.5 font-semibold">Type</th>
                 <th className="px-4 py-2.5 font-semibold">Ended reason</th>
                 <th className="px-4 py-2.5 font-semibold">Summary</th>
                 <th className="px-4 py-2.5 font-semibold">Promise date</th>
                 <th className="px-4 py-2.5 font-semibold">Escalated</th>
                 <th className="px-4 py-2.5 font-semibold">Start time</th>
+                <th className="px-4 py-2.5 font-semibold">Call ID</th>
+                <th className="px-4 py-2.5 font-semibold">Assistant</th>
+                <th className="px-4 py-2.5 font-semibold">Last activity</th>
+                <th className="px-4 py-2.5 font-semibold">Type</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -353,6 +359,7 @@ function VoiceLogs() {
                 const promise = latestFor(promises, c.client_id);
                 const escalation = latestFor(escalations, c.client_id);
                 const client = clients.find((cl) => cl.client_id === c.client_id);
+                const type = callType(c.type);
                 return (
                   <tr
                     key={c.call_id}
@@ -361,49 +368,25 @@ function VoiceLogs() {
                       c.call_id === active ? "bg-secondary" : "hover:bg-muted"
                     }`}
                   >
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                      {shortId(c.call_id)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-semibold">Accounting Assistant</span>
-                      <span className="block text-[11px] text-muted-foreground">RGF Voice · PH</span>
-                    </td>
                     <td className="px-4 py-3">
                       <span className="block truncate font-medium">
-                        {client?.parent_name || client?.client_name || c.client_name}
+                        {client?.parent_name || client?.client_name || c.client_name || "—"}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="block truncate font-medium">
-                        {client?.contact_person || "—"}
-                      </span>
-                      <span className="block text-[11px] text-muted-foreground">
-                        {c.phone || client?.phone || "—"}
-                      </span>
-                      {client?.email ? (
-                        <span className="block text-[11px] text-muted-foreground">{client.email}</span>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-semibold">
-                        <PhoneOutgoing className="h-3 w-3" />
-                        Outbound
-                      </span>
+                      <span className="block truncate font-medium">{client?.contact_person || "—"}</span>
+                      <span className="block text-[11px] text-muted-foreground">{c.phone || client?.phone || "—"}</span>
                     </td>
                     <td className="px-4 py-3">
                       <span
+                        title={c.endedReason}
                         className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${outcomeTone(callOutcome(c.endedReason, c.status))}`}
                       >
                         {endedReasonLabel(c.endedReason, c.status)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 max-w-[240px]">
-                      <span
-                        className="block truncate text-xs text-muted-foreground"
-                        title={c.callSummary || c.preview}
-                      >
-                        {c.callSummary || c.preview || "—"}
-                      </span>
+                    <td className="px-4 py-3">
+                      <SummaryCell ourText={c.callSummary || c.preview} />
                       {c.satisfactionOverall != null ? (
                         <span
                           className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${satisfactionTone(c.satisfactionOverall)}`}
@@ -412,58 +395,57 @@ function VoiceLogs() {
                         </span>
                       ) : null}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {promise ? (
-                        <span className="inline-flex flex-col">
-                          <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
-                            {new Date(promise.promise_date).toLocaleDateString("en-PH", {
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </span>
-                          <span className="mt-0.5 text-[10px] text-muted-foreground">
-                            {reasonLabel(promise.reason)}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                    <td className="px-4 py-3">
+                      <PromiseCell promise={promise} />
                     </td>
                     <td className="px-4 py-3">
-                      {escalation ? (
-                        <span
-                          title={escalation.reason}
-                          className="inline-block max-w-[160px] truncate rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive"
-                        >
-                          {escalation.reason}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                      <EscalatedCell escalation={escalation} />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{formatClientTime(c.startedAt)}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground" title={c.call_id}>
+                      {shortId(c.call_id)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="block font-semibold">{(c.assistantName || "Grace").trim()}</span>
+                      {c.phoneNumberName ? (
+                        <span className="block text-[11px] text-muted-foreground">{c.phoneNumberName}</span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                      {formatClientTime(c.startedAt)}
+                      {c.endedAt ? formatClientTime(c.endedAt) : "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-semibold">
+                        {type === "Inbound" ? (
+                          <PhoneIncoming className="h-3 w-3" />
+                        ) : type === "Web" ? (
+                          <Globe className="h-3 w-3" />
+                        ) : (
+                          <PhoneOutgoing className="h-3 w-3" />
+                        )}
+                        {type}
+                      </span>
                     </td>
                   </tr>
                 );
               })}
               {isLoading ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     Loading calls from Vapi…
                   </td>
                 </tr>
               ) : null}
               {error ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-destructive">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-destructive">
                     Could not load calls from Vapi.
                   </td>
                 </tr>
               ) : null}
               {!isLoading && !error && calls.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     No voice calls logged yet.
                   </td>
                 </tr>
@@ -631,4 +613,11 @@ function VoiceLogs() {
       ) : null}
     </AppShell>
   );
+}
+
+function callType(t?: string) {
+  const v = String(t || "").toLowerCase();
+  if (v.includes("inbound")) return "Inbound";
+  if (v.includes("web")) return "Web";
+  return "Outbound";
 }

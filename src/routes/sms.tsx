@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
+import { ConversationStatus, SummaryCell, PromiseCell, EscalatedCell } from "@/components/collections/LogCells";
 
 export const Route = createFileRoute("/sms")({
   head: () => ({
@@ -99,8 +100,8 @@ function digits(v: string | null | undefined) {
   return (v || "").replace(/\D/g, "");
 }
 function hasReplied(c: SmsConversation) {
-  const roles = new Set(c.messages.map((m) => m.role));
-  return roles.has("client") && roles.has("ai");
+  // The client has written at least once (does not flip back when the AI answers).
+  return c.messages.some((m) => m.role === "client");
 }
 function phoneDigitsFromClientId(clientId: string) {
   const part = clientId.includes("___") ? clientId.split("___")[1] : clientId;
@@ -211,7 +212,6 @@ function SmsInbox() {
           <table className="w-full min-w-[920px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                <th className="px-4 py-2.5 font-semibold">ID</th>
                 <th className="px-4 py-2.5 font-semibold">Client name</th>
                 <th className="px-4 py-2.5 font-semibold">Contact person</th>
                 <th className="px-4 py-2.5 font-semibold">Status</th>
@@ -219,6 +219,7 @@ function SmsInbox() {
                 <th className="px-4 py-2.5 font-semibold">Promise date</th>
                 <th className="px-4 py-2.5 font-semibold">Escalated</th>
                 <th className="px-4 py-2.5 font-semibold">Last activity</th>
+                <th className="px-4 py-2.5 font-semibold">ID</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -234,9 +235,6 @@ function SmsInbox() {
                       c.client_id === active ? "bg-secondary" : "hover:bg-muted"
                     }`}
                   >
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                      {shortId(c.client_id)}
-                    </td>
                     <td className="px-4 py-3">
                       <span className="block truncate font-medium">
                         {client?.parent_name || client?.client_name || c.client_name}
@@ -252,46 +250,22 @@ function SmsInbox() {
                       ) : null}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
-                          hasReplied(c)
-                            ? "bg-success/12 text-success border-success/30"
-                            : "bg-warning/18 text-warning border-warning/40"
-                        }`}
-                      >
-                        {hasReplied(c) ? "Replied" : "Awaiting reply"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 max-w-[220px]">
-                      <span className="block truncate text-xs text-muted-foreground" title={c.lastMessagePreview}>
-                        {c.lastMessagePreview || "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {promise ? (
-                        <span className="inline-flex flex-col">
-                          <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
-                            {shortDate(promise.promise_date)}
-                          </span>
-                          <span className="mt-0.5 text-[10px] text-muted-foreground">
-                            {reasonLabel(promise.reason)}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                      <ConversationStatus
+                        clientReplies={c.messages.filter((m) => m.role === "client").length}
+                        lastFrom={c.messages.length ? (c.messages[c.messages.length - 1]?.role === "client" ? "client" : "us") : ""}
+                      />
                     </td>
                     <td className="px-4 py-3">
-                      {escalation ? (
-                        <span
-                          title={escalation.reason}
-                          className="inline-block max-w-[160px] truncate rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive"
-                        >
-                          {escalation.reason}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                      <SummaryCell
+                        clientText={[...c.messages].reverse().find((m) => m.role === "client")?.content}
+                        ourText={[...c.messages].reverse().find((m) => m.role === "ai")?.content ?? c.lastMessagePreview}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <PromiseCell promise={promise} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <EscalatedCell escalation={escalation} />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                       {formatTs(c.lastMessageAt)}
@@ -301,6 +275,7 @@ function SmsInbox() {
                         </span>
                       ) : null}
                     </td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{shortId(c.client_id)}</td>
                   </tr>
                 );
               })}

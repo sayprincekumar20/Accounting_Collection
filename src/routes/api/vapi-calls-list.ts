@@ -84,6 +84,15 @@ export const Route = createFileRoute("/api/vapi-calls-list")({
             before = oldest;
           }
 
+          // Real assistant names for the Assistant column (one request; falls back to the id).
+          const assistantNames = new Map<string, string>();
+          try {
+            const assistants = (await vapiFetch<any[]>("/assistant?limit=100")) || [];
+            for (const a of assistants) if (a?.id) assistantNames.set(a.id, String(a.name || "").trim());
+          } catch (err) {
+            console.warn("[vapi-calls-list] could not load assistant names:", String(err).slice(0, 200));
+          }
+
           // Pages can overlap at the boundary timestamp; keep one entry per call id.
           const seen = new Set<string>();
           const unique = rawCalls.filter(
@@ -108,6 +117,10 @@ export const Route = createFileRoute("/api/vapi-calls-list")({
               preview,
               callSummary,
               satisfactionOverall: satisfaction?.overall ?? null,
+              type: call.type || "",
+              endedAt: call.endedAt || call.updatedAt || "",
+              assistantName: assistantNames.get(call.assistantId) || call.assistant?.name || "",
+              phoneNumberName: call.phoneNumber?.name || "",
             };
           });
 

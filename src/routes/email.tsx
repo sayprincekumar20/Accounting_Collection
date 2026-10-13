@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
+import { ConversationStatus, SummaryCell, PromiseCell, EscalatedCell, type LastFrom } from "@/components/collections/LogCells";
 
 export const Route = createFileRoute("/email")({
   head: () => ({
@@ -37,6 +38,11 @@ interface ThreadListItem {
   lastMessagePreview: string;
   lastDirection: string;
   lastMessageAt: string;
+  clientReplyCount?: number;
+  lastFrom?: LastFrom;
+  lastClientPreview?: string;
+  lastClientAt?: string;
+  lastOurPreview?: string;
 }
 interface ThreadAttachment {
   filename: string;
@@ -268,8 +274,10 @@ function EmailInbox() {
     return () => window.removeEventListener("keydown", onKey);
   }, [activeItem]);
 
-  const replied = threads.filter((t) => t.lastDirection === "inbound").length;
-  const notReplied = threads.length - replied;
+  // "Client replied" = the client has written at least once in the thread (does not flip back
+  // when the AI answers). "Needs answer" = the client wrote last and nothing was sent after.
+  const replied = threads.filter((t) => (t.clientReplyCount ?? (t.lastDirection === "inbound" ? 1 : 0)) > 0).length;
+  const needsAnswer = threads.filter((t) => (t.lastFrom || (t.lastDirection === "inbound" ? "client" : "us")) === "client").length;
   const promiseCount = threads.filter((t) => t.promise_recorded).length;
 
   return (
@@ -288,8 +296,8 @@ function EmailInbox() {
     >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total threads" value={String(threads.length)} tone="primary" />
-        <StatCard label="Replied" value={String(replied)} />
-        <StatCard label="Not replied" value={String(notReplied)} />
+        <StatCard label="Client replied" value={String(replied)} hint={`${threads.length - replied} with no reply yet`} />
+        <StatCard label="Needs answer" value={String(needsAnswer)} hint="Client wrote last" />
         <StatCard label="Promises to pay" value={String(promiseCount)} hint="Confirmed by email" />
       </div>
 
@@ -302,7 +310,6 @@ function EmailInbox() {
           <table className="w-full min-w-[920px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                <th className="px-4 py-2.5 font-semibold">ID</th>
                 <th className="px-4 py-2.5 font-semibold">Client name</th>
                 <th className="px-4 py-2.5 font-semibold">Contact person</th>
                 <th className="px-4 py-2.5 font-semibold">Status</th>
@@ -310,6 +317,7 @@ function EmailInbox() {
                 <th className="px-4 py-2.5 font-semibold">Promise date</th>
                 <th className="px-4 py-2.5 font-semibold">Escalated</th>
                 <th className="px-4 py-2.5 font-semibold">Last activity</th>
+                <th className="px-4 py-2.5 font-semibold">ID</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -325,9 +333,6 @@ function EmailInbox() {
                       t.thread_id === active ? "bg-secondary" : "hover:bg-muted"
                     }`}
                   >
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                      {shortId(t.thread_id)}
-                    </td>
                     <td className="px-4 py-3">
                       <span className="block truncate font-medium">
                         {client?.parent_name || client?.client_name || t.client_name}
@@ -342,46 +347,22 @@ function EmailInbox() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
-                          t.lastDirection === "inbound"
-                            ? "bg-success/12 text-success border-success/30"
-                            : "bg-warning/18 text-warning border-warning/40"
-                        }`}
-                      >
-                        {t.lastDirection === "inbound" ? "Replied" : "Awaiting reply"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 max-w-[220px]">
-                      <span className="block truncate text-xs text-muted-foreground" title={t.lastMessagePreview}>
-                        {t.lastMessagePreview || "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {promise ? (
-                        <span className="inline-flex flex-col">
-                          <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
-                            {shortDate(promise.promise_date)}
-                          </span>
-                          <span className="mt-0.5 text-[10px] text-muted-foreground">
-                            {reasonLabel(promise.reason)}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                      <ConversationStatus
+                        clientReplies={t.clientReplyCount ?? (t.lastDirection === "inbound" ? 1 : 0)}
+                        lastFrom={t.lastFrom || (t.lastDirection === "inbound" ? "client" : "us")}
+                      />
                     </td>
                     <td className="px-4 py-3">
-                      {escalation ? (
-                        <span
-                          title={escalation.reason}
-                          className="inline-block max-w-[160px] truncate rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive"
-                        >
-                          {escalation.reason}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                      <SummaryCell
+                        clientText={t.lastClientPreview ?? (t.lastDirection === "inbound" ? t.lastMessagePreview : "")}
+                        ourText={t.lastOurPreview ?? t.lastMessagePreview}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <PromiseCell promise={promise} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <EscalatedCell escalation={escalation} />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                       {formatTs(t.lastMessageAt)}
@@ -391,6 +372,7 @@ function EmailInbox() {
                         </span>
                       ) : null}
                     </td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{shortId(t.thread_id)}</td>
                   </tr>
                 );
               })}

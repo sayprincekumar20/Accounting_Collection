@@ -35,7 +35,7 @@ interface ConversationOut {
   client_name: string;
   notified_ar: boolean;
   promise_recorded: boolean;
-  messages: { role: "ai" | "client"; content: string; ts: string }[];
+  messages: { role: "ai" | "client"; content: string; ts: string; status: string }[];
   lastMessageAt: string;
   lastMessagePreview: string;
 }
@@ -140,6 +140,8 @@ export const Route = createFileRoute("/api/whatsapp-conversations")({
               role: fromDigits === ourNumber ? "ai" : "client",
               content: m.body || "",
               ts,
+              // Twilio delivery status for our messages: queued/sent/delivered/read/failed/undelivered.
+              status: fromDigits === ourNumber ? (m.status || "") : "received",
             });
             convo.lastMessageAt = ts;
             convo.lastMessagePreview = (m.body || "").slice(0, 140);

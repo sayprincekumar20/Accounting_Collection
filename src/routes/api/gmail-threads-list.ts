@@ -75,10 +75,10 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
           const escalations: HistoryEntry[] = escalationRows;
 
           const promisedClientIds = new Set(
-            promises.filter((p) => p.channel === "email").map((p) => p.client_id),
+            promises.filter((p) => (p.channel || "").toLowerCase() === "email").map((p) => p.client_id),
           );
           const escalatedClientIds = new Set(
-            escalations.filter((e) => e.channel === "email").map((e) => e.client_id),
+            escalations.filter((e) => (e.channel || "").toLowerCase() === "email").map((e) => e.client_id),
           );
 
           const listParams = new URLSearchParams({ maxResults });
@@ -149,6 +149,16 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
               const client = clients.find((c) => (c.email || "").toLowerCase() === otherPartyEmail);
               if (!client) return null; // not a known client — drop unrelated inbox mail (newsletters, personal, etc.)
 
+              // Whole-thread view, so the list can say whether the client EVER replied and what
+              // they last said, instead of only who sent the newest message.
+              type ThreadMsg = typeof lastMessage;
+              const msgs: ThreadMsg[] = thread.messages;
+              const fromUs = (m: ThreadMsg) => parseSender(getHeader(m.payload?.headers, "From")).email === businessEmail;
+              const clientMsgs = msgs.filter((m) => !fromUs(m));
+              const ourMsgs = msgs.filter((m) => fromUs(m));
+              const lastClient = clientMsgs[clientMsgs.length - 1];
+              const lastOurs = ourMsgs[ourMsgs.length - 1];
+
               return {
                 client_id: client.client_id,
                 client_name: client.client_name,
@@ -160,6 +170,11 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
                 lastMessagePreview: lastMessage.snippet || "",
                 lastDirection: isOutbound ? "outbound" : "inbound",
                 lastMessageAt: getHeader(headers, "Date"),
+                clientReplyCount: clientMsgs.length,
+                lastFrom: isOutbound ? "us" : "client",
+                lastClientPreview: lastClient?.snippet || "",
+                lastClientAt: lastClient ? getHeader(lastClient.payload?.headers, "Date") : "",
+                lastOurPreview: lastOurs?.snippet || "",
               };
             })
             .filter((t): t is NonNullable<typeof t> => t !== null);

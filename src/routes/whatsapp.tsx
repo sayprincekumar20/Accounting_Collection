@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
+import { ConversationStatus, SummaryCell, PromiseCell, EscalatedCell, ReadTicks } from "@/components/collections/LogCells";
 
 export const Route = createFileRoute("/whatsapp")({
   head: () => ({
@@ -99,8 +100,8 @@ function digits(v: string | null | undefined) {
   return (v || "").replace(/\D/g, "");
 }
 function hasReplied(c: WaConversation) {
-  const roles = new Set(c.messages.map((m) => m.role));
-  return roles.has("client") && roles.has("ai");
+  // The client has written at least once (does not flip back when the AI answers).
+  return c.messages.some((m) => m.role === "client");
 }
 function phoneDigitsFromClientId(clientId: string) {
   const part = clientId.includes("___") ? clientId.split("___")[1] : clientId;
@@ -211,7 +212,6 @@ function WhatsAppInbox() {
           <table className="w-full min-w-[920px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                <th className="px-4 py-2.5 font-semibold">ID</th>
                 <th className="px-4 py-2.5 font-semibold">Client name</th>
                 <th className="px-4 py-2.5 font-semibold">Contact person</th>
                 <th className="px-4 py-2.5 font-semibold">Status</th>
@@ -219,6 +219,7 @@ function WhatsAppInbox() {
                 <th className="px-4 py-2.5 font-semibold">Promise date</th>
                 <th className="px-4 py-2.5 font-semibold">Escalated</th>
                 <th className="px-4 py-2.5 font-semibold">Last activity</th>
+                <th className="px-4 py-2.5 font-semibold">ID</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -234,9 +235,6 @@ function WhatsAppInbox() {
                       c.client_id === active ? "bg-secondary" : "hover:bg-muted"
                     }`}
                   >
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                      {shortId(c.client_id)}
-                    </td>
                     <td className="px-4 py-3">
                       <span className="block truncate font-medium">
                         {client?.parent_name || client?.client_name || c.client_name}
@@ -252,46 +250,34 @@ function WhatsAppInbox() {
                       ) : null}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
-                          hasReplied(c)
-                            ? "bg-success/12 text-success border-success/30"
-                            : "bg-warning/18 text-warning border-warning/40"
-                        }`}
-                      >
-                        {hasReplied(c) ? "Replied" : "Awaiting reply"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 max-w-[220px]">
-                      <span className="block truncate text-xs text-muted-foreground" title={c.lastMessagePreview}>
-                        {c.lastMessagePreview || "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {promise ? (
-                        <span className="inline-flex flex-col">
-                          <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
-                            {shortDate(promise.promise_date)}
+                      <ConversationStatus
+                        clientReplies={c.messages.filter((m) => m.role === "client").length}
+                        lastFrom={c.messages.length ? (c.messages[c.messages.length - 1]?.role === "client" ? "client" : "us") : ""}
+                      />
+                      {(() => {
+                        const lastOurs = [...c.messages].reverse().find((m) => m.role === "ai");
+                        if (!lastOurs?.status) return null;
+                        const st = lastOurs.status.toLowerCase();
+                        const label = st === "read" ? "Seen" : st === "delivered" ? "Delivered, not seen" : st === "failed" || st === "undelivered" ? "" : "Sent";
+                        return (
+                          <span className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <ReadTicks status={lastOurs.status} />
+                            {label}
                           </span>
-                          <span className="mt-0.5 text-[10px] text-muted-foreground">
-                            {reasonLabel(promise.reason)}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3">
-                      {escalation ? (
-                        <span
-                          title={escalation.reason}
-                          className="inline-block max-w-[160px] truncate rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive"
-                        >
-                          {escalation.reason}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                      <SummaryCell
+                        clientText={[...c.messages].reverse().find((m) => m.role === "client")?.content}
+                        ourText={[...c.messages].reverse().find((m) => m.role === "ai")?.content ?? c.lastMessagePreview}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <PromiseCell promise={promise} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <EscalatedCell escalation={escalation} />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                       {formatTs(c.lastMessageAt)}
@@ -301,6 +287,7 @@ function WhatsAppInbox() {
                         </span>
                       ) : null}
                     </td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{shortId(c.client_id)}</td>
                   </tr>
                 );
               })}
@@ -386,54 +373,70 @@ function WhatsAppInbox() {
               </button>
             </header>
 
-            <div className="space-y-4 p-5">
-              <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                Full conversation
-              </h3>
-              {activeItem.messages.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No messages yet.</p>
-              ) : (
-                <ol className="space-y-4">
-                  {activeItem.messages.map((m, i) => (
-                    <li
-                      key={i}
-                      className={`flex flex-col gap-1 ${m.role === "ai" ? "items-end" : "items-start"}`}
-                    >
-                      <div className="text-[11px] text-muted-foreground">
-                        {m.role === "ai" ? "Accounting Assistant" : activeClient?.contact_person || activeItem.client_name}
-                        {" · "}
-                        {formatTs(m.ts)}
-                      </div>
-                      <div
-                        className={`max-w-[80%] rounded-xl border px-3.5 py-2.5 text-sm ${
-                          m.role === "ai"
-                            ? "border-transparent bg-primary text-primary-foreground"
-                            : "border-border bg-muted"
-                        }`}
-                      >
-                        <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {m.status ? (
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                            {m.status}
-                          </span>
-                        ) : null}
-                        {m.promise_recorded ? (
-                          <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
-                            Promise to Pay
-                          </span>
-                        ) : null}
-                        {m.notified_ar ? (
-                          <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-[10px] font-semibold text-destructive">
-                            AR Notified
-                          </span>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              )}
+            <div className="p-4">
+              <div className="rounded-xl bg-[#efeae2] px-3 py-4 sm:px-5">
+                {activeItem.messages.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-[#667781]">No messages yet.</p>
+                ) : (
+                  <ol className="space-y-1.5">
+                    {activeItem.messages.map((m, i) => {
+                      const ours = m.role === "ai";
+                      const prev = activeItem.messages[i - 1];
+                      const day = waDay(m.ts);
+                      const showDay = !prev || waDay(prev.ts) !== day;
+                      const firstOfRun = !prev || prev.role !== m.role || showDay;
+                      return (
+                        <li key={i}>
+                          {showDay ? (
+                            <div className="my-3 flex justify-center">
+                              <span className="rounded-md bg-white/90 px-3 py-1 text-[11px] font-medium text-[#54656f] shadow-sm">
+                                {day}
+                              </span>
+                            </div>
+                          ) : null}
+                          <div className={`flex ${ours ? "justify-end" : "justify-start"} ${firstOfRun ? "mt-2" : ""}`}>
+                            <div
+                              className={`relative max-w-[82%] rounded-lg px-2.5 pb-1.5 pt-1.5 text-[14px] leading-[19px] text-[#111b21] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] ${
+                                ours ? "bg-[#d9fdd3]" : "bg-white"
+                              } ${firstOfRun ? (ours ? "rounded-tr-none" : "rounded-tl-none") : ""}`}
+                            >
+                              {firstOfRun && !ours ? (
+                                <span className="mb-0.5 block text-[12px] font-semibold text-[#027eb5]">
+                                  {activeClient?.contact_person || activeItem.client_name || "Client"}
+                                </span>
+                              ) : null}
+                              <span className="whitespace-pre-wrap break-words">{m.content}</span>
+                              <span className="float-right ml-3 mt-1 flex translate-y-1 items-center gap-1 text-[11px] text-[#667781]">
+                                {waTime(m.ts)}
+                                {ours ? <ReadTicks status={m.status} /> : null}
+                              </span>
+                            </div>
+                          </div>
+                          {m.promise_recorded || m.notified_ar ? (
+                            <div className={`mt-1 flex gap-1.5 ${ours ? "justify-end" : "justify-start"}`}>
+                              {m.promise_recorded ? (
+                                <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
+                                  Promise to pay
+                                </span>
+                              ) : null}
+                              {m.notified_ar ? (
+                                <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-[10px] font-semibold text-destructive">
+                                  AR notified
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
+              </div>
+              <p className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1"><ReadTicks status="sent" /> Sent</span>
+                <span className="flex items-center gap-1"><ReadTicks status="delivered" /> Delivered</span>
+                <span className="flex items-center gap-1"><ReadTicks status="read" /> Seen</span>
+              </p>
             </div>
           </aside>
         </>
@@ -444,4 +447,20 @@ function WhatsAppInbox() {
 
 function peso(v: number) {
   return "₱" + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+}
+
+function waDay(ts: string) {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return "";
+  const today = new Date();
+  const yest = new Date();
+  yest.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === yest.toDateString()) return "Yesterday";
+  return d.toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+}
+
+function waTime(ts: string) {
+  const d = new Date(ts);
+  return isNaN(d.getTime()) ? "" : d.toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" });
 }
