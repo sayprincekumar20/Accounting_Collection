@@ -11,16 +11,21 @@ import { getEnv } from "@/lib/env";
 // Direct Vapi API call — replaces the old N8N_WEBHOOK_BASE_URL proxy.
 // Same response shape as before: { calls: CallListItem[] } (+ `truncated`, `days`).
 //
-// Previously a single request with limit=100, which is less than ONE weekly
-// cycle at production volume (~150 calls/week + retries), so the Voice tab and
-// each client's call history silently lost older calls. Now pages backwards in
-// time with createdAtLt until it covers the requested window (?days=, default
-// 35 = five weekly cycles) or hits MAX_CALLS, and says so when it stops early.
+// Pages backwards in time with createdAtLt until it covers the requested window
+// or hits MAX_CALLS, and says so when it stops early.
+//
+// Vapi only keeps call history for the plan's retention window (currently 14
+// days) and REJECTS (400) any createdAtGt older than that. So the window is
+// capped just inside 14 days, and if Vapi still rejects the date filter (e.g.
+// after a plan change), the route falls back to plain newest-first paging
+// without a date filter instead of failing the whole Voice tab.
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 10; // 1,000 calls max per request
-const DEFAULT_DAYS = 35;
-const MAX_DAYS = 180;
+const RETENTION_DAYS = 14; // Vapi plan's call-history window
+const DEFAULT_DAYS = RETENTION_DAYS;
+const MAX_DAYS = RETENTION_DAYS;
+const SAFETY_MS = 60 * 60 * 1000; // stay 1 hour inside the window
 
 export const Route = createFileRoute("/api/vapi-calls-list")({
   server: {
@@ -33,12 +38,13 @@ export const Route = createFileRoute("/api/vapi-calls-list")({
             Math.max(Number.isFinite(daysParam) ? daysParam : DEFAULT_DAYS, 1),
             MAX_DAYS,
           );
-          const since = new Date(Date.now() - days * 86400000).toISOString();
+          const since = new Date(Date.now() - days * 86400000 + SAFETY_MS).toISOString();
           const assistantId = await getEnv("VAPI_ASSISTANT_ID");
 
           const rawCalls: any[] = [];
           let before: string | undefined;
           let truncated = false;
+          let useDateFilter = true;
           for (let page = 0; ; page++) {
             if (page >= MAX_PAGES) {
               truncated = true;
@@ -47,10 +53,26 @@ export const Route = createFileRoute("/api/vapi-calls-list")({
               );
               break;
             }
-            const qs = new URLSearchParams({ limit: String(PAGE_SIZE), createdAtGt: since });
+            const qs = new URLSearchParams({ limit: String(PAGE_SIZE) });
+            if (useDateFilter) qs.set("createdAtGt", since);
             if (assistantId) qs.set("assistantId", assistantId);
             if (before) qs.set("createdAtLt", before);
-            const batch = (await vapiFetch<any[]>(`/call?${qs.toString()}`)) || [];
+            let batch: any[];
+            try {
+              batch = (await vapiFetch<any[]>(`/call?${qs.toString()}`)) || [];
+            } catch (err) {
+              // Retention window rejected the date filter: retry this page without it.
+              if (useDateFilter && /\(400\)/.test(String(err))) {
+                console.warn(
+                  "[vapi-calls-list] date filter rejected by Vapi, retrying without it:",
+                  String(err).slice(0, 200),
+                );
+                useDateFilter = false;
+                page--;
+                continue;
+              }
+              throw err;
+            }
             rawCalls.push(...batch);
             if (batch.length < PAGE_SIZE) break;
             // Next page: everything strictly older than the oldest call we have so far.
