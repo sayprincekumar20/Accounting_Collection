@@ -106,13 +106,25 @@ function phoneDigitsFromClientId(clientId: string) {
   const part = clientId.includes("___") ? clientId.split("___")[1] : clientId;
   return digits(part);
 }
+// Most client IDs end in an email (PARENT___email), so the phone can't be read from the ID.
+// Use the client's phone on file (Clients list) and fall back to the ID only if there is none.
+// Compare the last 10 digits so 63917..., 0917... and 917... are the same number.
 function latestForPhone<T extends { client_id: string; channel: string; recorded_at: string }>(
   rows: T[],
   phoneDigits: string,
   channel: string,
+  clients: { client_id: string; phone?: string | null }[] = [],
 ): T | undefined {
+  const last10 = (d: string) => d.slice(-10);
+  const target = last10(phoneDigits);
+  if (!target) return undefined;
+  const phoneById = new Map(clients.map((cl) => [cl.client_id, digits(cl.phone)]));
   return rows
-    .filter((r) => phoneDigitsFromClientId(r.client_id) === phoneDigits && String(r.channel).toLowerCase() === channel.toLowerCase())
+    .filter(
+      (r) =>
+        last10(phoneById.get(r.client_id) || phoneDigitsFromClientId(r.client_id)) === target &&
+        String(r.channel).toLowerCase() === channel.toLowerCase(),
+    )
     .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())[0];
 }
 
@@ -158,10 +170,10 @@ function WhatsAppInbox() {
     ? clients.find((cl) => digits(cl.phone) === digits(activeItem.client_id))
     : undefined;
   const activePromise = activeItem
-    ? latestForPhone(promises, digits(activeItem.client_id), "whatsapp")
+    ? latestForPhone(promises, digits(activeItem.client_id), "whatsapp", clients)
     : undefined;
   const activeEscalation = activeItem
-    ? latestForPhone(escalations, digits(activeItem.client_id), "whatsapp")
+    ? latestForPhone(escalations, digits(activeItem.client_id), "whatsapp", clients)
     : undefined;
 
   useEffect(() => {
@@ -211,8 +223,8 @@ function WhatsAppInbox() {
             </thead>
             <tbody className="divide-y divide-border">
               {conversations.map((c) => {
-                const promise = latestForPhone(promises, digits(c.client_id), "whatsapp");
-                const escalation = latestForPhone(escalations, digits(c.client_id), "whatsapp");
+                const promise = latestForPhone(promises, digits(c.client_id), "whatsapp", clients);
+                const escalation = latestForPhone(escalations, digits(c.client_id), "whatsapp", clients);
                 const client = clients.find((cl) => digits(cl.phone) === digits(c.client_id));
                 return (
                   <tr
