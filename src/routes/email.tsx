@@ -45,6 +45,7 @@ interface ThreadListItem {
   lastClientAt?: string;
   lastOurPreview?: string;
   bounced?: boolean;
+  sendFailed?: boolean;
 }
 interface ThreadAttachment {
   filename: string;
@@ -146,7 +147,7 @@ function useThreadsList() {
       const r = await fetch("/api/gmail-threads-list");
       if (!r.ok) throw new Error("Email threads fetch failed");
       const d = await r.json();
-      return (d.threads ?? []) as ThreadListItem[];
+      return { threads: (d.threads ?? []) as ThreadListItem[], truncated: !!d.truncated };
     },
     refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
@@ -244,7 +245,7 @@ function EmailInbox() {
 
   const threads = useMemo(
     () =>
-      (threadsData ?? [])
+      (threadsData?.threads ?? [])
         .slice()
         .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()),
     [threadsData],
@@ -296,7 +297,7 @@ function EmailInbox() {
       extra: `${client?.email || ""} ${t.client_id}`,
       clientReplies: t.clientReplyCount ?? (t.lastDirection === "inbound" ? 1 : 0),
       lastFrom: t.lastFrom || (t.lastDirection === "inbound" ? "client" : "us"),
-      bounced: !!t.bounced,
+      bounced: !!t.bounced || !!t.sendFailed,
       hasPromise: !!(client && latestFor(promises, client.client_id, "email")) || t.promise_recorded,
       hasEscalation: !!(client && latestFor(escalations, client.client_id, "email")) || t.notified_ar,
       lastActivity: t.lastMessageAt,
@@ -349,6 +350,11 @@ function EmailInbox() {
       <div className="mt-5">
         <LogFilterBar filters={filters} onChange={setFilters} onClear={clearFilters} shown={visible.length} total={threads.length} />
       </div>
+      {threadsData?.truncated ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Showing the most recent email threads of the last 30 days. Older threads are still in Gmail.
+        </p>
+      ) : null}
 
       <section className="surface-card mt-5 overflow-hidden">
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
@@ -379,10 +385,11 @@ function EmailInbox() {
                 const escalation = client ? latestFor(escalations, client.client_id, "email") : undefined;
                 return (
                   <tr
-                    key={t.thread_id || t.client_id}
-                    onClick={() => setActive(t.thread_id)}
-                    className={`cursor-pointer transition-colors ${
-                      t.thread_id === active ? "bg-secondary" : "hover:bg-muted"
+                    key={t.thread_id || `${t.client_id}-${t.lastMessageAt}`}
+                    onClick={() => (t.thread_id ? setActive(t.thread_id) : undefined)}
+                    title={t.sendFailed ? "Gmail refused this email, so there is no thread to open" : undefined}
+                    className={`transition-colors ${t.thread_id ? "cursor-pointer" : "cursor-default"} ${
+                      t.thread_id && t.thread_id === active ? "bg-secondary" : "hover:bg-muted"
                     }`}
                   >
                     <td className="px-4 py-3">
@@ -403,6 +410,7 @@ function EmailInbox() {
                         clientReplies={t.clientReplyCount ?? (t.lastDirection === "inbound" ? 1 : 0)}
                         lastFrom={t.lastFrom || (t.lastDirection === "inbound" ? "client" : "us")}
                         bounced={!!t.bounced}
+                        failed={!!t.sendFailed}
                       />
                     </td>
                     <td className="px-4 py-3">

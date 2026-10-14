@@ -56,14 +56,20 @@ export function ConversationStatus({
   clientReplies,
   lastFrom,
   bounced = false,
+  failed = false,
 }: {
   clientReplies: number;
   lastFrom: LastFrom;
   bounced?: boolean | undefined;
+  failed?: boolean | undefined;
 }) {
   let label: string;
   let tone: string;
-  if (bounced && clientReplies === 0) {
+  if (failed) {
+    // Gmail refused to send it (no thread exists).
+    label = "Send failed";
+    tone = "bg-destructive/12 text-destructive border-destructive/30";
+  } else if (bounced && clientReplies === 0) {
     // The reminder never arrived: the address on file is wrong or blocked.
     label = "Email bounced, check address";
     tone = "bg-destructive/12 text-destructive border-destructive/30";

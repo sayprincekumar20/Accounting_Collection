@@ -162,7 +162,7 @@ const TEXT_STATUSES: { value: StatusFilter; label: string }[] = [
   { value: "answered", label: "Answered" },
   { value: "promised", label: "Promise to pay" },
   { value: "escalated", label: "Escalated" },
-  { value: "bounced", label: "Email bounced" },
+  { value: "bounced", label: "Not delivered (bounced or failed)" },
 ];
 const VOICE_STATUSES: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All outcomes" },

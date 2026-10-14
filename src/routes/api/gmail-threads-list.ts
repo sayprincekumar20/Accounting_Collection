@@ -62,16 +62,35 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
           // page of 40, which silently dropped client threads once a chunk had more than 40).
           const maxResults = url.searchParams.get("maxResults") || "100";
           const MAX_PAGES = 3;
-          const days = Math.min(Math.max(Number(url.searchParams.get("days") || 90), 1), 365);
+          const days = Math.min(Math.max(Number(url.searchParams.get("days") || 30), 1), 365);
+          const sinceMs = Date.now() - days * 86400000;
           const pageToken = url.searchParams.get("pageToken");
 
-          const [accessToken, clientRows, promiseRows, escalationRows] = await Promise.all([
+          const [accessToken, clientRows, promiseRows, escalationRows, convoRows, logRows] = await Promise.all([
             getAccessToken(),
             fetchAllDataTableRows<{ client_id: string; client_name: string; contact_person: string; email: string }>(
               "rJpqXxmxhqJnlLrJ",
             ),
             fetchAllDataTableRows<{ client_id: string; channel: string }>("JyGFOqTqI3QXHJbb"),
             fetchAllDataTableRows<{ client_id: string; channel: string }>("ANfkZZDIrDuC4RjK"),
+            // Every email the automation sends or answers is logged here with its Gmail thread id.
+            fetchAllDataTableRows<{
+              client_id: string;
+              client_name: string;
+              channel: string;
+              direction: string;
+              thread_id: string;
+              timestamp: string;
+            }>("2WtfkEaHiBSzgItW").catch(() => []),
+            // Send attempts (SEND_SUCCESS / failures) per channel.
+            fetchAllDataTableRows<{
+              client_id: string;
+              channel: string;
+              event_type: string;
+              status: string;
+              error_message: string;
+              timestamp: string;
+            }>("a32Z5oGcNi0xzefb").catch(() => []),
           ]);
 
           const clients: ClientRow[] = clientRows;
@@ -111,7 +130,19 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
             emailChunks.push(clientEmails.slice(i, i + EMAIL_CHUNK_SIZE));
           }
 
-          const seenThreadIds = new Set<string>();
+          // Automation threads first (newest first): every reminder / AI reply the workflows sent,
+          // linked to its client by thread id, whatever address the client later replies from.
+          const threadClient = new Map<string, { client_id: string; client_name: string; at: number }>();
+          for (const r of convoRows) {
+            if (String(r.channel || "").toUpperCase() !== "EMAIL" || !r.thread_id) continue;
+            const at = new Date(r.timestamp).getTime() || 0;
+            if (at && at < sinceMs) continue;
+            const prev = threadClient.get(r.thread_id);
+            if (!prev || at > prev.at) threadClient.set(r.thread_id, { client_id: r.client_id, client_name: r.client_name, at });
+          }
+          const seenThreadIds = new Set<string>(
+            [...threadClient.entries()].sort((a, b) => b[1].at - a[1].at).map(([id]) => id),
+          );
           const nextPageTokenOut: string | null = null;
           let truncated = false;
           for (const chunk of emailChunks) {
@@ -171,7 +202,10 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
                 for (const h of ["From", "To", "Cc"]) for (const e of emailsIn(getHeader(m.payload?.headers, h))) participants.add(e);
               }
               participants.delete(businessEmail);
+              const linked = threadClient.get(thread.id);
               const client =
+                (linked && clients.find((c) => c.client_id === linked.client_id)) ||
+                (linked ? { client_id: linked.client_id, client_name: linked.client_name, contact_person: "", email: "" } : null) ||
                 clients.find((c) => (c.email || "").toLowerCase() === otherPartyEmail) ||
                 clients.find((c) => participants.has((c.email || "").toLowerCase().trim()));
               if (!client) return null; // not a known client — drop unrelated inbox mail (newsletters, personal, etc.)
@@ -214,6 +248,37 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
             })
             .filter((t): t is NonNullable<typeof t> => t !== null);
 
+          // Emails Gmail refused to send (no thread exists): show them too, with the error.
+          const failedRows = logRows
+            .filter(
+              (r) =>
+                String(r.channel || "").toUpperCase() === "EMAIL" &&
+                (String(r.status || "").toUpperCase() === "FAILED" || /FAIL/i.test(r.event_type || "")) &&
+                (new Date(r.timestamp).getTime() || 0) >= sinceMs,
+            )
+            .map((r) => {
+              const c = clients.find((x) => x.client_id === r.client_id);
+              return {
+                client_id: r.client_id,
+                client_name: c?.client_name || r.client_id.split("___")[0] || "",
+                contact_person: c?.contact_person ?? "",
+                thread_id: "",
+                notified_ar: escalatedClientIds.has(r.client_id),
+                promise_recorded: promisedClientIds.has(r.client_id),
+                message_count: 0,
+                lastMessagePreview: r.error_message || "Send failed",
+                lastDirection: "outbound",
+                lastMessageAt: r.timestamp,
+                clientReplyCount: 0,
+                lastFrom: "us",
+                bounced: false,
+                sendFailed: true,
+                lastClientPreview: "",
+                lastClientAt: "",
+                lastOurPreview: "Not sent: " + (r.error_message || "Gmail refused the message"),
+              };
+            });
+          threads.push(...failedRows);
           threads.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
 
           return new Response(JSON.stringify({ threads, nextPageToken: nextPageTokenOut, truncated }), {
