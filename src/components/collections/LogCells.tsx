@@ -55,13 +55,19 @@ export type LastFrom = "client" | "us" | "";
 export function ConversationStatus({
   clientReplies,
   lastFrom,
+  bounced = false,
 }: {
   clientReplies: number;
   lastFrom: LastFrom;
+  bounced?: boolean | undefined;
 }) {
   let label: string;
   let tone: string;
-  if (clientReplies === 0) {
+  if (bounced && clientReplies === 0) {
+    // The reminder never arrived: the address on file is wrong or blocked.
+    label = "Email bounced, check address";
+    tone = "bg-destructive/12 text-destructive border-destructive/30";
+  } else if (clientReplies === 0) {
     label = "No reply yet";
     tone = "bg-muted text-muted-foreground border-border";
   } else if (lastFrom === "client") {

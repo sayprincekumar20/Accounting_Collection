@@ -11,7 +11,8 @@ export type StatusFilter =
   | "promised"
   | "escalated"
   | "reached"
-  | "not_reached";
+  | "not_reached"
+  | "bounced";
 export type RangeFilter = "all" | "today" | "7d" | "30d";
 export type SourceFilter = "all" | "weekly" | "cliq" | "retry" | "untagged";
 
@@ -71,6 +72,7 @@ export interface FilterableRow {
   clientReplies?: number | undefined;
   lastFrom?: string | undefined; // "client" | "us"
   reached?: boolean | undefined; // voice: call connected
+  bounced?: boolean | undefined; // email: reminder bounced (wrong/blocked address)
   hasPromise?: boolean | undefined;
   hasEscalation?: boolean | undefined;
   lastActivity?: string | undefined;
@@ -132,6 +134,9 @@ export function matchesLogFilters(r: FilterableRow, f: LogFilterState): boolean 
     case "not_reached":
       if (r.reached) return false;
       break;
+    case "bounced":
+      if (!r.bounced) return false;
+      break;
     default:
       break;
   }
@@ -157,6 +162,7 @@ const TEXT_STATUSES: { value: StatusFilter; label: string }[] = [
   { value: "answered", label: "Answered" },
   { value: "promised", label: "Promise to pay" },
   { value: "escalated", label: "Escalated" },
+  { value: "bounced", label: "Email bounced" },
 ];
 const VOICE_STATUSES: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All outcomes" },

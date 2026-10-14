@@ -44,6 +44,7 @@ interface ThreadListItem {
   lastClientPreview?: string;
   lastClientAt?: string;
   lastOurPreview?: string;
+  bounced?: boolean;
 }
 interface ThreadAttachment {
   filename: string;
@@ -295,6 +296,7 @@ function EmailInbox() {
       extra: `${client?.email || ""} ${t.client_id}`,
       clientReplies: t.clientReplyCount ?? (t.lastDirection === "inbound" ? 1 : 0),
       lastFrom: t.lastFrom || (t.lastDirection === "inbound" ? "client" : "us"),
+      bounced: !!t.bounced,
       hasPromise: !!(client && latestFor(promises, client.client_id, "email")) || t.promise_recorded,
       hasEscalation: !!(client && latestFor(escalations, client.client_id, "email")) || t.notified_ar,
       lastActivity: t.lastMessageAt,
@@ -400,6 +402,7 @@ function EmailInbox() {
                       <ConversationStatus
                         clientReplies={t.clientReplyCount ?? (t.lastDirection === "inbound" ? 1 : 0)}
                         lastFrom={t.lastFrom || (t.lastDirection === "inbound" ? "client" : "us")}
+                        bounced={!!t.bounced}
                       />
                     </td>
                     <td className="px-4 py-3">

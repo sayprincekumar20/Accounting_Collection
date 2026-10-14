@@ -180,9 +180,16 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
               // they last said, instead of only who sent the newest message.
               type ThreadMsg = typeof lastMessage;
               const msgs: ThreadMsg[] = thread.messages;
-              const fromUs = (m: ThreadMsg) => parseSender(getHeader(m.payload?.headers, "From")).email === businessEmail;
-              const clientMsgs = msgs.filter((m) => !fromUs(m));
-              const ourMsgs = msgs.filter((m) => fromUs(m));
+              const senderOf = (m: ThreadMsg) => parseSender(getHeader(m.payload?.headers, "From")).email;
+              const fromUs = (m: ThreadMsg) => senderOf(m) === businessEmail;
+              // Bounces (mailer-daemon/postmaster/no-reply) and our own colleagues are not client replies.
+              const isSystem = (m: ThreadMsg) => /(mailer-daemon|postmaster|no-?reply)/i.test(senderOf(m) || "");
+              const isInternal = (m: ThreadMsg) => (senderOf(m) || "").endsWith("@rareglobalfood.com");
+              const clientMsgs = msgs.filter((m) => !fromUs(m) && !isSystem(m) && !isInternal(m));
+              const ourMsgs = msgs.filter((m) => fromUs(m) || isInternal(m));
+              const bounced = msgs.some((m) => isSystem(m));
+              const lastHuman = [...msgs].reverse().find((m) => !isSystem(m));
+              const lastFromHuman = lastHuman && !fromUs(lastHuman) && !isInternal(lastHuman) ? "client" : "us";
               const lastClient = clientMsgs[clientMsgs.length - 1];
               const lastOurs = ourMsgs[ourMsgs.length - 1];
 
@@ -198,7 +205,8 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
                 lastDirection: isOutbound ? "outbound" : "inbound",
                 lastMessageAt: getHeader(headers, "Date"),
                 clientReplyCount: clientMsgs.length,
-                lastFrom: isOutbound ? "us" : "client",
+                lastFrom: lastFromHuman,
+                bounced,
                 lastClientPreview: lastClient?.snippet || "",
                 lastClientAt: lastClient ? getHeader(lastClient.payload?.headers, "Date") : "",
                 lastOurPreview: lastOurs?.snippet || "",
