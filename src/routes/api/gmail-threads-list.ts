@@ -37,7 +37,7 @@ async function fetchThreadMetadata(threadId: string, accessToken: string) {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       return await gmailFetch<any>(
-        `/threads/${threadId}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Date`,
+        `/threads/${threadId}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Date`,
         accessToken,
       );
     } catch (err: any) {
@@ -58,7 +58,11 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
       GET: async ({ request }) => {
         try {
           const url = new URL(request.url);
-          const maxResults = url.searchParams.get("maxResults") || "40";
+          // Up to 100 threads per Gmail page and up to MAX_PAGES pages per email chunk (was a single
+          // page of 40, which silently dropped client threads once a chunk had more than 40).
+          const maxResults = url.searchParams.get("maxResults") || "100";
+          const MAX_PAGES = 3;
+          const days = Math.min(Math.max(Number(url.searchParams.get("days") || 90), 1), 365);
           const pageToken = url.searchParams.get("pageToken");
 
           const [accessToken, clientRows, promiseRows, escalationRows] = await Promise.all([
@@ -108,24 +112,35 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
           }
 
           const seenThreadIds = new Set<string>();
-          let nextPageTokenOut: string | null = null;
+          const nextPageTokenOut: string | null = null;
+          let truncated = false;
           for (const chunk of emailChunks) {
             const emailQuery = chunk.map((e) => `from:${e} OR to:${e}`).join(" OR ");
-            const chunkParams = new URLSearchParams(listParams);
-            chunkParams.set("q", `-in:chats -in:draft (${emailQuery})`);
-            const chunkList = await gmailFetch<{ threads?: { id: string }[]; nextPageToken?: string }>(
-              `/threads?${chunkParams.toString()}`,
-              accessToken,
-            );
-            for (const t of chunkList.threads || []) seenThreadIds.add(t.id);
-            // Only meaningful to report a next page when there's a single
-            // email chunk (the common case); with multiple chunks, each has
-            // its own independent pagination cursor that doesn't compose
-            // cleanly into one token, so pagination is disabled in that case
-            // rather than silently dropping threads.
-            if (emailChunks.length === 1) nextPageTokenOut = chunkList.nextPageToken || null;
+            let pageCursor: string | undefined;
+            for (let page = 0; page < MAX_PAGES; page++) {
+              const chunkParams = new URLSearchParams(listParams);
+              chunkParams.set("q", `-in:chats -in:draft newer_than:${days}d (${emailQuery})`);
+              if (pageCursor) chunkParams.set("pageToken", pageCursor);
+              const chunkList = await gmailFetch<{ threads?: { id: string }[]; nextPageToken?: string }>(
+                `/threads?${chunkParams.toString()}`,
+                accessToken,
+              );
+              for (const t of chunkList.threads || []) seenThreadIds.add(t.id);
+              pageCursor = chunkList.nextPageToken || undefined;
+              if (!pageCursor) break;
+              if (page === MAX_PAGES - 1) {
+                truncated = true;
+                console.warn(`[gmail-threads-list] more than ${MAX_PAGES * Number(maxResults)} threads in one email chunk; truncated`);
+              }
+            }
           }
-          const threadIds = Array.from(seenThreadIds);
+          // Each thread is one Gmail request; stay well inside Cloudflare's per-request subrequest limit.
+          const MAX_THREADS = 350;
+          let threadIds = Array.from(seenThreadIds);
+          if (threadIds.length > MAX_THREADS) {
+            truncated = true;
+            threadIds = threadIds.slice(0, MAX_THREADS);
+          }
           const rawThreads: any[] = [];
           for (let i = 0; i < threadIds.length; i += CHUNK_SIZE) {
             const chunk = threadIds.slice(i, i + CHUNK_SIZE);
@@ -146,7 +161,19 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
               const isOutbound = fromParsed.email === businessEmail;
               const otherPartyEmail = isOutbound ? toParsed.email : fromParsed.email;
 
-              const client = clients.find((c) => (c.email || "").toLowerCase() === otherPartyEmail);
+              // Match the thread to a client if ANY message involves a client address (From, To or Cc),
+              // not only the last message's sender/recipient: clients reply from colleagues' or personal
+              // addresses, get copied in Cc, or are one of several recipients.
+              const emailsIn = (raw: string) =>
+                (String(raw || "").toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/g) || []);
+              const participants = new Set<string>();
+              for (const m of thread.messages) {
+                for (const h of ["From", "To", "Cc"]) for (const e of emailsIn(getHeader(m.payload?.headers, h))) participants.add(e);
+              }
+              participants.delete(businessEmail);
+              const client =
+                clients.find((c) => (c.email || "").toLowerCase() === otherPartyEmail) ||
+                clients.find((c) => participants.has((c.email || "").toLowerCase().trim()));
               if (!client) return null; // not a known client — drop unrelated inbox mail (newsletters, personal, etc.)
 
               // Whole-thread view, so the list can say whether the client EVER replied and what
@@ -181,7 +208,7 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
 
           threads.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
 
-          return new Response(JSON.stringify({ threads, nextPageToken: nextPageTokenOut }), {
+          return new Response(JSON.stringify({ threads, nextPageToken: nextPageTokenOut, truncated }), {
             headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
           });
         } catch (err) {

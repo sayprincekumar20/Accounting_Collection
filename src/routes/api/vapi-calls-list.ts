@@ -121,6 +121,8 @@ export const Route = createFileRoute("/api/vapi-calls-list")({
               endedAt: call.endedAt || call.updatedAt || "",
               assistantName: assistantNames.get(call.assistantId) || call.assistant?.name || "",
               phoneNumberName: call.phoneNumber?.name || "",
+              triggerSource: call.assistantOverrides?.variableValues?.trigger_source || "",
+              requestedBy: call.assistantOverrides?.variableValues?.requested_by || "",
             };
           });
 

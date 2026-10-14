@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
 import { ConversationStatus, SummaryCell, PromiseCell, EscalatedCell, ReadTicks } from "@/components/collections/LogCells";
+import { LogFilterBar, matchesLogFilters, sourceLabel, useLogFilters, type FilterableRow } from "@/components/collections/LogFilters";
 
 export const Route = createFileRoute("/whatsapp")({
   head: () => ({
@@ -133,17 +134,19 @@ function useWaConversations() {
   return useQuery({
     queryKey: ["whatsapp-conversations"],
     queryFn: async () => {
-      const [waRes, clientsRes, pRes, eRes] = await Promise.all([
+      const [waRes, clientsRes, pRes, eRes, qRes] = await Promise.all([
         fetch("/api/whatsapp-conversations").then((r) => r.json()),
         fetch("/api/clients-list").then((r) => r.json()),
         fetch("/api/promise-history").then((r) => r.json()),
         fetch("/api/escalations").then((r) => r.json()),
+        fetch("/api/reminder-queue-list").then((r) => r.json()).catch(() => ({ queue: [] })),
       ]);
       return {
         conversations: (waRes.conversations ?? []) as WaConversation[],
         clients: (clientsRes.clients ?? []) as ClientRow[],
         promises: (pRes.promises ?? []) as PromiseRow[],
         escalations: (eRes.escalations ?? []) as EscalationRow[],
+        queue: (qRes.queue ?? []) as { client_id: string; trigger_source?: string; requested_by?: string }[],
       };
     },
     refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
@@ -155,6 +158,11 @@ function WhatsAppInbox() {
   const promises = data?.promises ?? [];
   const escalations = data?.escalations ?? [];
   const clients = data?.clients ?? [];
+  const sourceByClient = new Map((data?.queue ?? []).map((q) => [q.client_id, q]));
+  const [filters, setFilters, clearFilters] = useLogFilters();
+  // Conversations are keyed by phone: match clients on the last 10 digits (63917…, 0917…, 917…).
+  const last10 = (v: string | null | undefined) => digits(v).slice(-10);
+  const clientForPhone = (phone: string) => clients.find((cl) => !!last10(cl.phone) && last10(cl.phone) === last10(phone));
 
   const [active, setActive] = useState<string | null>(null);
 
@@ -190,6 +198,27 @@ function WhatsAppInbox() {
   const notReplied = conversations.length - replied;
   const promiseCount = conversations.filter((c) => c.promise_recorded).length;
 
+  // Same filter rules on every channel tab (search, status, period, source).
+  const rowFor = (c: (typeof conversations)[number]): FilterableRow => {
+    const client = clientForPhone(c.client_id);
+    const q = client ? sourceByClient.get(client.client_id) : undefined;
+    const last = c.messages[c.messages.length - 1];
+    return {
+      name: client?.parent_name || client?.client_name || c.client_name || c.client_id,
+      contact: client?.contact_person,
+      extra: `${c.client_id} ${client?.email || ""}`,
+      clientReplies: c.messages.filter((m) => m.role === "client").length,
+      lastFrom: last ? (last.role === "client" ? "client" : "us") : "",
+      hasPromise: !!latestForPhone(promises, digits(c.client_id), "whatsapp", clients) || !!c.promise_recorded,
+      hasEscalation: !!latestForPhone(escalations, digits(c.client_id), "whatsapp", clients),
+      lastActivity: c.lastMessageAt,
+      source: q?.trigger_source,
+    };
+  };
+  const visible = conversations.filter((c) => matchesLogFilters(rowFor(c), filters));
+  const toggleStatus = (st: "replied" | "no_reply" | "promised") =>
+    setFilters({ status: filters.status === st ? "all" : st });
+
   return (
     <AppShell
       title="Logs"
@@ -198,15 +227,38 @@ function WhatsAppInbox() {
     >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total conversations" value={String(conversations.length)} tone="primary" />
-        <StatCard label="Replied" value={String(replied)} />
-        <StatCard label="Not replied" value={String(notReplied)} />
-        <StatCard label="Promises to pay" value={String(promiseCount)} hint="Confirmed on WhatsApp" />
+        <StatCard
+          label="Replied"
+          value={String(replied)}
+          hint="Client wrote at least once"
+          onClick={() => toggleStatus("replied")}
+          active={filters.status === "replied"}
+        />
+        <StatCard
+          label="Not replied"
+          value={String(notReplied)}
+          onClick={() => toggleStatus("no_reply")}
+          active={filters.status === "no_reply"}
+        />
+        <StatCard
+          label="Promises to pay"
+          value={String(promiseCount)}
+          hint="Confirmed on WhatsApp"
+          onClick={() => toggleStatus("promised")}
+          active={filters.status === "promised"}
+        />
+      </div>
+
+      <div className="mt-5">
+        <LogFilterBar filters={filters} onChange={setFilters} onClear={clearFilters} shown={visible.length} total={conversations.length} />
       </div>
 
       <section className="surface-card mt-5 overflow-hidden">
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <h2 className="text-sm font-bold uppercase tracking-[0.1em]">Conversations</h2>
-          <span className="text-xs text-muted-foreground">{conversations.length} logged</span>
+          <span className="text-xs text-muted-foreground">
+            {visible.length === conversations.length ? `${conversations.length} logged` : `${visible.length} of ${conversations.length} shown`}
+          </span>
         </header>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[920px] text-sm">
@@ -223,7 +275,11 @@ function WhatsAppInbox() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {conversations.map((c) => {
+              {visible.map((c) => {
+                const src = (() => {
+                  const cl = clientForPhone(c.client_id);
+                  return cl ? sourceByClient.get(cl.client_id) : undefined;
+                })();
                 const promise = latestForPhone(promises, digits(c.client_id), "whatsapp", clients);
                 const escalation = latestForPhone(escalations, digits(c.client_id), "whatsapp", clients);
                 const client = clients.find((cl) => digits(cl.phone) === digits(c.client_id));
@@ -284,6 +340,11 @@ function WhatsAppInbox() {
                       {client ? (
                         <span className="block text-[11px]">
                           {peso(client.collection_amount)} due {shortDate(client.due_date)}
+                        </span>
+                      ) : null}
+                      {src?.trigger_source ? (
+                        <span className="mt-0.5 block text-[11px] font-semibold text-foreground">
+                          {sourceLabel(src.trigger_source, src.requested_by)}
                         </span>
                       ) : null}
                     </td>

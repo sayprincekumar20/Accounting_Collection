@@ -27,20 +27,27 @@ export function StatCard({
   value,
   hint,
   tone = "default",
+  onClick,
+  active = false,
 }: {
   label: string;
   value: string;
   hint?: string | undefined;
   tone?: "default" | "primary" | undefined;
+  /** When set, the card is a button that filters the list below (click again to clear). */
+  onClick?: (() => void) | undefined;
+  active?: boolean | undefined;
 }) {
-  return (
-    <div
-      className={
-        tone === "primary"
-          ? "rounded-xl bg-primary p-4 text-primary-foreground shadow-[var(--shadow-raised)]"
-          : "surface-card p-4"
-      }
-    >
+  const base =
+    tone === "primary"
+      ? "rounded-xl bg-primary p-4 text-primary-foreground shadow-[var(--shadow-raised)]"
+      : "surface-card p-4";
+  const interactive = onClick
+    ? " w-full cursor-pointer text-left transition-shadow hover:ring-2 hover:ring-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    : "";
+  const activeRing = active ? " ring-2 ring-primary" : "";
+  const body = (
+    <>
       <p
         className={
           tone === "primary"
@@ -52,17 +59,23 @@ export function StatCard({
       </p>
       <p className="mt-2 text-2xl font-bold tabular-nums">{value}</p>
       {hint ? (
-        <p
-          className={
-            tone === "primary"
-              ? "mt-1 text-xs opacity-80"
-              : "mt-1 text-xs text-muted-foreground"
-          }
-        >
+        <p className={tone === "primary" ? "mt-1 text-xs opacity-80" : "mt-1 text-xs text-muted-foreground"}>
           {hint}
         </p>
       ) : null}
-    </div>
+      {onClick ? (
+        <p className={`mt-1 text-[10px] font-semibold ${tone === "primary" ? "opacity-80" : "text-primary"}`}>
+          {active ? "Filtering, click to clear" : "Click to filter"}
+        </p>
+      ) : null}
+    </>
+  );
+  return onClick ? (
+    <button type="button" onClick={onClick} aria-pressed={active} className={base + interactive + activeRing}>
+      {body}
+    </button>
+  ) : (
+    <div className={base}>{body}</div>
   );
 }
 

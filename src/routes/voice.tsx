@@ -5,6 +5,7 @@ import { PhoneIncoming, PhoneOutgoing, Globe, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
 import { SummaryCell, PromiseCell, EscalatedCell } from "@/components/collections/LogCells";
+import { LogFilterBar, matchesLogFilters, sourceLabel, useLogFilters, type FilterableRow } from "@/components/collections/LogFilters";
 
 export const Route = createFileRoute("/voice")({
   head: () => ({
@@ -38,6 +39,8 @@ interface CallListItem {
   endedAt?: string;
   assistantName?: string;
   phoneNumberName?: string;
+  triggerSource?: string;
+  requestedBy?: string;
 }
 
 interface CallTurn {
@@ -315,6 +318,25 @@ function VoiceLogs() {
   const connected = calls.filter((c) => callOutcome(c.endedReason, c.status) === "connected").length;
   const notConnected = calls.length - connected;
 
+  // Same filter bar as the text channels; status means call outcome here.
+  const [filters, setFilters, clearFilters] = useLogFilters();
+  const rowFor = (c: CallListItem): FilterableRow => {
+    const client = clients.find((cl) => cl.client_id === c.client_id);
+    return {
+      name: client?.parent_name || client?.client_name || c.client_name || "",
+      contact: client?.contact_person,
+      extra: `${c.phone || ""} ${c.call_id}`,
+      reached: callOutcome(c.endedReason, c.status) === "connected",
+      hasPromise: !!latestFor(promises, c.client_id),
+      hasEscalation: !!latestFor(escalations, c.client_id),
+      lastActivity: c.endedAt || c.startedAt,
+      source: c.triggerSource,
+    };
+  };
+  const visible = calls.filter((c) => matchesLogFilters(rowFor(c), filters));
+  const toggleStatus = (st: "reached" | "not_reached" | "promised") =>
+    setFilters({ status: filters.status === st ? "all" : st });
+
   return (
     <AppShell
       title="Logs"
@@ -323,19 +345,44 @@ function VoiceLogs() {
     >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total calls" value={String(calls.length)} tone="primary" />
-        <StatCard label="Connected" value={String(connected)} />
-        <StatCard label="Not answered / failed" value={String(notConnected)} />
+        <StatCard
+          label="Connected"
+          value={String(connected)}
+          onClick={() => toggleStatus("reached")}
+          active={filters.status === "reached"}
+        />
+        <StatCard
+          label="Not answered / failed"
+          value={String(notConnected)}
+          onClick={() => toggleStatus("not_reached")}
+          active={filters.status === "not_reached"}
+        />
         <StatCard
           label="Promises to pay"
           value={String(calls.filter((c) => latestFor(promises, c.client_id)).length)}
           hint="Confirmed on a call"
+          onClick={() => toggleStatus("promised")}
+          active={filters.status === "promised"}
+        />
+      </div>
+
+      <div className="mt-5">
+        <LogFilterBar
+          variant="voice"
+          filters={filters}
+          onChange={setFilters}
+          onClear={clearFilters}
+          shown={visible.length}
+          total={calls.length}
         />
       </div>
 
       <section className="surface-card mt-5 overflow-hidden">
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <h2 className="text-sm font-bold uppercase tracking-[0.1em]">Calls</h2>
-          <span className="text-xs text-muted-foreground">{calls.length} logged</span>
+          <span className="text-xs text-muted-foreground">
+            {visible.length === calls.length ? `${calls.length} logged` : `${visible.length} of ${calls.length} shown`}
+          </span>
         </header>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1280px] text-sm">
@@ -355,7 +402,7 @@ function VoiceLogs() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {calls.map((c) => {
+              {visible.map((c) => {
                 const promise = latestFor(promises, c.client_id);
                 const escalation = latestFor(escalations, c.client_id);
                 const client = clients.find((cl) => cl.client_id === c.client_id);
@@ -425,6 +472,11 @@ function VoiceLogs() {
                         )}
                         {type}
                       </span>
+                      {c.triggerSource ? (
+                        <span className="mt-1 block text-[11px] font-semibold text-foreground">
+                          {sourceLabel(c.triggerSource, c.requestedBy)}
+                        </span>
+                      ) : null}
                     </td>
                   </tr>
                 );

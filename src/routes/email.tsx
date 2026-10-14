@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
 import { ConversationStatus, SummaryCell, PromiseCell, EscalatedCell, type LastFrom } from "@/components/collections/LogCells";
+import { LogFilterBar, matchesLogFilters, sourceLabel, useLogFilters, type FilterableRow } from "@/components/collections/LogFilters";
 
 export const Route = createFileRoute("/email")({
   head: () => ({
@@ -164,15 +165,17 @@ function useEmailSidebar() {
   return useQuery({
     queryKey: ["email-sidebar-data"],
     queryFn: async () => {
-      const [clientsRes, pRes, eRes] = await Promise.all([
+      const [clientsRes, pRes, eRes, qRes] = await Promise.all([
         fetch("/api/clients-list").then((r) => r.json()),
         fetch("/api/promise-history").then((r) => r.json()),
         fetch("/api/escalations").then((r) => r.json()),
+        fetch("/api/reminder-queue-list").then((r) => r.json()).catch(() => ({ queue: [] })),
       ]);
       return {
         clients: (clientsRes.clients ?? []) as ClientRow[],
         promises: (pRes.promises ?? []) as PromiseRow[],
         escalations: (eRes.escalations ?? []) as EscalationRow[],
+        queue: (qRes.queue ?? []) as { client_id: string; trigger_source?: string; requested_by?: string }[],
       };
     },
     refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
@@ -233,6 +236,8 @@ function EmailInbox() {
   const clients = sidebar?.clients ?? [];
   const promises = sidebar?.promises ?? [];
   const escalations = sidebar?.escalations ?? [];
+  const sourceByClient = new Map((sidebar?.queue ?? []).map((q) => [q.client_id, q]));
+  const [filters, setFilters, clearFilters] = useLogFilters();
 
   const [active, setActive] = useState<string | null>(null);
 
@@ -280,6 +285,26 @@ function EmailInbox() {
   const needsAnswer = threads.filter((t) => (t.lastFrom || (t.lastDirection === "inbound" ? "client" : "us")) === "client").length;
   const promiseCount = threads.filter((t) => t.promise_recorded).length;
 
+  // Same filter rules on every channel tab (search, status, period, source).
+  const rowFor = (t: ThreadListItem): FilterableRow => {
+    const client = findClient(t.client_id, t.client_name);
+    const q = sourceByClient.get(t.client_id);
+    return {
+      name: client?.parent_name || client?.client_name || t.client_name,
+      contact: t.contact_person || client?.contact_person,
+      extra: `${client?.email || ""} ${t.client_id}`,
+      clientReplies: t.clientReplyCount ?? (t.lastDirection === "inbound" ? 1 : 0),
+      lastFrom: t.lastFrom || (t.lastDirection === "inbound" ? "client" : "us"),
+      hasPromise: !!(client && latestFor(promises, client.client_id, "email")) || t.promise_recorded,
+      hasEscalation: !!(client && latestFor(escalations, client.client_id, "email")) || t.notified_ar,
+      lastActivity: t.lastMessageAt,
+      source: q?.trigger_source,
+    };
+  };
+  const visible = threads.filter((t) => matchesLogFilters(rowFor(t), filters));
+  const toggleStatus = (st: "replied" | "needs_answer" | "promised") =>
+    setFilters({ status: filters.status === st ? "all" : st });
+
   return (
     <AppShell
       title="Logs"
@@ -296,15 +321,39 @@ function EmailInbox() {
     >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total threads" value={String(threads.length)} tone="primary" />
-        <StatCard label="Client replied" value={String(replied)} hint={`${threads.length - replied} with no reply yet`} />
-        <StatCard label="Needs answer" value={String(needsAnswer)} hint="Client wrote last" />
-        <StatCard label="Promises to pay" value={String(promiseCount)} hint="Confirmed by email" />
+        <StatCard
+          label="Client replied"
+          value={String(replied)}
+          hint={`${threads.length - replied} with no reply yet`}
+          onClick={() => toggleStatus("replied")}
+          active={filters.status === "replied"}
+        />
+        <StatCard
+          label="Needs answer"
+          value={String(needsAnswer)}
+          hint="Client wrote last"
+          onClick={() => toggleStatus("needs_answer")}
+          active={filters.status === "needs_answer"}
+        />
+        <StatCard
+          label="Promises to pay"
+          value={String(promiseCount)}
+          hint="Confirmed by email"
+          onClick={() => toggleStatus("promised")}
+          active={filters.status === "promised"}
+        />
+      </div>
+
+      <div className="mt-5">
+        <LogFilterBar filters={filters} onChange={setFilters} onClear={clearFilters} shown={visible.length} total={threads.length} />
       </div>
 
       <section className="surface-card mt-5 overflow-hidden">
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <h2 className="text-sm font-bold uppercase tracking-[0.1em]">Threads</h2>
-          <span className="text-xs text-muted-foreground">{threads.length} logged</span>
+          <span className="text-xs text-muted-foreground">
+            {visible.length === threads.length ? `${threads.length} logged` : `${visible.length} of ${threads.length} shown`}
+          </span>
         </header>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[920px] text-sm">
@@ -321,8 +370,9 @@ function EmailInbox() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {threads.map((t) => {
+              {visible.map((t) => {
                 const client = findClient(t.client_id, t.client_name);
+                const src = sourceByClient.get(t.client_id);
                 const promise = client ? latestFor(promises, client.client_id, "email") : undefined;
                 const escalation = client ? latestFor(escalations, client.client_id, "email") : undefined;
                 return (
@@ -369,6 +419,11 @@ function EmailInbox() {
                       {client ? (
                         <span className="block text-[11px]">
                           {peso(client.collection_amount)} due {shortDate(client.due_date)}
+                        </span>
+                      ) : null}
+                      {src?.trigger_source ? (
+                        <span className="mt-0.5 block text-[11px] font-semibold text-foreground">
+                          {sourceLabel(src.trigger_source, src.requested_by)}
                         </span>
                       ) : null}
                     </td>

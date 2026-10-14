@@ -21,6 +21,8 @@ interface QueueRow {
   created_date?: unknown;
   attempted_date?: unknown;
   sent_date?: unknown;
+  trigger_source?: unknown;
+  requested_by?: unknown;
 }
 const s = (v: unknown) => (v == null ? "" : String(v));
 
@@ -47,6 +49,8 @@ export const Route = createFileRoute("/api/reminder-queue-list")({
             created_date: s(r.created_date),
             attempted_date: s(r.attempted_date),
             sent_date: s(r.sent_date),
+            trigger_source: s(r.trigger_source),
+            requested_by: s(r.requested_by),
           }));
           queue.sort(
             (a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime(),
