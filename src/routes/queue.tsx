@@ -1,7 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { Panel, ChannelBadge, StatusPill, StatCard, RefreshButton } from "@/components/collections/Bits";
+import {
+  LogFilterBar,
+  matchesLogFilters,
+  sourceLabel,
+  useLogFilters,
+} from "@/components/collections/LogFilters";
+import {
+  Panel,
+  ChannelBadge,
+  StatusPill,
+  StatCard,
+  RefreshButton,
+} from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/queue")({
   head: () => ({
@@ -33,7 +45,22 @@ interface QueueRow {
   created_date: string;
   attempted_date: string;
   sent_date: string;
+  trigger_source?: string;
+  requested_by?: string;
 }
+
+const QUEUE_STATUSES = [
+  { value: "all", label: "All statuses" },
+  { value: "q_PENDING", label: "Pending" },
+  { value: "q_WAITING_QUOTA", label: "Waiting on quota" },
+  { value: "q_SENT", label: "Sent" },
+  { value: "q_FAILED", label: "Failed" },
+  { value: "q_HELD", label: "Held (paused)" },
+  { value: "q_SUPPRESSED", label: "Suppressed (promise / AR)" },
+  { value: "q_SKIPPED_MULTIBRANCH", label: "Skipped: 5+ branches" },
+  { value: "q_SKIPPED_SALESPERSON", label: "Skipped: sales person" },
+  { value: "q_STALE", label: "Stale (retired)" },
+];
 
 function peso(v: number) {
   return "PHP " + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
@@ -41,7 +68,11 @@ function peso(v: number) {
 function shortDate(v: string | null | undefined) {
   if (!v) return "—";
   try {
-    return new Date(v).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+    return new Date(v).toLocaleDateString("en-PH", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   } catch {
     return v;
   }
@@ -65,6 +96,25 @@ function QueuePage() {
   const queue = data ?? [];
   const sent = queue.filter((q) => q.queue_status.toUpperCase() === "SENT");
   const waiting = queue.filter((q) => q.queue_status.toUpperCase() === "WAITING_QUOTA");
+  const skipped = queue.filter((q) => q.queue_status.toUpperCase().startsWith("SKIPPED"));
+  const [filters, setFilters, clearFilters] = useLogFilters();
+  const statusIsMine = QUEUE_STATUSES.some((o) => o.value === filters.status);
+  const wanted = statusIsMine && filters.status !== "all" ? filters.status.slice(2) : "";
+  const visible = queue.filter(
+    (q) =>
+      (!wanted || q.queue_status.toUpperCase() === wanted) &&
+      matchesLogFilters(
+        {
+          name: q.client_name,
+          contact: q.contact_person,
+          extra: `${q.invoice_numbers} ${q.preferred_channel} ${q.client_id}`,
+          lastActivity: q.sent_date || q.attempted_date || q.created_date,
+          source: q.trigger_source,
+        },
+        { ...filters, status: "all" },
+      ),
+  );
+  const toggle = (st: string) => setFilters({ status: filters.status === st ? "all" : st });
 
   return (
     <AppShell
@@ -72,13 +122,40 @@ function QueuePage() {
       subtitle="Built by the n8n daily overdue run · live"
       actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
     >
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Queued today" value={String(queue.length)} tone="primary" />
-        <StatCard label="Sent" value={String(sent.length)} />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="In this cycle's queue" value={String(queue.length)} tone="primary" />
+        <StatCard
+          label="Sent"
+          value={String(sent.length)}
+          onClick={() => toggle("q_SENT")}
+          active={filters.status === "q_SENT"}
+        />
         <StatCard
           label="Waiting on quota"
           value={String(waiting.length)}
           hint={peso(waiting.reduce((s, q) => s + Number(q.collection_amount), 0))}
+          onClick={() => toggle("q_WAITING_QUOTA")}
+          active={filters.status === "q_WAITING_QUOTA"}
+        />
+        <StatCard
+          label="Skipped"
+          value={String(skipped.length)}
+          hint="5+ branches or do-not-contact sales person"
+          onClick={() => toggle("q_SKIPPED_MULTIBRANCH")}
+          active={filters.status === "q_SKIPPED_MULTIBRANCH"}
+        />
+      </div>
+
+      <div className="mt-5">
+        <LogFilterBar
+          filters={filters}
+          onChange={setFilters}
+          onClear={clearFilters}
+          shown={visible.length}
+          total={queue.length}
+          statusOptions={QUEUE_STATUSES}
+          rangeLabel="Any sent date"
+          searchPlaceholder="Search client, contact, invoice, channel…"
         />
       </div>
 
@@ -97,10 +174,11 @@ function QueuePage() {
                   <th className="px-4 py-2.5 font-semibold">Due</th>
                   <th className="px-4 py-2.5 font-semibold">Sent</th>
                   <th className="px-4 py-2.5 font-semibold">Status</th>
+                  <th className="px-4 py-2.5 font-semibold">Source</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {queue.map((q) => (
+                {visible.map((q) => (
                   <tr key={q.queue_id} className="hover:bg-muted/60">
                     <td className="px-4 py-3 font-semibold">{q.client_name}</td>
                     <td className="px-4 py-3">
@@ -127,12 +205,15 @@ function QueuePage() {
                     <td className="px-4 py-3">
                       <StatusPill status={q.queue_status.toLowerCase()} />
                     </td>
+                    <td className="px-4 py-3 text-xs font-semibold">
+                      {q.trigger_source ? sourceLabel(q.trigger_source, q.requested_by) : "—"}
+                    </td>
                   </tr>
                 ))}
-                {!isLoading && queue.length === 0 ? (
+                {!isLoading && visible.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      No queue entries yet.
+                    <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                      No queue entries match.
                     </td>
                   </tr>
                 ) : null}

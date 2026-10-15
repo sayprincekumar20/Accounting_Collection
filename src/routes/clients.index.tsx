@@ -2,6 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import {
+  LogFilterBar,
+  matchesLogFilters,
+  useLogFilters,
+} from "@/components/collections/LogFilters";
 import { Panel, StatusPill, RefreshButton } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/clients/")({
@@ -35,6 +40,45 @@ interface ClientRow {
   due_date: string;
   status: string;
   invoice_numbers: string;
+  overdue_total?: number;
+  promise_suppressed_until?: string;
+  suppression_reason?: string;
+  ar_handoff_until?: string;
+  sales_person?: string;
+}
+
+const CLIENT_STATUSES = [
+  { value: "all", label: "All clients" },
+  { value: "c_promise", label: "Payment promise active" },
+  { value: "c_handoff", label: "AR team handling (escalated)" },
+  { value: "c_email", label: "Email clients" },
+  { value: "c_sms", label: "Phone only (SMS)" },
+  { value: "c_nocontact", label: "No contact channel" },
+  { value: "c_overdue", label: "Has overdue invoices" },
+];
+const todayStart = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+};
+const activeUntil = (v?: string) => !!v && new Date(v).getTime() >= todayStart();
+function clientStatusMatch(c: ClientRow, status: string) {
+  switch (status) {
+    case "c_promise":
+      return activeUntil(c.promise_suppressed_until) && c.suppression_reason !== "ar_handoff";
+    case "c_handoff":
+      return activeUntil(c.ar_handoff_until);
+    case "c_email":
+      return !!c.email;
+    case "c_sms":
+      return !c.email && !!c.phone;
+    case "c_nocontact":
+      return !c.email && !c.phone;
+    case "c_overdue":
+      return Number(c.overdue_total || 0) > 0;
+    default:
+      return true;
+  }
 }
 
 function peso(v: number) {
@@ -43,7 +87,11 @@ function peso(v: number) {
 function shortDate(v: string | null | undefined) {
   if (!v) return "—";
   try {
-    return new Date(v).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+    return new Date(v).toLocaleDateString("en-PH", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   } catch {
     return v;
   }
@@ -70,30 +118,51 @@ function useClients() {
 function ClientsPage() {
   const { data, isLoading, isFetching, error, refetch } = useClients();
   const clients = data ?? [];
-  const [search, setSearch] = useState("");
-
-  const filtered = clients.filter((c) =>
-    `${c.client_name} ${c.parent_name ?? ""} ${c.email ?? ""} ${c.invoice_numbers ?? ""}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
+  const [filters, setFilters, clearFilters] = useLogFilters();
+  const { data: queue } = useQuery({
+    queryKey: ["reminder-queue-list"],
+    queryFn: async () => {
+      const r = await fetch("/api/reminder-queue-list");
+      if (!r.ok) return [];
+      const d = await r.json();
+      return (d.queue ?? []) as { client_id: string; trigger_source?: string }[];
+    },
+    refetchInterval: 14400000,
+  });
+  const sourceByClient = new Map((queue ?? []).map((q) => [q.client_id, q.trigger_source || ""]));
+  const statusIsMine = CLIENT_STATUSES.some((o) => o.value === filters.status);
+  const filtered = clients.filter(
+    (c) =>
+      (!statusIsMine || clientStatusMatch(c, filters.status)) &&
+      matchesLogFilters(
+        {
+          name: `${c.client_name} ${c.parent_name ?? ""}`,
+          contact: c.contact_person,
+          extra: `${c.email ?? ""} ${c.phone ?? ""} ${c.invoice_numbers ?? ""} ${c.sales_person ?? ""}`,
+          lastActivity: c.due_date,
+          source: sourceByClient.get(c.client_id),
+        },
+        { ...filters, status: "all" },
+      ),
   );
-
   return (
     <AppShell
       title="Clients"
       subtitle="Overdue accounts and the channels we can reach them on · live"
-      actions={
-        <div className="flex items-center gap-2">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search client, invoice or email…"
-            className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40 sm:w-72"
-          />
-          <RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />
-        </div>
-      }
+      actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
     >
+      <div className="mb-5">
+        <LogFilterBar
+          filters={filters}
+          onChange={setFilters}
+          onClear={clearFilters}
+          shown={filtered.length}
+          total={clients.length}
+          statusOptions={CLIENT_STATUSES}
+          rangeLabel="Any due date"
+          searchPlaceholder="Search client, contact, email, phone, invoice, sales person…"
+        />
+      </div>
       <Panel title="Client ledger" description={`${filtered.length} accounts`}>
         {isLoading ? <p className="p-4 text-sm text-muted-foreground">Loading…</p> : null}
         {error ? <p className="p-4 text-sm text-destructive">Could not load clients.</p> : null}
@@ -128,6 +197,7 @@ function ClientsPage() {
                         {c.client_name}
                       </Link>
                       <p className="text-xs text-muted-foreground">
+                        {c.contact_person ? `${c.contact_person} · ` : ""}
                         {c.parent_name ?? "Direct account"}
                       </p>
                     </td>
@@ -145,6 +215,15 @@ function ClientsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <StatusPill status={c.status} />
+                      {activeUntil(c.ar_handoff_until) ? (
+                        <span className="mt-1 block text-[11px] font-semibold text-destructive">
+                          AR handling until {shortDate(c.ar_handoff_until)}
+                        </span>
+                      ) : activeUntil(c.promise_suppressed_until) ? (
+                        <span className="mt-1 block text-[11px] font-semibold text-success">
+                          Promise until {shortDate(c.promise_suppressed_until)}
+                        </span>
+                      ) : null}
                     </td>
                   </tr>
                 );

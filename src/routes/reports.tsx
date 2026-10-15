@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
+import { LogFilterBar, useLogFilters } from "@/components/collections/LogFilters";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({
@@ -10,7 +12,7 @@ export const Route = createFileRoute("/reports")({
       {
         name: "description",
         content:
-          "Daily overdue run history: processed accounts, outstanding totals, queued channels, no-contact and email-only exceptions, synced live from n8n.",
+          "Weekly run history: what each run queued and skipped, and what actually happened (sent, calls, replies, promises, escalations).",
       },
       { property: "og:title", content: "Daily Run Reports | Rare Global Food Collections" },
     ],
@@ -18,30 +20,70 @@ export const Route = createFileRoute("/reports")({
   component: ReportsPage,
 });
 
+interface Results {
+  emails_sent: number;
+  sms_sent: number;
+  whatsapp_sent: number;
+  calls_placed: number;
+  calls_failed: number;
+  retries: number;
+  cliq_call_sends: number;
+  client_replies: number;
+  clients_replied: number;
+  ai_replies: number;
+  promises: number;
+  escalations: number;
+}
 interface RunLog {
   run_date: string;
   run_timestamp: string;
   total_processed: number;
   total_outstanding: number;
   email_queued: number;
+  sms_queued: number;
   viber_queued: number;
+  voice_queued: number;
+  skipped_cooldown: number;
+  skipped_multibranch: number;
+  skipped_salesperson: number;
   no_contact_count: number;
   no_contact_amount: number;
+  no_contact_details: {
+    parent_name?: string;
+    branch_name?: string;
+    amount?: number;
+    invoices?: string;
+  }[];
   email_only_count: number;
   email_only_amount: number;
-  skipped_cooldown: number;
+  email_only_details: { client_name?: string; email?: string; amount?: number }[];
+  recorded: { no_contact: boolean; email_only: boolean; sms: boolean; voice: boolean };
+  results: Results;
 }
 
 function peso(v: number) {
-  return "PHP " + Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+  return (
+    "PHP " +
+    Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  );
 }
-function shortDate(v: string | null | undefined) {
-  if (!v) return "—";
-  try {
-    return new Date(v).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
-  } catch {
-    return v;
-  }
+function runLabel(v: string) {
+  const d = new Date(`${v}T00:00:00+08:00`);
+  return isNaN(d.getTime())
+    ? v
+    : d.toLocaleDateString("en-PH", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+}
+function inRange(runDate: string, range: string) {
+  if (range === "all") return true;
+  const t = new Date(`${runDate}T00:00:00+08:00`).getTime();
+  const now = Date.now();
+  if (range === "today") return now - t < 86400000 && now >= t;
+  return now - t <= (range === "7d" ? 7 : 30) * 86400000;
 }
 
 function useRunLogs() {
@@ -53,100 +95,288 @@ function useRunLogs() {
       const d = await r.json();
       return (d.runs ?? []) as RunLog[];
     },
-    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
+    refetchInterval: 14400000, // 4 hours -- see the refresh button for on-demand updates
   });
 }
 
+const notRecorded = (
+  <span className="text-muted-foreground" title="Not recorded by this run (added later)">
+    —
+  </span>
+);
+
 function ReportsPage() {
   const { data, isLoading, isFetching, error, refetch } = useRunLogs();
-  const runs = data ?? [];
-  const latest = runs[0];
-  const max = Math.max(...runs.map((r) => r.total_processed), 1);
+  const [filters, setFilters, clearFilters] = useLogFilters();
+  const all = data ?? [];
+  const runs = all.filter((r) => inRange(r.run_date, filters.range));
+  const [selected, setSelected] = useState<string | null>(null);
+  const current = runs.find((r) => r.run_date === selected) || runs[0];
+  const q = filters.q.trim().toLowerCase();
+  const noContact = (current?.no_contact_details ?? []).filter(
+    (b) => !q || `${b.parent_name} ${b.branch_name} ${b.invoices}`.toLowerCase().includes(q),
+  );
+  const emailOnly = (current?.email_only_details ?? []).filter(
+    (c) => !q || `${c.client_name} ${c.email}`.toLowerCase().includes(q),
+  );
+  const res = current?.results;
 
   return (
     <AppShell
       title="Reports"
-      subtitle="Daily overdue run history and exception lists · live"
+      subtitle="Weekly runs: what was queued, skipped, and what actually happened · live"
       actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
     >
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Runs logged" value={String(runs.length)} tone="primary" />
-        <StatCard
-          label="No contact (latest run)"
-          value={String(latest?.no_contact_count ?? 0)}
-          hint={peso(latest?.no_contact_amount ?? 0)}
-        />
-        <StatCard
-          label="Email only (latest run)"
-          value={String(latest?.email_only_count ?? 0)}
-          hint={peso(latest?.email_only_amount ?? 0)}
-        />
-      </div>
+      <LogFilterBar
+        filters={filters}
+        onChange={setFilters}
+        onClear={clearFilters}
+        shown={runs.length}
+        total={all.length}
+        hideStatus
+        hideSource
+        rangeLabel="Any run date"
+        searchPlaceholder="Search the exception lists (client, branch, email, invoice)…"
+      />
 
-      <div className="mt-5 space-y-5">
-        {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
-        {error ? <p className="text-sm text-destructive">Could not load run logs.</p> : null}
+      {isLoading ? <p className="mt-4 text-sm text-muted-foreground">Loading…</p> : null}
+      {error ? <p className="mt-4 text-sm text-destructive">Could not load run logs.</p> : null}
 
-        <Panel title="Processed per run" description="Recent daily runs">
-          <div className="flex h-40 items-end gap-2 px-4 py-4">
-            {runs
-              .slice()
-              .reverse()
-              .map((r) => (
-                <div key={r.run_date} className="flex min-w-0 flex-1 flex-col items-center gap-1">
-                  <div
-                    className="w-full rounded-t bg-primary"
-                    style={{ height: `${(r.total_processed / max) * 100}%` }}
-                    title={`${r.total_processed} processed`}
-                  />
-                  <span className="truncate text-[10px] text-muted-foreground">
-                    {new Date(r.run_date).getDate()}
-                  </span>
-                </div>
-              ))}
+      {current ? (
+        <>
+          <h2 className="mt-6 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+            Run of {runLabel(current.run_date)}
+            {current.run_timestamp
+              ? ` · started ${new Date(current.run_timestamp).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" })}`
+              : ""}
+          </h2>
+          <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label="Clients processed"
+              value={String(current.total_processed)}
+              hint={peso(current.total_outstanding) + " outstanding"}
+              tone="primary"
+            />
+            <StatCard
+              label="Queued to contact"
+              value={String(current.email_queued + current.sms_queued + current.viber_queued)}
+              hint={`${current.email_queued} email · ${current.recorded.sms ? current.sms_queued : "–"} SMS · ${current.recorded.voice ? current.voice_queued : "–"} calls`}
+            />
+            <StatCard
+              label="Skipped"
+              value={String(
+                current.skipped_cooldown +
+                  current.skipped_multibranch +
+                  current.skipped_salesperson,
+              )}
+              hint={`${current.skipped_multibranch} 5+ branches · ${current.skipped_salesperson} sales person · ${current.skipped_cooldown} cooldown`}
+            />
+            <StatCard
+              label="Not reachable"
+              value={current.recorded.no_contact ? String(current.no_contact_count) : "–"}
+              hint={
+                current.recorded.no_contact
+                  ? `no phone/email · ${peso(current.no_contact_amount)}`
+                  : "not recorded for this run"
+              }
+            />
           </div>
-        </Panel>
 
-        <Panel title="Daily run log">
+          {res ? (
+            <div className="mt-5">
+              <Panel
+                title="What happened in this cycle"
+                description="Live from the logs, from this run until the next one (Wed to Fri)."
+              >
+                <div className="grid gap-px bg-border sm:grid-cols-3 lg:grid-cols-6">
+                  {[
+                    ["Emails sent", res.emails_sent],
+                    ["SMS sent", res.sms_sent],
+                    [
+                      "Calls placed",
+                      res.calls_placed,
+                      res.calls_failed ? `${res.calls_failed} failed` : "",
+                    ],
+                    ["Client replies", res.client_replies, `${res.clients_replied} clients`],
+                    ["Promises to pay", res.promises],
+                    ["Escalated to AR", res.escalations],
+                  ].map(([label, value, hint]) => (
+                    <div key={String(label)} className="bg-card px-4 py-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                        {label}
+                      </p>
+                      <p className="mt-1 text-xl font-bold tabular-nums">{String(value)}</p>
+                      {hint ? (
+                        <p className="text-[11px] text-muted-foreground">{String(hint)}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+                <p className="px-4 py-2 text-[11px] text-muted-foreground">
+                  {res.ai_replies} AI replies · {res.retries} same-day call retries ·{" "}
+                  {res.cliq_call_sends} sends/calls from /call
+                </p>
+              </Panel>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      <div className="mt-5">
+        <Panel
+          title="Daily run log"
+          description="Every recorded run. Click a run to see its details above."
+        >
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[1180px] text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-2.5 font-semibold">Run date</th>
-                  <th className="px-4 py-2.5 text-right font-semibold">Processed</th>
-                  <th className="px-4 py-2.5 text-right font-semibold">Outstanding</th>
-                  <th className="px-4 py-2.5 text-right font-semibold">Email</th>
-                  <th className="px-4 py-2.5 text-right font-semibold">Viber</th>
-                  <th className="px-4 py-2.5 text-right font-semibold">No contact</th>
+                  <th className="px-3 py-2.5 font-semibold">Run date</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Clients</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Outstanding</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Email q.</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">SMS q.</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Calls q.</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">5+ branch</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Sales person</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Cooldown</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">No contact</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Email only</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Sent</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Calls</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Replies</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Promises</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Escalated</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {runs.map((r) => (
-                  <tr key={r.run_date} className="hover:bg-muted/60">
-                    <td className="px-4 py-3 font-semibold">{shortDate(r.run_date)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{r.total_processed}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">
+                  <tr
+                    key={r.run_date}
+                    onClick={() => setSelected(r.run_date)}
+                    className={`cursor-pointer tabular-nums ${r.run_date === current?.run_date ? "bg-secondary" : "hover:bg-muted/60"}`}
+                  >
+                    <td className="px-3 py-3 font-semibold whitespace-nowrap">
+                      {runLabel(r.run_date)}
+                    </td>
+                    <td className="px-3 py-3 text-right">{r.total_processed}</td>
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
                       {peso(r.total_outstanding)}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums">{r.email_queued}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{r.viber_queued}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {r.no_contact_count} · {peso(r.no_contact_amount)}
+                    <td className="px-3 py-3 text-right">{r.email_queued}</td>
+                    <td className="px-3 py-3 text-right">
+                      {r.recorded.sms ? r.sms_queued : notRecorded}
                     </td>
+                    <td className="px-3 py-3 text-right">
+                      {r.recorded.voice ? r.voice_queued : notRecorded}
+                    </td>
+                    <td className="px-3 py-3 text-right">{r.skipped_multibranch}</td>
+                    <td className="px-3 py-3 text-right">{r.skipped_salesperson}</td>
+                    <td className="px-3 py-3 text-right">{r.skipped_cooldown}</td>
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                      {r.recorded.no_contact
+                        ? `${r.no_contact_count} · ${peso(r.no_contact_amount)}`
+                        : notRecorded}
+                    </td>
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                      {r.recorded.email_only
+                        ? `${r.email_only_count} · ${peso(r.email_only_amount)}`
+                        : notRecorded}
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      {r.results.emails_sent + r.results.sms_sent + r.results.whatsapp_sent}
+                    </td>
+                    <td className="px-3 py-3 text-right">{r.results.calls_placed}</td>
+                    <td className="px-3 py-3 text-right">{r.results.client_replies}</td>
+                    <td className="px-3 py-3 text-right">{r.results.promises}</td>
+                    <td className="px-3 py-3 text-right">{r.results.escalations}</td>
                   </tr>
                 ))}
                 {!isLoading && runs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      No runs logged yet.
+                    <td
+                      colSpan={16}
+                      className="px-4 py-8 text-center text-sm text-muted-foreground"
+                    >
+                      No runs in this period.
                     </td>
                   </tr>
                 ) : null}
               </tbody>
             </table>
           </div>
+          <p className="px-4 py-2 text-[11px] text-muted-foreground">
+            "q." = queued by the run. Sent, Calls, Replies, Promises and Escalated are live results
+            for that run&apos;s cycle. "—" = not recorded by that run (the field was added later).
+          </p>
         </Panel>
       </div>
+
+      {current ? (
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+          <Panel
+            title={`No contact on file (${current.recorded.no_contact ? noContact.length : "–"})`}
+            description="Overdue branches with no phone and no email: not reachable automatically."
+          >
+            <ExceptionList
+              recorded={current.recorded.no_contact}
+              rows={noContact.map((b) => ({
+                main: b.branch_name || b.parent_name || "",
+                sub: [
+                  b.parent_name !== b.branch_name ? b.parent_name : "",
+                  b.invoices ? `Invoices ${b.invoices}` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
+                amount: b.amount || 0,
+              }))}
+            />
+          </Panel>
+          <Panel
+            title={`Email only, no mobile (${current.recorded.email_only ? emailOnly.length : "–"})`}
+            description="Reminder emailed, but no phone number for a call."
+          >
+            <ExceptionList
+              recorded={current.recorded.email_only}
+              rows={emailOnly.map((c) => ({
+                main: c.client_name || "",
+                sub: c.email || "",
+                amount: c.amount || 0,
+              }))}
+            />
+          </Panel>
+        </div>
+      ) : null}
     </AppShell>
+  );
+}
+
+function ExceptionList({
+  rows,
+  recorded,
+}: {
+  rows: { main: string; sub: string; amount: number }[];
+  recorded: boolean;
+}) {
+  if (!recorded) {
+    return (
+      <p className="px-4 py-6 text-sm text-muted-foreground">
+        Not recorded for this run (added from 21 Oct).
+      </p>
+    );
+  }
+  if (rows.length === 0) return <p className="px-4 py-6 text-sm text-muted-foreground">None.</p>;
+  return (
+    <ul className="max-h-80 divide-y divide-border overflow-y-auto">
+      {rows.map((r, i) => (
+        <li key={i} className="flex items-start justify-between gap-3 px-4 py-2.5">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">{r.main}</p>
+            {r.sub ? <p className="truncate text-[11px] text-muted-foreground">{r.sub}</p> : null}
+          </div>
+          <span className="shrink-0 text-sm tabular-nums">{peso(r.amount)}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

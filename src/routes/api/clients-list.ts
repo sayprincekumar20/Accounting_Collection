@@ -26,6 +26,14 @@ interface ClientTableRow {
   credit_terms: string | null;
   credit_limit: number | null;
   source: string | null;
+  overdue_total?: number | null;
+  current_total?: number | null;
+  promise_suppressed_until?: string | null;
+  suppression_reason?: string | null;
+  ar_handoff_until?: string | null;
+  sales_person?: string | null;
+  segment?: string | null;
+  ar_owner?: string | null;
 }
 
 export const Route = createFileRoute("/api/clients-list")({
@@ -60,6 +68,14 @@ export const Route = createFileRoute("/api/clients-list")({
               credit_terms: r.credit_terms || "",
               credit_limit: r.credit_limit != null ? Number(r.credit_limit) : null,
               source: r.source || "",
+              overdue_total: Number(r.overdue_total || 0),
+              current_total: Number(r.current_total || 0),
+              promise_suppressed_until: r.promise_suppressed_until || "",
+              suppression_reason: r.suppression_reason || "",
+              ar_handoff_until: r.ar_handoff_until || "",
+              sales_person: r.sales_person || "",
+              segment: r.segment || "",
+              ar_owner: r.ar_owner || "",
             }));
 
           return new Response(JSON.stringify({ clients, truncated: result.truncated }), {

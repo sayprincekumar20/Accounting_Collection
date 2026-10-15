@@ -18,7 +18,8 @@ export type SourceFilter = "all" | "weekly" | "cliq" | "retry" | "untagged";
 
 export interface LogFilterState {
   q: string;
-  status: StatusFilter;
+  /** One of StatusFilter on channel tabs; pages may use their own values (see statusOptions). */
+  status: StatusFilter | (string & {});
   range: RangeFilter;
   source: SourceFilter;
 }
@@ -179,6 +180,11 @@ export function LogFilterBar({
   shown,
   total,
   variant = "text",
+  statusOptions,
+  hideStatus = false,
+  hideSource = false,
+  rangeLabel,
+  searchPlaceholder,
 }: {
   filters: LogFilterState;
   onChange: (patch: Partial<LogFilterState>) => void;
@@ -186,10 +192,20 @@ export function LogFilterBar({
   shown: number;
   total: number;
   variant?: "text" | "voice";
+  /** Page-specific status options (first one should be the "all" option). */
+  statusOptions?: { value: string; label: string }[] | undefined;
+  hideStatus?: boolean | undefined;
+  hideSource?: boolean | undefined;
+  /** What the period filters on, shown as the first option (e.g. "Any run date"). */
+  rangeLabel?: string | undefined;
+  searchPlaceholder?: string | undefined;
 }) {
-  const statuses = variant === "voice" ? VOICE_STATUSES : TEXT_STATUSES;
+  const statuses = statusOptions ?? (variant === "voice" ? VOICE_STATUSES : TEXT_STATUSES);
   const active =
-    filters.q || filters.status !== "all" || filters.range !== "all" || filters.source !== "all";
+    filters.q ||
+    (!hideStatus && filters.status !== "all") ||
+    filters.range !== "all" ||
+    (!hideSource && filters.source !== "all");
   const select =
     "h-9 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40";
   return (
@@ -198,45 +214,49 @@ export function LogFilterBar({
         type="search"
         value={filters.q}
         onChange={(e) => onChange({ q: e.target.value })}
-        placeholder="Search client, contact, email, phone…"
+        placeholder={searchPlaceholder || "Search client, contact, email, phone…"}
         aria-label="Search"
         className={`${select} min-w-[220px] flex-1`}
       />
-      <select
-        aria-label="Status"
-        value={statuses.some((s) => s.value === filters.status) ? filters.status : "all"}
-        onChange={(e) => onChange({ status: e.target.value as StatusFilter })}
-        className={select}
-      >
-        {statuses.map((s) => (
-          <option key={s.value} value={s.value}>
-            {s.label}
-          </option>
-        ))}
-      </select>
+      {hideStatus ? null : (
+        <select
+          aria-label="Status"
+          value={statuses.some((s) => s.value === filters.status) ? filters.status : "all"}
+          onChange={(e) => onChange({ status: e.target.value as StatusFilter })}
+          className={select}
+        >
+          {statuses.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      )}
       <select
         aria-label="Period"
         value={filters.range}
         onChange={(e) => onChange({ range: e.target.value as RangeFilter })}
         className={select}
       >
-        <option value="all">Any time</option>
+        <option value="all">{rangeLabel || "Any time"}</option>
         <option value="today">Today</option>
         <option value="7d">Last 7 days</option>
         <option value="30d">Last 30 days</option>
       </select>
-      <select
-        aria-label="Source"
-        value={filters.source}
-        onChange={(e) => onChange({ source: e.target.value as SourceFilter })}
-        className={select}
-      >
-        <option value="all">All sources</option>
-        <option value="weekly">Weekly run (auto)</option>
-        <option value="cliq">/call from Cliq</option>
-        <option value="retry">Same-day retry</option>
-        <option value="untagged">Not tagged (before 14 Oct)</option>
-      </select>
+      {hideSource ? null : (
+        <select
+          aria-label="Source"
+          value={filters.source}
+          onChange={(e) => onChange({ source: e.target.value as SourceFilter })}
+          className={select}
+        >
+          <option value="all">All sources</option>
+          <option value="weekly">Weekly run (auto)</option>
+          <option value="cliq">/call from Cliq</option>
+          <option value="retry">Same-day retry</option>
+          <option value="untagged">Not tagged (before 14 Oct)</option>
+        </select>
+      )}
       <span className="ml-auto text-xs text-muted-foreground tabular-nums">
         Showing {shown} of {total}
       </span>
