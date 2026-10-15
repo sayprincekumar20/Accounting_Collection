@@ -153,14 +153,15 @@ export function EscalatedCell({
 }) {
   if (!escalation) return <span className="text-xs text-muted-foreground">—</span>;
   const reason = cleanText(escalation.reason);
+  const when = dayTime(escalation.recorded_at);
   return (
-    <span className="inline-flex max-w-[220px] flex-col items-start gap-0.5" title={reason}>
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive">
+    <span className="inline-flex max-w-[200px] flex-col items-start gap-0.5" title={reason}>
+      <span className="rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive">
         Escalated
-        {dayTime(escalation.recorded_at) ? (
-          <span className="font-normal">{dayTime(escalation.recorded_at)}</span>
-        ) : null}
       </span>
+      {when ? (
+        <span className="whitespace-nowrap text-[10px] text-muted-foreground">{when}</span>
+      ) : null}
       {reason ? (
         <span className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">
           {reason}

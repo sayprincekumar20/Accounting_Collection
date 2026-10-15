@@ -221,6 +221,13 @@ function Overview() {
   );
   const outstanding = visibleClients.reduce((sum, c) => sum + Number(c.collection_amount), 0);
   const replies = recentAll.filter((m) => m.direction === "inbound").length;
+  // Without filters, use the same this-cycle numbers as Reports so both pages agree.
+  const filtersActive = !!(filters.q || channelFilter || filters.range !== "all");
+  const cycle = (
+    latestRun as
+      | { results?: { client_replies: number; clients_replied: number; promises: number } }
+      | undefined
+  )?.results;
 
   return (
     <AppShell
@@ -255,11 +262,21 @@ function Overview() {
           value={String(recentAll.length)}
           hint={channelFilter ? channelFilter.toUpperCase() : "Across all channels"}
         />
-        <StatCard label="Client replies" value={String(replies)} hint="Inbound conversations" />
+        <StatCard
+          label="Client replies"
+          value={String(filtersActive ? replies : (cycle?.client_replies ?? replies))}
+          hint={
+            filtersActive
+              ? "Matching filters"
+              : `This cycle · ${cycle?.clients_replied ?? 0} clients`
+          }
+        />
         <StatCard
           label="Payment promises"
-          value={String(promisesAll.length)}
-          hint="Recorded by the AI agents"
+          value={String(
+            filtersActive ? promisesAll.length : (cycle?.promises ?? promisesAll.length),
+          )}
+          hint={filtersActive ? "Matching filters" : "This cycle · recorded by the AI agents"}
         />
         <StatCard
           label="In the queue"

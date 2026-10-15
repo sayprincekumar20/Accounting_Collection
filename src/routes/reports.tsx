@@ -33,6 +33,7 @@ interface Results {
   ai_replies: number;
   promises: number;
   escalations: number;
+  not_reached?: number;
 }
 interface RunLog {
   run_date: string;
@@ -199,7 +200,7 @@ function ReportsPage() {
                     ],
                     ["Client replies", res.client_replies, `${res.clients_replied} clients`],
                     ["Promises to pay", res.promises],
-                    ["Escalated to AR", res.escalations],
+                    ["Escalated to AR", res.escalations, "needs AR action"],
                   ].map(([label, value, hint]) => (
                     <div key={String(label)} className="bg-card px-4 py-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
@@ -213,6 +214,7 @@ function ReportsPage() {
                   ))}
                 </div>
                 <p className="px-4 py-2 text-[11px] text-muted-foreground">
+                  {res.not_reached ?? 0} clients not reached by phone (no more retries) ·{" "}
                   {res.ai_replies} AI replies · {res.retries} same-day call retries ·{" "}
                   {res.cliq_call_sends} sends/calls from /call
                 </p>

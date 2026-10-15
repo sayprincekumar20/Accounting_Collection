@@ -30,8 +30,13 @@ const up = (v: unknown) => s(v).toUpperCase();
 const ts = (r: Row) => new Date(s(r["timestamp"]) || s(r["createdAt"])).getTime() || 0;
 const norm = (t: string) => t.toLowerCase().replace(/\s+/g, " ").trim();
 
+// Wording of every reminder template (email, SMS, WhatsApp/Viber, old and new). Reminders are also
+// matched exactly by their message id in the send log (EMAIL / SMS SEND_SUCCESS).
 const REMINDER_TEXT =
-  /(^overdue balance reminder)|(friendly reminder that the following invoice)|(you have \d+ (overdue|current) invoices?)|(overdue (account|accounts) with rare global food)/i;
+  /(^overdue balance reminder)|(friendly reminder that the following invoice)|(you have \d+ (overdue|current) invoices?)|(overdue (account|accounts) with rare global food)|(would like to follow up if we have available collection)|(your account statement from rare global food)|(please see the attached statement for details)/i;
+
+/** The automatic "Not reached by phone today (...)" alert: not an escalation needing AR action. */
+export const isNotReachedAlert = (reason: unknown) => /^not reached by phone/i.test(String(reason || "").trim());
 
 export async function loadAuthorshipContext(): Promise<AuthorshipContext> {
   const [convos, escalations, logs] = await Promise.all([
@@ -58,9 +63,9 @@ export function classifyOutbound(
     clientIds: string[];
     channel: string;
     at: number;
-    text?: string;
-    messageId?: string;
-    threadId?: string;
+    text?: string | undefined;
+    messageId?: string | undefined;
+    threadId?: string | undefined;
   },
 ): Author {
   const channel = opts.channel.toUpperCase();
@@ -102,7 +107,7 @@ export function escalationsFor(
 ): EscalationNote[] {
   const ids = new Set(clientIds);
   return ctx.escalations
-    .filter((e) => ids.has(s(e["client_id"])) && up(e["channel"]) !== "SYSTEM")
+    .filter((e) => ids.has(s(e["client_id"])) && up(e["channel"]) !== "SYSTEM" && !isNotReachedAlert(e["reason"]))
     .filter((e) => !channel || up(e["channel"]) === channel.toUpperCase())
     .map((e) => ({
       reason: s(e["reason"]),

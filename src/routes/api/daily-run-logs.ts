@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
+import { isNotReachedAlert } from "@/lib/authorship";
 
 // Daily Run Log rows (written by v3 at each weekly run) plus live RESULTS for each run's cycle
 // (from the run date until the next run, max 7 days): what was actually sent, called, replied,
@@ -87,7 +88,10 @@ export const Route = createFileRoute("/api/daily-run-logs")({
                 (l) => up(l["channel"]) === ch && up(l["event_type"]) === "SEND_SUCCESS",
               ).length;
             const cycleConvos = convos.filter(inCycle);
-            const cycleEsc = escalations.filter((e) => inCycle(e) && up(e["channel"]) !== "SYSTEM");
+            const cycleAlerts = escalations.filter((e) => inCycle(e) && up(e["channel"]) !== "SYSTEM");
+            // Real escalations need AR action; "Not reached by phone" alerts are counted separately.
+            const cycleEsc = cycleAlerts.filter((e) => !isNotReachedAlert(e["reason"]));
+            const notReached = cycleAlerts.filter((e) => isNotReachedAlert(e["reason"]));
             return {
               ...run,
               results: {
@@ -117,6 +121,7 @@ export const Route = createFileRoute("/api/daily-run-logs")({
                 ).length,
                 promises: promises.filter(inCycle).length,
                 escalations: cycleEsc.length,
+                not_reached: notReached.length,
               },
             };
           });

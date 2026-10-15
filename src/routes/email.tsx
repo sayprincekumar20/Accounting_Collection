@@ -221,7 +221,9 @@ function MessageBody({ body }: { body: string }) {
   return (
     <iframe
       title="email-body"
-      srcDoc={body}
+      // Inline images ("cid:" references) cannot load here and showed as broken icons; the same
+      // images are listed as attachments below the message.
+      srcDoc={body.replace(/<img\b[^>]*\bsrc=["']cid:[^"']*["'][^>]*>/gi, "")}
       sandbox=""
       className="w-full border-0"
       style={{ minHeight: "40px" }}
@@ -420,17 +422,17 @@ function EmailInbox() {
           </span>
         </header>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] text-sm">
+          <table className="w-full min-w-[920px] table-fixed text-sm">
             <thead>
               <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                <th className="px-4 py-2.5 font-semibold">Client name</th>
-                <th className="px-4 py-2.5 font-semibold">Contact person</th>
-                <th className="px-4 py-2.5 font-semibold">Status</th>
-                <th className="px-4 py-2.5 font-semibold">Summary</th>
-                <th className="px-4 py-2.5 font-semibold">Promise date</th>
-                <th className="px-4 py-2.5 font-semibold">Escalated</th>
-                <th className="px-4 py-2.5 font-semibold">Last activity</th>
-                <th className="px-4 py-2.5 font-semibold">ID</th>
+                <th className="px-4 py-2.5 font-semibold w-[17%]">Client name</th>
+                <th className="px-4 py-2.5 font-semibold w-[15%]">Contact person</th>
+                <th className="px-4 py-2.5 font-semibold w-[12%]">Status</th>
+                <th className="px-4 py-2.5 font-semibold w-[21%]">Summary</th>
+                <th className="px-4 py-2.5 font-semibold w-[9%]">Promise date</th>
+                <th className="px-4 py-2.5 font-semibold w-[13%]">Escalated</th>
+                <th className="px-4 py-2.5 font-semibold w-[10%]">Last activity</th>
+                <th className="px-4 py-2.5 font-semibold w-[6%]">ID</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">

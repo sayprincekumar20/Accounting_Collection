@@ -69,6 +69,7 @@ export const Route = createFileRoute("/api/gmail-thread-detail")({
                   author = classifyOutbound(ctx, {
                     clientIds,
                     channel: "EMAIL",
+                    messageId: (m as { messageId?: string }).messageId,
                     at: new Date(m.date || "").getTime() || 0,
                     text: String(m.body || "").slice(0, 400),
                     threadId,

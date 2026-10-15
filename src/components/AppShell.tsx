@@ -21,7 +21,7 @@ const nav = [
 
 const inboxes = [
   { channel: "whatsapp", label: "WhatsApp", icon: MessageSquare, to: "/whatsapp" as const },
-  { channel: "viber", label: "Viber", icon: MessageCircle, to: "/viber" as const },
+  { channel: "viber", label: "Viber (paused)", icon: MessageCircle, to: "/viber" as const },
   { channel: "sms", label: "SMS", icon: Smartphone, to: "/sms" as const },
   { channel: "email", label: "Email", icon: Mail, to: "/email" as const },
   { channel: "voice", label: "Voice", icon: Phone, to: "/voice" as const },
@@ -122,9 +122,7 @@ export function AppShell({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold md:text-2xl">{title}</h1>
-              {subtitle ? (
-                <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
-              ) : null}
+              {subtitle ? <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p> : null}
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">

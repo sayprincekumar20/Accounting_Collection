@@ -125,10 +125,16 @@ function ClientsPage() {
       const r = await fetch("/api/reminder-queue-list");
       if (!r.ok) return [];
       const d = await r.json();
-      return (d.queue ?? []) as { client_id: string; trigger_source?: string }[];
+      return (d.queue ?? []) as {
+        client_id: string;
+        trigger_source?: string;
+        queue_status?: string;
+        preferred_channel?: string;
+      }[];
     },
     refetchInterval: 14400000,
   });
+  const queueByClient = new Map((queue ?? []).map((q) => [q.client_id, q]));
   const sourceByClient = new Map((queue ?? []).map((q) => [q.client_id, q.trigger_source || ""]));
   const statusIsMine = CLIENT_STATUSES.some((o) => o.value === filters.status);
   const filtered = clients.filter(
@@ -179,12 +185,23 @@ function ClientsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {filtered.map((c) => {
+                // The channel actually used for this client (Viber is paused, phone-only clients get SMS),
+                // plus Voice when there is a phone number.
+                const used = String(
+                  queueByClient.get(c.client_id)?.preferred_channel ||
+                    (c.email ? "EMAIL" : c.phone ? "SMS" : ""),
+                ).toUpperCase();
                 const channels = [
-                  c.whatsapp_available && "WhatsApp",
-                  c.viber_available && "Viber",
-                  c.sms_available && "SMS",
-                  c.gmail_available && "Email",
-                  c.voice_available && "Voice",
+                  used === "EMAIL"
+                    ? "Email"
+                    : used === "SMS"
+                      ? "SMS"
+                      : used === "WHATSAPP"
+                        ? "WhatsApp"
+                        : used === "VIBER"
+                          ? "Viber"
+                          : "",
+                  c.phone ? "Voice" : "",
                 ].filter(Boolean) as string[];
                 return (
                   <tr key={c.client_id} className="hover:bg-muted/60">
@@ -209,12 +226,14 @@ function ClientsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span>{shortDate(c.due_date)}</span>
-                      <p className="text-xs text-destructive">
-                        {daysOverdue(c.due_date)} days overdue
-                      </p>
+                      <DueText due={c.due_date} />
                     </td>
                     <td className="px-4 py-3">
-                      <StatusPill status={c.status} />
+                      <StatusPill
+                        status={String(
+                          queueByClient.get(c.client_id)?.queue_status || c.status || "",
+                        ).toLowerCase()}
+                      />
                       {activeUntil(c.ar_handoff_until) ? (
                         <span className="mt-1 block text-[11px] font-semibold text-destructive">
                           AR handling until {shortDate(c.ar_handoff_until)}
@@ -241,4 +260,18 @@ function ClientsPage() {
       </Panel>
     </AppShell>
   );
+}
+
+/** "28 days overdue" / "Due today" / "Due in 3 days" (a future due date is not overdue). */
+function DueText({ due }: { due: string | null | undefined }) {
+  if (!due) return null;
+  const d = new Date(due);
+  if (isNaN(d.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+  const days = Math.round((today.getTime() - d.getTime()) / 86400000);
+  if (days > 0) return <p className="text-xs text-destructive">{days} days overdue</p>;
+  if (days === 0) return <p className="text-xs font-semibold text-warning">Due today</p>;
+  return <p className="text-xs text-muted-foreground">Due in {-days} days</p>;
 }
