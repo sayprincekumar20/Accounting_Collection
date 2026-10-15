@@ -2,6 +2,18 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { getEnv } from "./lib/env";
+import {
+  authConfig,
+  clearedSessionCookie,
+  createSessionToken,
+  isValidSession,
+  readCookie,
+  safeEqual,
+  safeNext,
+  SESSION_COOKIE,
+  sessionCookie,
+} from "./lib/auth";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -44,9 +56,62 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+// Login gate (single shared ID + password). Off until DASHBOARD_PASSWORD is set in Cloudflare.
+const PUBLIC_PATHS = new Set(["/login", "/api/auth/login", "/api/auth/logout"]);
+const isStaticAsset = (path: string) => /\.(js|css|map|png|jpe?g|svg|ico|webp|gif|woff2?|ttf|txt|json)$/i.test(path);
+
+async function handleAuth(request: Request): Promise<Response | null> {
+  // Read the login settings the same way as every other secret (cloudflare:workers env binding):
+  // the framework runtime does not pass Cloudflare's env to this fetch handler.
+  const cfg = authConfig({
+    DASHBOARD_USER: await getEnv("DASHBOARD_USER"),
+    DASHBOARD_PASSWORD: await getEnv("DASHBOARD_PASSWORD"),
+    DASHBOARD_SESSION_SECRET: await getEnv("DASHBOARD_SESSION_SECRET"),
+  });
+  if (!cfg) return null; // login not configured yet: dashboard stays open as before
+  const url = new URL(request.url);
+  const path = url.pathname;
+
+  if (path === "/api/auth/login" && request.method === "POST") {
+    const form = await request.formData().catch(() => null);
+    const user = String(form?.get("username") || "").trim();
+    const pass = String(form?.get("password") || "");
+    const next = safeNext(String(form?.get("next") || "/"));
+    if (safeEqual(user, cfg.user) && safeEqual(pass, cfg.password)) {
+      return new Response(null, {
+        status: 303,
+        headers: { location: next, "set-cookie": sessionCookie(await createSessionToken(cfg)) },
+      });
+    }
+    return new Response(null, {
+      status: 303,
+      headers: { location: `/login?error=1&next=${encodeURIComponent(next)}` },
+    });
+  }
+  if (path === "/api/auth/logout") {
+    return new Response(null, { status: 303, headers: { location: "/login", "set-cookie": clearedSessionCookie() } });
+  }
+  if (PUBLIC_PATHS.has(path) || isStaticAsset(path)) return null;
+
+  if (await isValidSession(readCookie(request, SESSION_COOKIE), cfg)) return null;
+
+  if (path.startsWith("/api/")) {
+    return new Response(JSON.stringify({ error: "Not signed in" }), {
+      status: 401,
+      headers: { "content-type": "application/json" },
+    });
+  }
+  return new Response(null, {
+    status: 303,
+    headers: { location: `/login?next=${encodeURIComponent(path + url.search)}` },
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const authResponse = await handleAuth(request);
+      if (authResponse) return authResponse;
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

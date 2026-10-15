@@ -109,6 +109,12 @@ export function AppShell({
             Live
           </div>
         </div>
+        <a
+          href="/api/auth/logout"
+          className="mt-3 block rounded-lg px-3 py-2 text-center text-xs font-semibold text-ink-foreground/80 hover:bg-white/5 hover:text-ink-foreground"
+        >
+          Sign out
+        </a>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

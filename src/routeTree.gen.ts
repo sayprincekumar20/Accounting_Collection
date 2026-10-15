@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as EmailRouteImport } from './routes/email'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as QueueRouteImport } from './routes/queue'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as SmsRouteImport } from './routes/sms'
@@ -42,6 +43,11 @@ const IndexRoute = IndexRouteImport.update({
 const EmailRoute = EmailRouteImport.update({
   id: '/email',
   path: '/email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const QueueRoute = QueueRouteImport.update({
@@ -159,6 +165,7 @@ const ClientsClientIdRoute = ClientsClientIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/email': typeof EmailRoute
+  '/login': typeof LoginRoute
   '/queue': typeof QueueRoute
   '/reports': typeof ReportsRoute
   '/sms': typeof SmsRoute
@@ -185,6 +192,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/email': typeof EmailRoute
+  '/login': typeof LoginRoute
   '/queue': typeof QueueRoute
   '/reports': typeof ReportsRoute
   '/sms': typeof SmsRoute
@@ -212,6 +220,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/email': typeof EmailRoute
+  '/login': typeof LoginRoute
   '/queue': typeof QueueRoute
   '/reports': typeof ReportsRoute
   '/sms': typeof SmsRoute
@@ -240,6 +249,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/email'
+    | '/login'
     | '/queue'
     | '/reports'
     | '/sms'
@@ -266,6 +276,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/email'
+    | '/login'
     | '/queue'
     | '/reports'
     | '/sms'
@@ -292,6 +303,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/email'
+    | '/login'
     | '/queue'
     | '/reports'
     | '/sms'
@@ -319,6 +331,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   EmailRoute: typeof EmailRoute
+  LoginRoute: typeof LoginRoute
   QueueRoute: typeof QueueRoute
   ReportsRoute: typeof ReportsRoute
   SmsRoute: typeof SmsRoute
@@ -357,6 +370,13 @@ declare module '@tanstack/react-router' {
       path: '/email'
       fullPath: '/email'
       preLoaderRoute: typeof EmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/queue': {
@@ -519,6 +539,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EmailRoute: EmailRoute,
+  LoginRoute: LoginRoute,
   QueueRoute: QueueRoute,
   ReportsRoute: ReportsRoute,
   SmsRoute: SmsRoute,
