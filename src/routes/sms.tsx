@@ -4,8 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
-import { ConversationStatus, SummaryCell, PromiseCell, EscalatedCell } from "@/components/collections/LogCells";
-import { LogFilterBar, matchesLogFilters, sourceLabel, useLogFilters, type FilterableRow } from "@/components/collections/LogFilters";
+import {
+  ConversationStatus,
+  SummaryCell,
+  PromiseCell,
+  EscalatedCell,
+} from "@/components/collections/LogCells";
+import {
+  LogFilterBar,
+  matchesLogFilters,
+  sourceLabel,
+  useLogFilters,
+  type FilterableRow,
+} from "@/components/collections/LogFilters";
 
 export const Route = createFileRoute("/sms")({
   head: () => ({
@@ -13,7 +24,8 @@ export const Route = createFileRoute("/sms")({
       { title: "SMS Inbox | Rare Global Food Collections" },
       {
         name: "description",
-        content: "Real SMS conversations for every overdue client, synced live from Telerivet via n8n.",
+        content:
+          "Real SMS conversations for every overdue client, synced live from Telerivet via n8n.",
       },
       { property: "og:title", content: "SMS Inbox | Rare Global Food Collections" },
     ],
@@ -28,6 +40,7 @@ interface SmsMessage {
   status?: string;
   notified_ar?: boolean;
   promise_recorded?: boolean;
+  author?: string;
 }
 interface SmsConversation {
   client_id: string;
@@ -35,6 +48,7 @@ interface SmsConversation {
   notified_ar: boolean;
   promise_recorded: boolean;
   messages: SmsMessage[];
+  escalations?: { reason: string; recorded_at: string; channel: string }[];
   lastMessageAt: string;
   lastMessagePreview: string;
 }
@@ -79,7 +93,11 @@ function shortId(id: string) {
 function shortDate(v: string | null | undefined) {
   if (!v) return "—";
   try {
-    return new Date(v).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+    return new Date(v).toLocaleDateString("en-PH", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   } catch {
     return v;
   }
@@ -139,14 +157,20 @@ function useSmsConversations() {
         fetch("/api/clients-list").then((r) => r.json()),
         fetch("/api/promise-history").then((r) => r.json()),
         fetch("/api/escalations").then((r) => r.json()),
-        fetch("/api/reminder-queue-list").then((r) => r.json()).catch(() => ({ queue: [] })),
+        fetch("/api/reminder-queue-list")
+          .then((r) => r.json())
+          .catch(() => ({ queue: [] })),
       ]);
       return {
         conversations: (smsRes.conversations ?? []) as SmsConversation[],
         clients: (clientsRes.clients ?? []) as ClientRow[],
         promises: (pRes.promises ?? []) as PromiseRow[],
         escalations: (eRes.escalations ?? []) as EscalationRow[],
-        queue: (qRes.queue ?? []) as { client_id: string; trigger_source?: string; requested_by?: string }[],
+        queue: (qRes.queue ?? []) as {
+          client_id: string;
+          trigger_source?: string;
+          requested_by?: string;
+        }[],
       };
     },
     refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
@@ -162,7 +186,8 @@ function SmsInbox() {
   const [filters, setFilters, clearFilters] = useLogFilters();
   // Conversations are keyed by phone: match clients on the last 10 digits (63917…, 0917…, 917…).
   const last10 = (v: string | null | undefined) => digits(v).slice(-10);
-  const clientForPhone = (phone: string) => clients.find((cl) => !!last10(cl.phone) && last10(cl.phone) === last10(phone));
+  const clientForPhone = (phone: string) =>
+    clients.find((cl) => !!last10(cl.phone) && last10(cl.phone) === last10(phone));
 
   const [active, setActive] = useState<string | null>(null);
 
@@ -209,7 +234,8 @@ function SmsInbox() {
       extra: `${c.client_id} ${client?.email || ""}`,
       clientReplies: c.messages.filter((m) => m.role === "client").length,
       lastFrom: last ? (last.role === "client" ? "client" : "us") : "",
-      hasPromise: !!latestForPhone(promises, digits(c.client_id), "sms", clients) || !!c.promise_recorded,
+      hasPromise:
+        !!latestForPhone(promises, digits(c.client_id), "sms", clients) || !!c.promise_recorded,
       hasEscalation: !!latestForPhone(escalations, digits(c.client_id), "sms", clients),
       lastActivity: c.lastMessageAt,
       source: q?.trigger_source,
@@ -250,14 +276,22 @@ function SmsInbox() {
       </div>
 
       <div className="mt-5">
-        <LogFilterBar filters={filters} onChange={setFilters} onClear={clearFilters} shown={visible.length} total={conversations.length} />
+        <LogFilterBar
+          filters={filters}
+          onChange={setFilters}
+          onClear={clearFilters}
+          shown={visible.length}
+          total={conversations.length}
+        />
       </div>
 
       <section className="surface-card mt-5 overflow-hidden">
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <h2 className="text-sm font-bold uppercase tracking-[0.1em]">Conversations</h2>
           <span className="text-xs text-muted-foreground">
-            {visible.length === conversations.length ? `${conversations.length} logged` : `${visible.length} of ${conversations.length} shown`}
+            {visible.length === conversations.length
+              ? `${conversations.length} logged`
+              : `${visible.length} of ${conversations.length} shown`}
           </span>
         </header>
         <div className="overflow-x-auto">
@@ -302,19 +336,32 @@ function SmsInbox() {
                       </span>
                       <span className="block text-[11px] text-muted-foreground">{c.client_id}</span>
                       {client?.email ? (
-                        <span className="block text-[11px] text-muted-foreground">{client.email}</span>
+                        <span className="block text-[11px] text-muted-foreground">
+                          {client.email}
+                        </span>
                       ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <ConversationStatus
                         clientReplies={c.messages.filter((m) => m.role === "client").length}
-                        lastFrom={c.messages.length ? (c.messages[c.messages.length - 1]?.role === "client" ? "client" : "us") : ""}
+                        lastFrom={
+                          c.messages.length
+                            ? c.messages[c.messages.length - 1]?.role === "client"
+                              ? "client"
+                              : "us"
+                            : ""
+                        }
                       />
                     </td>
                     <td className="px-4 py-3">
                       <SummaryCell
-                        clientText={[...c.messages].reverse().find((m) => m.role === "client")?.content}
-                        ourText={[...c.messages].reverse().find((m) => m.role === "ai")?.content ?? c.lastMessagePreview}
+                        clientText={
+                          [...c.messages].reverse().find((m) => m.role === "client")?.content
+                        }
+                        ourText={
+                          [...c.messages].reverse().find((m) => m.role === "ai")?.content ??
+                          c.lastMessagePreview
+                        }
                       />
                     </td>
                     <td className="px-4 py-3">
@@ -336,7 +383,9 @@ function SmsInbox() {
                         </span>
                       ) : null}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{shortId(c.client_id)}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {shortId(c.client_id)}
+                    </td>
                   </tr>
                 );
               })}
@@ -387,12 +436,14 @@ function SmsInbox() {
                 </p>
                 <dl className="mt-2 space-y-1 text-xs text-muted-foreground">
                   <div>
-                    <span className="font-semibold text-foreground">Phone:</span> {activeItem.client_id}
+                    <span className="font-semibold text-foreground">Phone:</span>{" "}
+                    {activeItem.client_id}
                   </div>
                   {activeClient ? (
                     <div>
                       <span className="font-semibold text-foreground">Outstanding:</span>{" "}
-                      {peso(activeClient.collection_amount)} · due {shortDate(activeClient.due_date)}
+                      {peso(activeClient.collection_amount)} · due{" "}
+                      {shortDate(activeClient.due_date)}
                     </div>
                   ) : null}
                 </dl>
@@ -400,7 +451,8 @@ function SmsInbox() {
                   <ChannelBadge channel="sms" />
                   {activePromise ? (
                     <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
-                      Promised {shortDate(activePromise.promise_date)} · {reasonLabel(activePromise.reason)}
+                      Promised {shortDate(activePromise.promise_date)} ·{" "}
+                      {reasonLabel(activePromise.reason)}
                     </span>
                   ) : null}
                   {activeEscalation ? (
@@ -430,44 +482,80 @@ function SmsInbox() {
                 <p className="text-sm text-muted-foreground">No messages yet.</p>
               ) : (
                 <ol className="space-y-4">
-                  {activeItem.messages.map((m, i) => (
-                    <li
-                      key={i}
-                      className={`flex flex-col gap-1 ${m.role === "ai" ? "items-end" : "items-start"}`}
-                    >
-                      <div className="text-[11px] text-muted-foreground">
-                        {m.role === "ai" ? "Accounting Assistant" : activeClient?.contact_person || activeItem.client_name}
-                        {" · "}
-                        {formatTs(m.ts)}
-                      </div>
-                      <div
-                        className={`max-w-[80%] rounded-xl border px-3.5 py-2.5 text-sm ${
-                          m.role === "ai"
-                            ? "border-transparent bg-primary text-primary-foreground"
-                            : "border-border bg-muted"
-                        }`}
-                      >
-                        <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {m.status ? (
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                            {m.status}
-                          </span>
-                        ) : null}
-                        {m.promise_recorded ? (
-                          <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
-                            Promise to Pay
-                          </span>
-                        ) : null}
-                        {m.notified_ar ? (
-                          <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-[10px] font-semibold text-destructive">
-                            AR Notified
-                          </span>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
+                  {[
+                    ...activeItem.messages.map((m) => ({
+                      kind: "msg" as const,
+                      at: new Date(m.ts).getTime() || 0,
+                      m,
+                    })),
+                    ...(activeItem.escalations ?? []).map((e) => ({
+                      kind: "esc" as const,
+                      at: new Date(e.recorded_at).getTime() || 0,
+                      reason: e.reason,
+                    })),
+                  ]
+                    .sort((a, b) => a.at - b.at)
+                    .map((it, i) =>
+                      it.kind === "esc" ? (
+                        <li
+                          key={`esc-${i}`}
+                          className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2"
+                        >
+                          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-destructive">
+                            AI agent notified the AR team ·{" "}
+                            {formatTs(new Date(it.at).toISOString())}
+                          </p>
+                          <p className="mt-0.5 text-sm">{it.reason}</p>
+                        </li>
+                      ) : (
+                        ((m: SmsMessage) => (
+                          <li
+                            key={i}
+                            className={`flex flex-col gap-1 ${m.role === "ai" ? "items-end" : "items-start"}`}
+                          >
+                            <div className="text-[11px] text-muted-foreground">
+                              {m.role === "ai"
+                                ? m.author === "ar_team"
+                                  ? "AR team"
+                                  : m.author === "reminder"
+                                    ? "Automated reminder"
+                                    : "AI agent"
+                                : activeClient?.contact_person || activeItem.client_name}
+                              {" · "}
+                              {formatTs(m.ts)}
+                            </div>
+                            <div
+                              className={`max-w-[80%] rounded-xl border px-3.5 py-2.5 text-sm ${
+                                m.role === "ai" && m.author === "ar_team"
+                                  ? "border-transparent bg-success text-white"
+                                  : m.role === "ai"
+                                    ? "border-transparent bg-primary text-primary-foreground"
+                                    : "border-border bg-muted"
+                              }`}
+                            >
+                              <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {m.status ? (
+                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                                  {m.status}
+                                </span>
+                              ) : null}
+                              {m.promise_recorded ? (
+                                <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
+                                  Promise to Pay
+                                </span>
+                              ) : null}
+                              {m.notified_ar ? (
+                                <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-[10px] font-semibold text-destructive">
+                                  AR Notified
+                                </span>
+                              ) : null}
+                            </div>
+                          </li>
+                        ))(it.m)
+                      ),
+                    )}
                 </ol>
               )}
             </div>

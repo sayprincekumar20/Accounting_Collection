@@ -4,8 +4,20 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
-import { ConversationStatus, SummaryCell, PromiseCell, EscalatedCell, type LastFrom } from "@/components/collections/LogCells";
-import { LogFilterBar, matchesLogFilters, sourceLabel, useLogFilters, type FilterableRow } from "@/components/collections/LogFilters";
+import {
+  ConversationStatus,
+  SummaryCell,
+  PromiseCell,
+  EscalatedCell,
+  type LastFrom,
+} from "@/components/collections/LogCells";
+import {
+  LogFilterBar,
+  matchesLogFilters,
+  sourceLabel,
+  useLogFilters,
+  type FilterableRow,
+} from "@/components/collections/LogFilters";
 
 export const Route = createFileRoute("/email")({
   head: () => ({
@@ -64,11 +76,13 @@ interface ThreadMessage {
   quotedBody: string | null;
   attachments: ThreadAttachment[];
   direction: "inbound" | "outbound";
+  author?: string;
 }
 interface ThreadDetail {
   threadId: string;
   subject: string;
   messages: ThreadMessage[];
+  escalations?: { reason: string; recorded_at: string; channel: string }[];
 }
 interface ClientRow {
   client_id: string;
@@ -112,7 +126,11 @@ function shortId(id: string) {
 function shortDate(value: string | null | undefined) {
   if (!value) return "—";
   try {
-    return new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+    return new Date(value).toLocaleDateString("en-PH", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   } catch {
     return value;
   }
@@ -136,7 +154,9 @@ function latestFor<T extends { client_id: string; channel: string; recorded_at: 
   channel: string,
 ): T | undefined {
   return rows
-    .filter((r) => r.client_id === clientId && String(r.channel).toLowerCase() === channel.toLowerCase())
+    .filter(
+      (r) => r.client_id === clientId && String(r.channel).toLowerCase() === channel.toLowerCase(),
+    )
     .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())[0];
 }
 
@@ -171,13 +191,19 @@ function useEmailSidebar() {
         fetch("/api/clients-list").then((r) => r.json()),
         fetch("/api/promise-history").then((r) => r.json()),
         fetch("/api/escalations").then((r) => r.json()),
-        fetch("/api/reminder-queue-list").then((r) => r.json()).catch(() => ({ queue: [] })),
+        fetch("/api/reminder-queue-list")
+          .then((r) => r.json())
+          .catch(() => ({ queue: [] })),
       ]);
       return {
         clients: (clientsRes.clients ?? []) as ClientRow[],
         promises: (pRes.promises ?? []) as PromiseRow[],
         escalations: (eRes.escalations ?? []) as EscalationRow[],
-        queue: (qRes.queue ?? []) as { client_id: string; trigger_source?: string; requested_by?: string }[],
+        queue: (qRes.queue ?? []) as {
+          client_id: string;
+          trigger_source?: string;
+          requested_by?: string;
+        }[],
       };
     },
     refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
@@ -254,6 +280,17 @@ function EmailInbox() {
   const activeItem = threads.find((t) => t.thread_id === active) ?? null;
   const { data: detail, isLoading: detailLoading } = useThreadDetail(activeItem?.thread_id ?? null);
   const messages = detail?.messages ?? [];
+  // One timeline: thread messages plus the AI agents' "notified AR team" events, by time.
+  const timeline: (
+    { kind: "msg"; at: number; m: ThreadMessage } | { kind: "esc"; at: number; reason: string }
+  )[] = [
+    ...messages.map((m) => ({ kind: "msg" as const, at: new Date(m.date).getTime() || 0, m })),
+    ...(detail?.escalations ?? []).map((e) => ({
+      kind: "esc" as const,
+      at: new Date(e.recorded_at).getTime() || 0,
+      reason: e.reason,
+    })),
+  ].sort((a, b) => a.at - b.at);
 
   function findClient(clientId: string, clientName: string) {
     return (
@@ -266,11 +303,15 @@ function EmailInbox() {
     );
   }
 
-  const activeClient = activeItem ? findClient(activeItem.client_id, activeItem.client_name) : undefined;
+  const activeClient = activeItem
+    ? findClient(activeItem.client_id, activeItem.client_name)
+    : undefined;
   const activePromise =
     activeItem && activeClient ? latestFor(promises, activeClient.client_id, "email") : undefined;
   const activeEscalation =
-    activeItem && activeClient ? latestFor(escalations, activeClient.client_id, "email") : undefined;
+    activeItem && activeClient
+      ? latestFor(escalations, activeClient.client_id, "email")
+      : undefined;
 
   useEffect(() => {
     if (!activeItem) return;
@@ -283,8 +324,12 @@ function EmailInbox() {
 
   // "Client replied" = the client has written at least once in the thread (does not flip back
   // when the AI answers). "Needs answer" = the client wrote last and nothing was sent after.
-  const replied = threads.filter((t) => (t.clientReplyCount ?? (t.lastDirection === "inbound" ? 1 : 0)) > 0).length;
-  const needsAnswer = threads.filter((t) => (t.lastFrom || (t.lastDirection === "inbound" ? "client" : "us")) === "client").length;
+  const replied = threads.filter(
+    (t) => (t.clientReplyCount ?? (t.lastDirection === "inbound" ? 1 : 0)) > 0,
+  ).length;
+  const needsAnswer = threads.filter(
+    (t) => (t.lastFrom || (t.lastDirection === "inbound" ? "client" : "us")) === "client",
+  ).length;
   const promiseCount = threads.filter((t) => t.promise_recorded).length;
 
   // Same filter rules on every channel tab (search, status, period, source).
@@ -298,8 +343,10 @@ function EmailInbox() {
       clientReplies: t.clientReplyCount ?? (t.lastDirection === "inbound" ? 1 : 0),
       lastFrom: t.lastFrom || (t.lastDirection === "inbound" ? "client" : "us"),
       bounced: !!t.bounced || !!t.sendFailed,
-      hasPromise: !!(client && latestFor(promises, client.client_id, "email")) || t.promise_recorded,
-      hasEscalation: !!(client && latestFor(escalations, client.client_id, "email")) || t.notified_ar,
+      hasPromise:
+        !!(client && latestFor(promises, client.client_id, "email")) || t.promise_recorded,
+      hasEscalation:
+        !!(client && latestFor(escalations, client.client_id, "email")) || t.notified_ar,
       lastActivity: t.lastMessageAt,
       source: q?.trigger_source,
     };
@@ -348,11 +395,18 @@ function EmailInbox() {
       </div>
 
       <div className="mt-5">
-        <LogFilterBar filters={filters} onChange={setFilters} onClear={clearFilters} shown={visible.length} total={threads.length} />
+        <LogFilterBar
+          filters={filters}
+          onChange={setFilters}
+          onClear={clearFilters}
+          shown={visible.length}
+          total={threads.length}
+        />
       </div>
       {threadsData?.truncated ? (
         <p className="mt-2 text-xs text-muted-foreground">
-          Showing the most recent email threads of the last 30 days. Older threads are still in Gmail.
+          Showing the most recent email threads of the last 30 days. Older threads are still in
+          Gmail.
         </p>
       ) : null}
 
@@ -360,7 +414,9 @@ function EmailInbox() {
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <h2 className="text-sm font-bold uppercase tracking-[0.1em]">Threads</h2>
           <span className="text-xs text-muted-foreground">
-            {visible.length === threads.length ? `${threads.length} logged` : `${visible.length} of ${threads.length} shown`}
+            {visible.length === threads.length
+              ? `${threads.length} logged`
+              : `${visible.length} of ${threads.length} shown`}
           </span>
         </header>
         <div className="overflow-x-auto">
@@ -382,12 +438,18 @@ function EmailInbox() {
                 const client = findClient(t.client_id, t.client_name);
                 const src = sourceByClient.get(t.client_id);
                 const promise = client ? latestFor(promises, client.client_id, "email") : undefined;
-                const escalation = client ? latestFor(escalations, client.client_id, "email") : undefined;
+                const escalation = client
+                  ? latestFor(escalations, client.client_id, "email")
+                  : undefined;
                 return (
                   <tr
                     key={t.thread_id || `${t.client_id}-${t.lastMessageAt}`}
                     onClick={() => (t.thread_id ? setActive(t.thread_id) : undefined)}
-                    title={t.sendFailed ? "Gmail refused this email, so there is no thread to open" : undefined}
+                    title={
+                      t.sendFailed
+                        ? "Gmail refused this email, so there is no thread to open"
+                        : undefined
+                    }
                     className={`transition-colors ${t.thread_id ? "cursor-pointer" : "cursor-default"} ${
                       t.thread_id && t.thread_id === active ? "bg-secondary" : "hover:bg-muted"
                     }`}
@@ -407,7 +469,9 @@ function EmailInbox() {
                     </td>
                     <td className="px-4 py-3">
                       <ConversationStatus
-                        clientReplies={t.clientReplyCount ?? (t.lastDirection === "inbound" ? 1 : 0)}
+                        clientReplies={
+                          t.clientReplyCount ?? (t.lastDirection === "inbound" ? 1 : 0)
+                        }
                         lastFrom={t.lastFrom || (t.lastDirection === "inbound" ? "client" : "us")}
                         bounced={!!t.bounced}
                         failed={!!t.sendFailed}
@@ -415,7 +479,10 @@ function EmailInbox() {
                     </td>
                     <td className="px-4 py-3">
                       <SummaryCell
-                        clientText={t.lastClientPreview ?? (t.lastDirection === "inbound" ? t.lastMessagePreview : "")}
+                        clientText={
+                          t.lastClientPreview ??
+                          (t.lastDirection === "inbound" ? t.lastMessagePreview : "")
+                        }
                         ourText={t.lastOurPreview ?? t.lastMessagePreview}
                       />
                     </td>
@@ -438,7 +505,9 @@ function EmailInbox() {
                         </span>
                       ) : null}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{shortId(t.thread_id)}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {shortId(t.thread_id)}
+                    </td>
                   </tr>
                 );
               })}
@@ -490,13 +559,15 @@ function EmailInbox() {
                 <dl className="mt-2 space-y-1 text-xs text-muted-foreground">
                   {detail?.subject ? (
                     <div>
-                      <span className="font-semibold text-foreground">Subject:</span> {detail.subject}
+                      <span className="font-semibold text-foreground">Subject:</span>{" "}
+                      {detail.subject}
                     </div>
                   ) : null}
                   {activeClient ? (
                     <div>
                       <span className="font-semibold text-foreground">Outstanding:</span>{" "}
-                      {peso(activeClient.collection_amount)} · due {shortDate(activeClient.due_date)}
+                      {peso(activeClient.collection_amount)} · due{" "}
+                      {shortDate(activeClient.due_date)}
                     </div>
                   ) : null}
                 </dl>
@@ -507,7 +578,8 @@ function EmailInbox() {
                   </span>
                   {activePromise ? (
                     <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
-                      Promised {shortDate(activePromise.promise_date)} · {reasonLabel(activePromise.reason)}
+                      Promised {shortDate(activePromise.promise_date)} ·{" "}
+                      {reasonLabel(activePromise.reason)}
                     </span>
                   ) : null}
                   {activeEscalation ? (
@@ -530,7 +602,18 @@ function EmailInbox() {
             </header>
 
             <ol className="divide-y divide-border">
-              {messages.map((m) => {
+              {timeline.map((item, idx) => {
+                if (item.kind === "esc") {
+                  return (
+                    <li key={`esc-${idx}`} className="bg-destructive/5 px-5 py-3">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-destructive">
+                        AI agent notified the AR team · {formatTs(new Date(item.at).toISOString())}
+                      </p>
+                      <p className="mt-1 text-sm">{item.reason}</p>
+                    </li>
+                  );
+                }
+                const m = item.m;
                 const outbound = m.direction === "outbound";
                 const name = (m.from.split("<")[0] || m.from).replace(/"/g, "").trim() || m.from;
                 const initial = name.charAt(0).toUpperCase();
@@ -551,6 +634,7 @@ function EmailInbox() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline gap-x-2">
                           <span className="truncate text-sm font-semibold">{name}</span>
+                          <AuthorBadge author={m.author} />
                           <span className="truncate text-xs text-muted-foreground">{m.from}</span>
                           <span className="ml-auto shrink-0 text-xs text-muted-foreground">
                             {formatTs(m.date)}
@@ -582,7 +666,9 @@ function EmailInbox() {
                 );
               })}
               {detailLoading ? (
-                <li className="px-5 py-6 text-sm text-muted-foreground">Loading thread from Gmail…</li>
+                <li className="px-5 py-6 text-sm text-muted-foreground">
+                  Loading thread from Gmail…
+                </li>
               ) : null}
               {!detailLoading && messages.length === 0 ? (
                 <li className="px-5 py-6 text-sm text-muted-foreground">Nothing to show.</li>
@@ -592,5 +678,25 @@ function EmailInbox() {
         </>
       ) : null}
     </AppShell>
+  );
+}
+
+// Who wrote a message: client, automated reminder, AI agent, a person in AR, or a delivery failure.
+const AUTHOR_LABEL: Record<string, { label: string; tone: string }> = {
+  client: { label: "Client", tone: "bg-muted text-foreground" },
+  reminder: { label: "Automated reminder", tone: "bg-secondary text-secondary-foreground" },
+  ai: { label: "AI agent", tone: "bg-primary/10 text-primary" },
+  ar_team: { label: "AR team", tone: "bg-success/12 text-success" },
+  system: { label: "Delivery failure", tone: "bg-destructive/12 text-destructive" },
+};
+function AuthorBadge({ author }: { author?: string | undefined }) {
+  const a = author ? AUTHOR_LABEL[author] : undefined;
+  if (!a) return null;
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${a.tone}`}
+    >
+      {a.label}
+    </span>
   );
 }

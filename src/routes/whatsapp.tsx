@@ -4,8 +4,20 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
-import { ConversationStatus, SummaryCell, PromiseCell, EscalatedCell, ReadTicks } from "@/components/collections/LogCells";
-import { LogFilterBar, matchesLogFilters, sourceLabel, useLogFilters, type FilterableRow } from "@/components/collections/LogFilters";
+import {
+  ConversationStatus,
+  SummaryCell,
+  PromiseCell,
+  EscalatedCell,
+  ReadTicks,
+} from "@/components/collections/LogCells";
+import {
+  LogFilterBar,
+  matchesLogFilters,
+  sourceLabel,
+  useLogFilters,
+  type FilterableRow,
+} from "@/components/collections/LogFilters";
 
 export const Route = createFileRoute("/whatsapp")({
   head: () => ({
@@ -13,7 +25,8 @@ export const Route = createFileRoute("/whatsapp")({
       { title: "WhatsApp Inbox | Rare Global Food Collections" },
       {
         name: "description",
-        content: "Real WhatsApp conversations for every overdue client, synced live from Twilio via n8n.",
+        content:
+          "Real WhatsApp conversations for every overdue client, synced live from Twilio via n8n.",
       },
       { property: "og:title", content: "WhatsApp Inbox | Rare Global Food Collections" },
     ],
@@ -28,6 +41,7 @@ interface WaMessage {
   status?: string;
   notified_ar?: boolean;
   promise_recorded?: boolean;
+  author?: string;
 }
 interface WaConversation {
   client_id: string;
@@ -37,6 +51,7 @@ interface WaConversation {
   messages: WaMessage[];
   lastMessageAt: string;
   lastMessagePreview: string;
+  escalations?: { reason: string; recorded_at: string; channel: string }[];
 }
 interface ClientRow {
   client_id: string;
@@ -79,7 +94,11 @@ function shortId(id: string) {
 function shortDate(v: string | null | undefined) {
   if (!v) return "—";
   try {
-    return new Date(v).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+    return new Date(v).toLocaleDateString("en-PH", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   } catch {
     return v;
   }
@@ -139,14 +158,20 @@ function useWaConversations() {
         fetch("/api/clients-list").then((r) => r.json()),
         fetch("/api/promise-history").then((r) => r.json()),
         fetch("/api/escalations").then((r) => r.json()),
-        fetch("/api/reminder-queue-list").then((r) => r.json()).catch(() => ({ queue: [] })),
+        fetch("/api/reminder-queue-list")
+          .then((r) => r.json())
+          .catch(() => ({ queue: [] })),
       ]);
       return {
         conversations: (waRes.conversations ?? []) as WaConversation[],
         clients: (clientsRes.clients ?? []) as ClientRow[],
         promises: (pRes.promises ?? []) as PromiseRow[],
         escalations: (eRes.escalations ?? []) as EscalationRow[],
-        queue: (qRes.queue ?? []) as { client_id: string; trigger_source?: string; requested_by?: string }[],
+        queue: (qRes.queue ?? []) as {
+          client_id: string;
+          trigger_source?: string;
+          requested_by?: string;
+        }[],
       };
     },
     refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
@@ -162,7 +187,8 @@ function WhatsAppInbox() {
   const [filters, setFilters, clearFilters] = useLogFilters();
   // Conversations are keyed by phone: match clients on the last 10 digits (63917…, 0917…, 917…).
   const last10 = (v: string | null | undefined) => digits(v).slice(-10);
-  const clientForPhone = (phone: string) => clients.find((cl) => !!last10(cl.phone) && last10(cl.phone) === last10(phone));
+  const clientForPhone = (phone: string) =>
+    clients.find((cl) => !!last10(cl.phone) && last10(cl.phone) === last10(phone));
 
   const [active, setActive] = useState<string | null>(null);
 
@@ -209,7 +235,9 @@ function WhatsAppInbox() {
       extra: `${c.client_id} ${client?.email || ""}`,
       clientReplies: c.messages.filter((m) => m.role === "client").length,
       lastFrom: last ? (last.role === "client" ? "client" : "us") : "",
-      hasPromise: !!latestForPhone(promises, digits(c.client_id), "whatsapp", clients) || !!c.promise_recorded,
+      hasPromise:
+        !!latestForPhone(promises, digits(c.client_id), "whatsapp", clients) ||
+        !!c.promise_recorded,
       hasEscalation: !!latestForPhone(escalations, digits(c.client_id), "whatsapp", clients),
       lastActivity: c.lastMessageAt,
       source: q?.trigger_source,
@@ -250,14 +278,22 @@ function WhatsAppInbox() {
       </div>
 
       <div className="mt-5">
-        <LogFilterBar filters={filters} onChange={setFilters} onClear={clearFilters} shown={visible.length} total={conversations.length} />
+        <LogFilterBar
+          filters={filters}
+          onChange={setFilters}
+          onClear={clearFilters}
+          shown={visible.length}
+          total={conversations.length}
+        />
       </div>
 
       <section className="surface-card mt-5 overflow-hidden">
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <h2 className="text-sm font-bold uppercase tracking-[0.1em]">Conversations</h2>
           <span className="text-xs text-muted-foreground">
-            {visible.length === conversations.length ? `${conversations.length} logged` : `${visible.length} of ${conversations.length} shown`}
+            {visible.length === conversations.length
+              ? `${conversations.length} logged`
+              : `${visible.length} of ${conversations.length} shown`}
           </span>
         </header>
         <div className="overflow-x-auto">
@@ -281,7 +317,12 @@ function WhatsAppInbox() {
                   return cl ? sourceByClient.get(cl.client_id) : undefined;
                 })();
                 const promise = latestForPhone(promises, digits(c.client_id), "whatsapp", clients);
-                const escalation = latestForPhone(escalations, digits(c.client_id), "whatsapp", clients);
+                const escalation = latestForPhone(
+                  escalations,
+                  digits(c.client_id),
+                  "whatsapp",
+                  clients,
+                );
                 const client = clients.find((cl) => digits(cl.phone) === digits(c.client_id));
                 return (
                   <tr
@@ -302,19 +343,34 @@ function WhatsAppInbox() {
                       </span>
                       <span className="block text-[11px] text-muted-foreground">{c.client_id}</span>
                       {client?.email ? (
-                        <span className="block text-[11px] text-muted-foreground">{client.email}</span>
+                        <span className="block text-[11px] text-muted-foreground">
+                          {client.email}
+                        </span>
                       ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <ConversationStatus
                         clientReplies={c.messages.filter((m) => m.role === "client").length}
-                        lastFrom={c.messages.length ? (c.messages[c.messages.length - 1]?.role === "client" ? "client" : "us") : ""}
+                        lastFrom={
+                          c.messages.length
+                            ? c.messages[c.messages.length - 1]?.role === "client"
+                              ? "client"
+                              : "us"
+                            : ""
+                        }
                       />
                       {(() => {
                         const lastOurs = [...c.messages].reverse().find((m) => m.role === "ai");
                         if (!lastOurs?.status) return null;
                         const st = lastOurs.status.toLowerCase();
-                        const label = st === "read" ? "Seen" : st === "delivered" ? "Delivered, not seen" : st === "failed" || st === "undelivered" ? "" : "Sent";
+                        const label =
+                          st === "read"
+                            ? "Seen"
+                            : st === "delivered"
+                              ? "Delivered, not seen"
+                              : st === "failed" || st === "undelivered"
+                                ? ""
+                                : "Sent";
                         return (
                           <span className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
                             <ReadTicks status={lastOurs.status} />
@@ -325,8 +381,13 @@ function WhatsAppInbox() {
                     </td>
                     <td className="px-4 py-3">
                       <SummaryCell
-                        clientText={[...c.messages].reverse().find((m) => m.role === "client")?.content}
-                        ourText={[...c.messages].reverse().find((m) => m.role === "ai")?.content ?? c.lastMessagePreview}
+                        clientText={
+                          [...c.messages].reverse().find((m) => m.role === "client")?.content
+                        }
+                        ourText={
+                          [...c.messages].reverse().find((m) => m.role === "ai")?.content ??
+                          c.lastMessagePreview
+                        }
                       />
                     </td>
                     <td className="px-4 py-3">
@@ -348,7 +409,9 @@ function WhatsAppInbox() {
                         </span>
                       ) : null}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{shortId(c.client_id)}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {shortId(c.client_id)}
+                    </td>
                   </tr>
                 );
               })}
@@ -399,12 +462,14 @@ function WhatsAppInbox() {
                 </p>
                 <dl className="mt-2 space-y-1 text-xs text-muted-foreground">
                   <div>
-                    <span className="font-semibold text-foreground">Phone:</span> {activeItem.client_id}
+                    <span className="font-semibold text-foreground">Phone:</span>{" "}
+                    {activeItem.client_id}
                   </div>
                   {activeClient ? (
                     <div>
                       <span className="font-semibold text-foreground">Outstanding:</span>{" "}
-                      {peso(activeClient.collection_amount)} · due {shortDate(activeClient.due_date)}
+                      {peso(activeClient.collection_amount)} · due{" "}
+                      {shortDate(activeClient.due_date)}
                     </div>
                   ) : null}
                 </dl>
@@ -412,7 +477,8 @@ function WhatsAppInbox() {
                   <ChannelBadge channel="whatsapp" />
                   {activePromise ? (
                     <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
-                      Promised {shortDate(activePromise.promise_date)} · {reasonLabel(activePromise.reason)}
+                      Promised {shortDate(activePromise.promise_date)} ·{" "}
+                      {reasonLabel(activePromise.reason)}
                     </span>
                   ) : null}
                   {activeEscalation ? (
@@ -455,15 +521,30 @@ function WhatsAppInbox() {
                               </span>
                             </div>
                           ) : null}
-                          <div className={`flex ${ours ? "justify-end" : "justify-start"} ${firstOfRun ? "mt-2" : ""}`}>
+                          <div
+                            className={`flex ${ours ? "justify-end" : "justify-start"} ${firstOfRun ? "mt-2" : ""}`}
+                          >
                             <div
                               className={`relative max-w-[82%] rounded-lg px-2.5 pb-1.5 pt-1.5 text-[14px] leading-[19px] text-[#111b21] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] ${
                                 ours ? "bg-[#d9fdd3]" : "bg-white"
                               } ${firstOfRun ? (ours ? "rounded-tr-none" : "rounded-tl-none") : ""}`}
                             >
+                              {ours && (firstOfRun || m.author !== prev?.author) ? (
+                                <span
+                                  className={`mb-0.5 block text-[11px] font-semibold ${m.author === "ar_team" ? "text-[#1f7a3a]" : "text-[#667781]"}`}
+                                >
+                                  {m.author === "ar_team"
+                                    ? "AR team"
+                                    : m.author === "reminder"
+                                      ? "Automated reminder"
+                                      : "AI agent"}
+                                </span>
+                              ) : null}
                               {firstOfRun && !ours ? (
                                 <span className="mb-0.5 block text-[12px] font-semibold text-[#027eb5]">
-                                  {activeClient?.contact_person || activeItem.client_name || "Client"}
+                                  {activeClient?.contact_person ||
+                                    activeItem.client_name ||
+                                    "Client"}
                                 </span>
                               ) : null}
                               <span className="whitespace-pre-wrap break-words">{m.content}</span>
@@ -474,7 +555,9 @@ function WhatsAppInbox() {
                             </div>
                           </div>
                           {m.promise_recorded || m.notified_ar ? (
-                            <div className={`mt-1 flex gap-1.5 ${ours ? "justify-end" : "justify-start"}`}>
+                            <div
+                              className={`mt-1 flex gap-1.5 ${ours ? "justify-end" : "justify-start"}`}
+                            >
                               {m.promise_recorded ? (
                                 <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
                                   Promise to pay
@@ -493,10 +576,32 @@ function WhatsAppInbox() {
                   </ol>
                 )}
               </div>
+              {(activeItem.escalations ?? []).length ? (
+                <div className="mt-3 space-y-2">
+                  {(activeItem.escalations ?? []).map((e, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2"
+                    >
+                      <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-destructive">
+                        AI agent notified the AR team · {waDay(e.recorded_at)}{" "}
+                        {waTime(e.recorded_at)}
+                      </p>
+                      <p className="mt-0.5 text-sm">{e.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <p className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
-                <span className="flex items-center gap-1"><ReadTicks status="sent" /> Sent</span>
-                <span className="flex items-center gap-1"><ReadTicks status="delivered" /> Delivered</span>
-                <span className="flex items-center gap-1"><ReadTicks status="read" /> Seen</span>
+                <span className="flex items-center gap-1">
+                  <ReadTicks status="sent" /> Sent
+                </span>
+                <span className="flex items-center gap-1">
+                  <ReadTicks status="delivered" /> Delivered
+                </span>
+                <span className="flex items-center gap-1">
+                  <ReadTicks status="read" /> Seen
+                </span>
               </p>
             </div>
           </aside>
@@ -518,10 +623,17 @@ function waDay(ts: string) {
   yest.setDate(today.getDate() - 1);
   if (d.toDateString() === today.toDateString()) return "Today";
   if (d.toDateString() === yest.toDateString()) return "Yesterday";
-  return d.toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString("en-PH", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function waTime(ts: string) {
   const d = new Date(ts);
-  return isNaN(d.getTime()) ? "" : d.toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" });
+  return isNaN(d.getTime())
+    ? ""
+    : d.toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" });
 }

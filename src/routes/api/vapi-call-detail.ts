@@ -1,6 +1,8 @@
+import { escalationsFor, loadAuthorshipContext } from "@/lib/authorship";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   vapiFetch,
+  extractClientId,
   extractClientName,
   extractSummaryAndSatisfaction,
   parseTranscript,
@@ -30,7 +32,10 @@ export const Route = createFileRoute("/api/vapi-call-detail")({
           const endedAt = call.endedAt || "";
           const durationSeconds =
             startedAt && endedAt
-              ? Math.max(0, Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000))
+              ? Math.max(
+                  0,
+                  Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000),
+                )
               : 0;
 
           const detail = {
@@ -58,7 +63,26 @@ export const Route = createFileRoute("/api/vapi-call-detail")({
             turns: parseTranscript(call),
           };
 
-          return new Response(JSON.stringify(detail), {
+          // Grace's "notified AR team" events for this client during (or just after) this call.
+          let escalations: { reason: string; recorded_at: string; channel: string }[] = [];
+          try {
+            const clientId = extractClientId(call);
+            if (clientId) {
+              const ctx = await loadAuthorshipContext();
+              const from = new Date(startedAt || 0).getTime() - 60 * 1000;
+              const to = (endedAt ? new Date(endedAt).getTime() : Date.now()) + 10 * 60 * 1000;
+              escalations = escalationsFor(ctx, [clientId], "VOICE").filter((e) => {
+                const t = new Date(e.recorded_at).getTime();
+                return t >= from && t <= to;
+              });
+            }
+          } catch (err) {
+            console.warn(
+              "[vapi-call-detail] escalations lookup failed:",
+              String(err).slice(0, 200),
+            );
+          }
+          return new Response(JSON.stringify({ ...detail, escalations }), {
             headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
           });
         } catch (err) {

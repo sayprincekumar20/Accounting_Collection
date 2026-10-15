@@ -2,6 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { fetchRecentWhatsAppMessages } from "@/lib/twilio-server";
 import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { getEnv } from "@/lib/env";
+import {
+  classifyOutbound,
+  escalationsFor,
+  loadAuthorshipContext,
+  type EscalationNote,
+} from "@/lib/authorship";
 
 // Direct Twilio API call — replaces the old N8N_WEBHOOK_BASE_URL proxy.
 //
@@ -35,7 +41,14 @@ interface ConversationOut {
   client_name: string;
   notified_ar: boolean;
   promise_recorded: boolean;
-  messages: { role: "ai" | "client"; content: string; ts: string; status: string }[];
+  messages: {
+    role: "ai" | "client";
+    content: string;
+    ts: string;
+    status: string;
+    author?: string;
+  }[];
+  escalations?: EscalationNote[];
   lastMessageAt: string;
   lastMessagePreview: string;
 }
@@ -141,10 +154,37 @@ export const Route = createFileRoute("/api/whatsapp-conversations")({
               content: m.body || "",
               ts,
               // Twilio delivery status for our messages: queued/sent/delivered/read/failed/undelivered.
-              status: fromDigits === ourNumber ? (m.status || "") : "received",
+              status: fromDigits === ourNumber ? m.status || "" : "received",
             });
             convo.lastMessageAt = ts;
             convo.lastMessagePreview = (m.body || "").slice(0, 140);
+          }
+
+          // Who wrote each message we sent (automated reminder / AI agent / AR team), and the AI
+          // agents' "notified AR team" events for each client, shown inline in the conversation.
+          const authorCtx = await loadAuthorshipContext().catch(() => null);
+          if (authorCtx) {
+            const idsByPhone = new Map<string, string[]>();
+            for (const c of clients) {
+              const d = digits(c.phone).slice(-10);
+              if (!d) continue;
+              idsByPhone.set(d, [...(idsByPhone.get(d) || []), c.client_id]);
+            }
+            for (const convo of byPhone.values()) {
+              const ids = idsByPhone.get(String(convo.client_id).slice(-10)) || [];
+              for (const msg of convo.messages) {
+                msg.author =
+                  msg.role === "client"
+                    ? "client"
+                    : classifyOutbound(authorCtx, {
+                        clientIds: ids,
+                        channel: "WHATSAPP",
+                        at: new Date(msg.ts).getTime() || 0,
+                        text: msg.content,
+                      });
+              }
+              convo.escalations = escalationsFor(authorCtx, ids, "WHATSAPP");
+            }
           }
 
           const conversations = Array.from(byPhone.values()).sort(

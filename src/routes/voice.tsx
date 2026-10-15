@@ -5,7 +5,13 @@ import { PhoneIncoming, PhoneOutgoing, Globe, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
 import { SummaryCell, PromiseCell, EscalatedCell } from "@/components/collections/LogCells";
-import { LogFilterBar, matchesLogFilters, sourceLabel, useLogFilters, type FilterableRow } from "@/components/collections/LogFilters";
+import {
+  LogFilterBar,
+  matchesLogFilters,
+  sourceLabel,
+  useLogFilters,
+  type FilterableRow,
+} from "@/components/collections/LogFilters";
 
 export const Route = createFileRoute("/voice")({
   head: () => ({
@@ -56,6 +62,7 @@ interface CallSatisfaction {
 }
 
 interface CallDetail {
+  escalations?: { reason: string; recorded_at: string; channel: string }[];
   callId: string;
   clientName: string;
   phone: string;
@@ -177,7 +184,8 @@ function callOutcome(endedReason: string, status: string): "connected" | "not_an
 }
 
 function endedReasonLabel(raw: string, status: string): string {
-  if (!raw) return status === "ended" || status === "completed" ? "Call Ended" : status || "Unknown";
+  if (!raw)
+    return status === "ended" || status === "completed" ? "Call Ended" : status || "Unknown";
   return (
     ENDED_REASON_LABELS[raw] ??
     raw
@@ -299,7 +307,9 @@ function VoiceLogs() {
   const [active, setActive] = useState<string | null>(null);
   const [audioFailed, setAudioFailed] = useState(false);
   const activeItem = calls.find((c) => c.call_id === active) ?? null;
-  const activeClient = activeItem ? clients.find((cl) => cl.client_id === activeItem.client_id) : undefined;
+  const activeClient = activeItem
+    ? clients.find((cl) => cl.client_id === activeItem.client_id)
+    : undefined;
   const { data: detail } = useCallDetail(activeItem?.call_id ?? null);
 
   useEffect(() => {
@@ -315,7 +325,9 @@ function VoiceLogs() {
     return () => window.removeEventListener("keydown", onKey);
   }, [activeItem]);
 
-  const connected = calls.filter((c) => callOutcome(c.endedReason, c.status) === "connected").length;
+  const connected = calls.filter(
+    (c) => callOutcome(c.endedReason, c.status) === "connected",
+  ).length;
   const notConnected = calls.length - connected;
 
   // Same filter bar as the text channels; status means call outcome here.
@@ -381,7 +393,9 @@ function VoiceLogs() {
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <h2 className="text-sm font-bold uppercase tracking-[0.1em]">Calls</h2>
           <span className="text-xs text-muted-foreground">
-            {visible.length === calls.length ? `${calls.length} logged` : `${visible.length} of ${calls.length} shown`}
+            {visible.length === calls.length
+              ? `${calls.length} logged`
+              : `${visible.length} of ${calls.length} shown`}
           </span>
         </header>
         <div className="overflow-x-auto">
@@ -421,8 +435,12 @@ function VoiceLogs() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="block truncate font-medium">{client?.contact_person || "—"}</span>
-                      <span className="block text-[11px] text-muted-foreground">{c.phone || client?.phone || "—"}</span>
+                      <span className="block truncate font-medium">
+                        {client?.contact_person || "—"}
+                      </span>
+                      <span className="block text-[11px] text-muted-foreground">
+                        {c.phone || client?.phone || "—"}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -448,14 +466,23 @@ function VoiceLogs() {
                     <td className="px-4 py-3">
                       <EscalatedCell escalation={escalation} />
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{formatClientTime(c.startedAt)}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground" title={c.call_id}>
+                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                      {formatClientTime(c.startedAt)}
+                    </td>
+                    <td
+                      className="px-4 py-3 font-mono text-xs text-muted-foreground"
+                      title={c.call_id}
+                    >
                       {shortId(c.call_id)}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="block font-semibold">{(c.assistantName || "Grace").trim()}</span>
+                      <span className="block font-semibold">
+                        {(c.assistantName || "Grace").trim()}
+                      </span>
                       {c.phoneNumberName ? (
-                        <span className="block text-[11px] text-muted-foreground">{c.phoneNumberName}</span>
+                        <span className="block text-[11px] text-muted-foreground">
+                          {c.phoneNumberName}
+                        </span>
                       ) : null}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
@@ -534,11 +561,14 @@ function VoiceLogs() {
                   </div>
                   <div>
                     <span className="font-semibold text-foreground">Client name:</span>{" "}
-                    {activeClient?.parent_name || activeClient?.client_name || activeItem.client_name}
+                    {activeClient?.parent_name ||
+                      activeClient?.client_name ||
+                      activeItem.client_name}
                   </div>
                   <div>
                     <span className="font-semibold text-foreground">Contact person:</span>{" "}
-                    {activeClient?.contact_person || "—"} · {activeItem.phone || activeClient?.phone || "—"}
+                    {activeClient?.contact_person || "—"} ·{" "}
+                    {activeItem.phone || activeClient?.phone || "—"}
                   </div>
                   <div>
                     <span className="font-semibold text-foreground">Ended:</span>{" "}
@@ -569,6 +599,21 @@ function VoiceLogs() {
             </header>
 
             <div className="space-y-5 p-5">
+              {(detail?.escalations ?? []).length ? (
+                <section className="space-y-2">
+                  {(detail?.escalations ?? []).map((e, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2"
+                    >
+                      <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-destructive">
+                        Grace notified the AR team · {formatClientTime(e.recorded_at)}
+                      </p>
+                      <p className="mt-0.5 text-sm">{e.reason}</p>
+                    </div>
+                  ))}
+                </section>
+              ) : null}
               {detail?.callSummary || detail?.satisfaction ? (
                 <div>
                   <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
