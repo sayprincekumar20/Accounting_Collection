@@ -1,7 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import {
+  LogFilterBar,
+  matchesLogFilters,
+  useLogFilters,
+} from "@/components/collections/LogFilters";
 import { AppShell } from "@/components/AppShell";
-import { StatCard, Panel, ChannelBadge, StatusPill, RefreshButton } from "@/components/collections/Bits";
+import {
+  StatCard,
+  Panel,
+  ChannelBadge,
+  StatusPill,
+  RefreshButton,
+} from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -32,7 +43,11 @@ function peso(v: number) {
 function shortDate(v: string | null | undefined) {
   if (!v) return "—";
   try {
-    return new Date(v).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+    return new Date(v).toLocaleDateString("en-PH", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   } catch {
     return v;
   }
@@ -76,7 +91,7 @@ function useOverviewData() {
       const queue = queueRes.queue || [];
       const counters = countersRes.counters || [];
       const latestRun = (runsRes.runs || [])[0];
-      const promises = (promisesRes.promises || []).slice(0, 6);
+      const promises = promisesRes.promises || [];
 
       const recent: {
         channel: string;
@@ -122,7 +137,7 @@ function useOverviewData() {
       }
       recent.sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime());
 
-      return { clients, queue, counters, latestRun, recent: recent.slice(0, 8), promises };
+      return { clients, queue, counters, latestRun, recent, promises };
     },
     refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
@@ -134,11 +149,78 @@ function Overview() {
   const queue = data?.queue ?? [];
   const counters = data?.counters ?? [];
   const latestRun = data?.latestRun;
-  const recent = data?.recent ?? [];
-  const promises = data?.promises ?? [];
-
-  const outstanding = clients.reduce((sum: number, c: { collection_amount: number }) => sum + Number(c.collection_amount), 0);
-  const replies = recent.filter((m) => m.direction === "inbound").length;
+  // Shared filters (search, channel, period) narrow every card and list on this page.
+  const [filters, setFilters, clearFilters] = useLogFilters();
+  const OVERVIEW_CHANNELS = [
+    { value: "all", label: "All channels" },
+    { value: "ch_email", label: "Email" },
+    { value: "ch_sms", label: "SMS" },
+    { value: "ch_voice", label: "Voice" },
+  ];
+  const channelFilter =
+    OVERVIEW_CHANNELS.some((o) => o.value === filters.status) && filters.status !== "all"
+      ? filters.status.slice(3)
+      : "";
+  const base = { ...filters, status: "all", source: "all" as const };
+  const allRecent = data?.recent ?? [];
+  const recentAll = allRecent.filter(
+    (m) =>
+      (!channelFilter || m.channel === channelFilter) &&
+      matchesLogFilters(
+        { name: m.client_name, extra: m.preview, lastActivity: m.occurred_at },
+        base,
+      ),
+  );
+  const recent = recentAll.slice(0, 8);
+  type PromiseLite = {
+    client_name: string;
+    channel: string;
+    reason: string;
+    promise_date: string;
+    client_id?: string;
+    recorded_at?: string;
+  };
+  const promisesAll = ((data?.promises ?? []) as PromiseLite[]).filter(
+    (p) =>
+      (!channelFilter || String(p.channel || "").toLowerCase() === channelFilter) &&
+      matchesLogFilters(
+        { name: p.client_name || p.client_id || "", lastActivity: p.recorded_at },
+        base,
+      ),
+  );
+  const promises = promisesAll.slice(0, 6);
+  type ClientLite = {
+    client_name: string;
+    parent_name?: string;
+    contact_person?: string;
+    email?: string;
+    phone?: string;
+    collection_amount: number;
+  };
+  const visibleClients = (clients as ClientLite[]).filter((c) =>
+    matchesLogFilters(
+      {
+        name: `${c.client_name} ${c.parent_name || ""}`,
+        contact: c.contact_person,
+        extra: `${c.email || ""} ${c.phone || ""}`,
+      },
+      { ...base, range: "all" },
+    ),
+  );
+  type QueueLite = {
+    client_name: string;
+    preferred_channel?: string;
+    sent_date?: string;
+    created_date?: string;
+    collection_amount: number;
+  };
+  const visibleQueue = (queue as QueueLite[]).filter(
+    (q) =>
+      (!channelFilter || String(q.preferred_channel || "").toLowerCase() === channelFilter) &&
+      matchesLogFilters({ name: q.client_name, lastActivity: q.sent_date || q.created_date }, base),
+  );
+  const outstanding = visibleClients.reduce((sum, c) => sum + Number(c.collection_amount), 0);
+  const replies = recentAll.filter((m) => m.direction === "inbound").length;
 
   return (
     <AppShell
@@ -146,6 +228,18 @@ function Overview() {
       subtitle={`Daily overdue run · ${latestRun ? shortDate(latestRun.run_date) : "no runs yet"} · live`}
       actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
     >
+      <div className="mb-5">
+        <LogFilterBar
+          filters={filters}
+          onChange={setFilters}
+          onClear={clearFilters}
+          shown={recentAll.length}
+          total={allRecent.length}
+          statusOptions={OVERVIEW_CHANNELS}
+          hideSource
+          searchPlaceholder="Search client or message…"
+        />
+      </div>
       {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
       {error ? <p className="text-sm text-destructive">Could not load overview data.</p> : null}
 
@@ -153,20 +247,29 @@ function Overview() {
         <StatCard
           label="Total outstanding"
           value={peso(outstanding)}
-          hint={`${clients.length} accounts tracked`}
+          hint={`${visibleClients.length} accounts tracked`}
           tone="primary"
         />
-        <StatCard label="Recent messages" value={String(recent.length)} hint="Across all channels" />
+        <StatCard
+          label="Messages"
+          value={String(recentAll.length)}
+          hint={channelFilter ? channelFilter.toUpperCase() : "Across all channels"}
+        />
         <StatCard label="Client replies" value={String(replies)} hint="Inbound conversations" />
         <StatCard
           label="Payment promises"
-          value={String(promises.length)}
-          hint="Recorded by the AI reply agent"
+          value={String(promisesAll.length)}
+          hint="Recorded by the AI agents"
         />
         <StatCard
-          label="Queued today"
-          value={String(queue.length)}
-          hint={peso(queue.reduce((s: number, q: { collection_amount: number }) => s + Number(q.collection_amount), 0))}
+          label="In the queue"
+          value={String(visibleQueue.length)}
+          hint={peso(
+            visibleQueue.reduce(
+              (s: number, q: { collection_amount: number }) => s + Number(q.collection_amount),
+              0,
+            ),
+          )}
         />
       </div>
 
@@ -201,7 +304,10 @@ function Overview() {
             </ul>
           </Panel>
 
-          <Panel title="Latest communications" description="Newest events pulled from every provider">
+          <Panel
+            title="Latest communications"
+            description="Newest events pulled from every provider"
+          >
             <ul className="divide-y divide-border">
               {recent.map((m, i) => (
                 <li key={i} className="flex flex-wrap items-start gap-3 px-4 py-3">
@@ -224,7 +330,9 @@ function Overview() {
                 </li>
               ))}
               {!isLoading && recent.length === 0 ? (
-                <li className="px-4 py-6 text-center text-sm text-muted-foreground">No activity yet.</li>
+                <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+                  No activity yet.
+                </li>
               ) : null}
             </ul>
           </Panel>
@@ -233,32 +341,48 @@ function Overview() {
         <div className="space-y-5">
           <Panel title="Today's queue" description="From the n8n daily overdue run">
             <ul className="divide-y divide-border">
-              {queue.slice(0, 6).map((q: { queue_id: string; client_name: string; queue_status: string; collection_amount: number; due_date: string; preferred_channel: string; fallback_channel: string }) => (
-                <li key={q.queue_id} className="px-4 py-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-semibold">{q.client_name}</span>
-                    <StatusPill status={q.queue_status.toLowerCase()} />
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {peso(q.collection_amount)} · due {shortDate(q.due_date)}
-                  </p>
-                  <div className="mt-1.5 flex items-center gap-1.5">
-                    {q.preferred_channel ? (
-                      <ChannelBadge channel={q.preferred_channel.toLowerCase()} />
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground">No channel on file</span>
-                    )}
-                    {q.fallback_channel ? (
-                      <>
-                        <span className="text-[11px] text-muted-foreground">fallback →</span>
-                        <ChannelBadge channel={q.fallback_channel.toLowerCase()} />
-                      </>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
+              {(visibleQueue as typeof queue)
+                .slice(0, 6)
+                .map(
+                  (q: {
+                    queue_id: string;
+                    client_name: string;
+                    queue_status: string;
+                    collection_amount: number;
+                    due_date: string;
+                    preferred_channel: string;
+                    fallback_channel: string;
+                  }) => (
+                    <li key={q.queue_id} className="px-4 py-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm font-semibold">{q.client_name}</span>
+                        <StatusPill status={q.queue_status.toLowerCase()} />
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {peso(q.collection_amount)} · due {shortDate(q.due_date)}
+                      </p>
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        {q.preferred_channel ? (
+                          <ChannelBadge channel={q.preferred_channel.toLowerCase()} />
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground">
+                            No channel on file
+                          </span>
+                        )}
+                        {q.fallback_channel ? (
+                          <>
+                            <span className="text-[11px] text-muted-foreground">fallback →</span>
+                            <ChannelBadge channel={q.fallback_channel.toLowerCase()} />
+                          </>
+                        ) : null}
+                      </div>
+                    </li>
+                  ),
+                )}
               {!isLoading && queue.length === 0 ? (
-                <li className="px-4 py-6 text-center text-sm text-muted-foreground">Nothing queued yet.</li>
+                <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+                  Nothing queued yet.
+                </li>
               ) : null}
             </ul>
           </Panel>
@@ -271,7 +395,15 @@ function Overview() {
             ) : (
               <ul className="divide-y divide-border">
                 {promises.map(
-                  (p: { client_name: string; channel: string; reason: string; promise_date: string }, i: number) => (
+                  (
+                    p: {
+                      client_name: string;
+                      channel: string;
+                      reason: string;
+                      promise_date: string;
+                    },
+                    i: number,
+                  ) => (
                     <li key={i} className="px-4 py-3">
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate text-sm font-semibold">{p.client_name}</span>
@@ -295,11 +427,19 @@ function Overview() {
                   ["Outstanding", peso(latestRun.total_outstanding)],
                   ["Viber queued", String(latestRun.viber_queued)],
                   ["Email queued", String(latestRun.email_queued)],
-                  ["No contact", `${latestRun.no_contact_count} · ${peso(latestRun.no_contact_amount)}`],
-                  ["Email only", `${latestRun.email_only_count} · ${peso(latestRun.email_only_amount)}`],
+                  [
+                    "No contact",
+                    `${latestRun.no_contact_count} · ${peso(latestRun.no_contact_amount)}`,
+                  ],
+                  [
+                    "Email only",
+                    `${latestRun.email_only_count} · ${peso(latestRun.email_only_amount)}`,
+                  ],
                 ].map(([label, value]) => (
                   <div key={label} className="bg-card px-4 py-3">
-                    <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</dt>
+                    <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                      {label}
+                    </dt>
                     <dd className="mt-0.5 text-sm font-semibold">{value}</dd>
                   </div>
                 ))}
