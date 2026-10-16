@@ -165,7 +165,10 @@ function useThreadsList() {
     queryKey: ["gmail-threads-list"],
     queryFn: async () => {
       const r = await fetch("/api/gmail-threads-list");
-      if (!r.ok) throw new Error("Email threads fetch failed");
+      if (!r.ok) {
+        const body = (await r.json().catch(() => ({}))) as { detail?: string };
+        throw new Error(body.detail || "Email threads fetch failed");
+      }
       const d = await r.json();
       return { threads: (d.threads ?? []) as ThreadListItem[], truncated: !!d.truncated };
     },
@@ -524,6 +527,11 @@ function EmailInbox() {
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-sm text-destructive">
                     Could not load Gmail threads.
+                    {error instanceof Error && error.message !== "Email threads fetch failed" ? (
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {error.message}
+                      </span>
+                    ) : null}
                   </td>
                 </tr>
               ) : null}

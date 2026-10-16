@@ -1,5 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getAccessToken, gmailFetch, getHeader, parseSender, getGmailBusinessEmail } from "@/lib/gmail-server";
+import {
+  getAccessToken,
+  gmailFetch,
+  getHeader,
+  parseSender,
+  getGmailBusinessEmail,
+} from "@/lib/gmail-server";
 import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
 
 // Direct Gmail API call — replaces the old N8N_WEBHOOK_BASE_URL proxy.
@@ -66,42 +72,50 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
           const sinceMs = Date.now() - days * 86400000;
           const pageToken = url.searchParams.get("pageToken");
 
-          const [accessToken, clientRows, promiseRows, escalationRows, convoRows, logRows] = await Promise.all([
-            getAccessToken(),
-            fetchAllDataTableRows<{ client_id: string; client_name: string; contact_person: string; email: string }>(
-              "rJpqXxmxhqJnlLrJ",
-            ),
-            fetchAllDataTableRows<{ client_id: string; channel: string }>("JyGFOqTqI3QXHJbb"),
-            fetchAllDataTableRows<{ client_id: string; channel: string }>("ANfkZZDIrDuC4RjK"),
-            // Every email the automation sends or answers is logged here with its Gmail thread id.
-            fetchAllDataTableRows<{
-              client_id: string;
-              client_name: string;
-              channel: string;
-              direction: string;
-              thread_id: string;
-              timestamp: string;
-            }>("2WtfkEaHiBSzgItW").catch(() => []),
-            // Send attempts (SEND_SUCCESS / failures) per channel.
-            fetchAllDataTableRows<{
-              client_id: string;
-              channel: string;
-              event_type: string;
-              status: string;
-              error_message: string;
-              timestamp: string;
-            }>("a32Z5oGcNi0xzefb").catch(() => []),
-          ]);
+          const [accessToken, clientRows, promiseRows, escalationRows, convoRows, logRows] =
+            await Promise.all([
+              getAccessToken(),
+              fetchAllDataTableRows<{
+                client_id: string;
+                client_name: string;
+                contact_person: string;
+                email: string;
+              }>("rJpqXxmxhqJnlLrJ"),
+              fetchAllDataTableRows<{ client_id: string; channel: string }>("JyGFOqTqI3QXHJbb"),
+              fetchAllDataTableRows<{ client_id: string; channel: string }>("ANfkZZDIrDuC4RjK"),
+              // Every email the automation sends or answers is logged here with its Gmail thread id.
+              fetchAllDataTableRows<{
+                client_id: string;
+                client_name: string;
+                channel: string;
+                direction: string;
+                thread_id: string;
+                timestamp: string;
+              }>("2WtfkEaHiBSzgItW").catch(() => []),
+              // Send attempts (SEND_SUCCESS / failures) per channel.
+              fetchAllDataTableRows<{
+                client_id: string;
+                channel: string;
+                event_type: string;
+                status: string;
+                error_message: string;
+                timestamp: string;
+              }>("a32Z5oGcNi0xzefb").catch(() => []),
+            ]);
 
           const clients: ClientRow[] = clientRows;
           const promises: HistoryEntry[] = promiseRows;
           const escalations: HistoryEntry[] = escalationRows;
 
           const promisedClientIds = new Set(
-            promises.filter((p) => (p.channel || "").toLowerCase() === "email").map((p) => p.client_id),
+            promises
+              .filter((p) => (p.channel || "").toLowerCase() === "email")
+              .map((p) => p.client_id),
           );
           const escalatedClientIds = new Set(
-            escalations.filter((e) => (e.channel || "").toLowerCase() === "email").map((e) => e.client_id),
+            escalations
+              .filter((e) => (e.channel || "").toLowerCase() === "email")
+              .map((e) => e.client_id),
           );
 
           const listParams = new URLSearchParams({ maxResults });
@@ -132,13 +146,21 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
 
           // Automation threads first (newest first): every reminder / AI reply the workflows sent,
           // linked to its client by thread id, whatever address the client later replies from.
-          const threadClient = new Map<string, { client_id: string; client_name: string; at: number }>();
+          const threadClient = new Map<
+            string,
+            { client_id: string; client_name: string; at: number }
+          >();
           for (const r of convoRows) {
             if (String(r.channel || "").toUpperCase() !== "EMAIL" || !r.thread_id) continue;
             const at = new Date(r.timestamp).getTime() || 0;
             if (at && at < sinceMs) continue;
             const prev = threadClient.get(r.thread_id);
-            if (!prev || at > prev.at) threadClient.set(r.thread_id, { client_id: r.client_id, client_name: r.client_name, at });
+            if (!prev || at > prev.at)
+              threadClient.set(r.thread_id, {
+                client_id: r.client_id,
+                client_name: r.client_name,
+                at,
+              });
           }
           const seenThreadIds = new Set<string>(
             [...threadClient.entries()].sort((a, b) => b[1].at - a[1].at).map(([id]) => id),
@@ -152,16 +174,18 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
               const chunkParams = new URLSearchParams(listParams);
               chunkParams.set("q", `-in:chats -in:draft newer_than:${days}d (${emailQuery})`);
               if (pageCursor) chunkParams.set("pageToken", pageCursor);
-              const chunkList = await gmailFetch<{ threads?: { id: string }[]; nextPageToken?: string }>(
-                `/threads?${chunkParams.toString()}`,
-                accessToken,
-              );
+              const chunkList = await gmailFetch<{
+                threads?: { id: string }[];
+                nextPageToken?: string;
+              }>(`/threads?${chunkParams.toString()}`, accessToken);
               for (const t of chunkList.threads || []) seenThreadIds.add(t.id);
               pageCursor = chunkList.nextPageToken || undefined;
               if (!pageCursor) break;
               if (page === MAX_PAGES - 1) {
                 truncated = true;
-                console.warn(`[gmail-threads-list] more than ${MAX_PAGES * Number(maxResults)} threads in one email chunk; truncated`);
+                console.warn(
+                  `[gmail-threads-list] more than ${MAX_PAGES * Number(maxResults)} threads in one email chunk; truncated`,
+                );
               }
             }
           }
@@ -175,7 +199,9 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
           const rawThreads: any[] = [];
           for (let i = 0; i < threadIds.length; i += CHUNK_SIZE) {
             const chunk = threadIds.slice(i, i + CHUNK_SIZE);
-            const chunkResults = await Promise.all(chunk.map((id) => fetchThreadMetadata(id, accessToken)));
+            const chunkResults = await Promise.all(
+              chunk.map((id) => fetchThreadMetadata(id, accessToken)),
+            );
             rawThreads.push(...chunkResults.filter(Boolean));
           }
 
@@ -196,16 +222,26 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
               // not only the last message's sender/recipient: clients reply from colleagues' or personal
               // addresses, get copied in Cc, or are one of several recipients.
               const emailsIn = (raw: string) =>
-                (String(raw || "").toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/g) || []);
+                String(raw || "")
+                  .toLowerCase()
+                  .match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/g) || [];
               const participants = new Set<string>();
               for (const m of thread.messages) {
-                for (const h of ["From", "To", "Cc"]) for (const e of emailsIn(getHeader(m.payload?.headers, h))) participants.add(e);
+                for (const h of ["From", "To", "Cc"])
+                  for (const e of emailsIn(getHeader(m.payload?.headers, h))) participants.add(e);
               }
               participants.delete(businessEmail);
               const linked = threadClient.get(thread.id);
               const client =
                 (linked && clients.find((c) => c.client_id === linked.client_id)) ||
-                (linked ? { client_id: linked.client_id, client_name: linked.client_name, contact_person: "", email: "" } : null) ||
+                (linked
+                  ? {
+                      client_id: linked.client_id,
+                      client_name: linked.client_name,
+                      contact_person: "",
+                      email: "",
+                    }
+                  : null) ||
                 clients.find((c) => (c.email || "").toLowerCase() === otherPartyEmail) ||
                 clients.find((c) => participants.has((c.email || "").toLowerCase().trim()));
               if (!client) return null; // not a known client — drop unrelated inbox mail (newsletters, personal, etc.)
@@ -214,16 +250,20 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
               // they last said, instead of only who sent the newest message.
               type ThreadMsg = typeof lastMessage;
               const msgs: ThreadMsg[] = thread.messages;
-              const senderOf = (m: ThreadMsg) => parseSender(getHeader(m.payload?.headers, "From")).email;
+              const senderOf = (m: ThreadMsg) =>
+                parseSender(getHeader(m.payload?.headers, "From")).email;
               const fromUs = (m: ThreadMsg) => senderOf(m) === businessEmail;
               // Bounces (mailer-daemon/postmaster/no-reply) and our own colleagues are not client replies.
-              const isSystem = (m: ThreadMsg) => /(mailer-daemon|postmaster|no-?reply)/i.test(senderOf(m) || "");
-              const isInternal = (m: ThreadMsg) => (senderOf(m) || "").endsWith("@rareglobalfood.com");
+              const isSystem = (m: ThreadMsg) =>
+                /(mailer-daemon|postmaster|no-?reply)/i.test(senderOf(m) || "");
+              const isInternal = (m: ThreadMsg) =>
+                (senderOf(m) || "").endsWith("@rareglobalfood.com");
               const clientMsgs = msgs.filter((m) => !fromUs(m) && !isSystem(m) && !isInternal(m));
               const ourMsgs = msgs.filter((m) => fromUs(m) || isInternal(m));
               const bounced = msgs.some((m) => isSystem(m));
               const lastHuman = [...msgs].reverse().find((m) => !isSystem(m));
-              const lastFromHuman = lastHuman && !fromUs(lastHuman) && !isInternal(lastHuman) ? "client" : "us";
+              const lastFromHuman =
+                lastHuman && !fromUs(lastHuman) && !isInternal(lastHuman) ? "client" : "us";
               const lastClient = clientMsgs[clientMsgs.length - 1];
               const lastOurs = ourMsgs[ourMsgs.length - 1];
 
@@ -253,7 +293,8 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
             .filter(
               (r) =>
                 String(r.channel || "").toUpperCase() === "EMAIL" &&
-                (String(r.status || "").toUpperCase() === "FAILED" || /FAIL/i.test(r.event_type || "")) &&
+                (String(r.status || "").toUpperCase() === "FAILED" ||
+                  /FAIL/i.test(r.event_type || "")) &&
                 (new Date(r.timestamp).getTime() || 0) >= sinceMs,
             )
             .map((r) => {
@@ -279,17 +320,30 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
               };
             });
           threads.push(...failedRows);
-          threads.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
+          threads.sort(
+            (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime(),
+          );
 
-          return new Response(JSON.stringify({ threads, nextPageToken: nextPageTokenOut, truncated }), {
-            headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-          });
+          return new Response(
+            JSON.stringify({ threads, nextPageToken: nextPageTokenOut, truncated }),
+            {
+              headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+            },
+          );
         } catch (err) {
           console.error("[gmail-threads-list] fetch error:", err);
-          return new Response(JSON.stringify({ error: "Failed to fetch email threads" }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          });
+          // Include Google's own error text (behind the dashboard login; it never contains the secrets),
+          // so a wrong client/secret/token or a disabled Gmail API is obvious.
+          return new Response(
+            JSON.stringify({
+              error: "Failed to fetch email threads",
+              detail: String(err).slice(0, 400),
+            }),
+            {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
         }
       },
     },

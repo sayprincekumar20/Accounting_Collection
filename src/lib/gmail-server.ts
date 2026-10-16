@@ -23,7 +23,8 @@ const GMAIL_API = "https://gmail.googleapis.com/gmail/v1";
  * failed with things like `Invalid URL: undefined/clients-list`).
  */
 export async function getGmailBusinessEmail(): Promise<string> {
-  return (await getEnv("GMAIL_BUSINESS_EMAIL")) || "";
+  // Trimmed: a space or line break pasted along with a Cloudflare secret breaks the match.
+  return ((await getEnv("GMAIL_BUSINESS_EMAIL")) || "").trim();
 }
 
 let cachedToken: { accessToken: string; expiresAt: number } | null = null;
@@ -38,9 +39,9 @@ export async function getAccessToken(): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: (await getEnv("GMAIL_CLIENT_ID")) || "",
-      client_secret: (await getEnv("GMAIL_CLIENT_SECRET")) || "",
-      refresh_token: (await getEnv("GMAIL_REFRESH_TOKEN")) || "",
+      client_id: ((await getEnv("GMAIL_CLIENT_ID")) || "").trim(),
+      client_secret: ((await getEnv("GMAIL_CLIENT_SECRET")) || "").trim(),
+      refresh_token: ((await getEnv("GMAIL_REFRESH_TOKEN")) || "").trim(),
       grant_type: "refresh_token",
     }),
   });
@@ -55,7 +56,11 @@ export async function getAccessToken(): Promise<string> {
   return cachedToken.accessToken;
 }
 
-export async function gmailFetch<T = any>(path: string, accessToken: string, init: RequestInit = {}): Promise<T> {
+export async function gmailFetch<T = any>(
+  path: string,
+  accessToken: string,
+  init: RequestInit = {},
+): Promise<T> {
   const res = await fetch(`${GMAIL_API}/users/me${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${accessToken}`, ...(init.headers || {}) },
@@ -67,7 +72,10 @@ export async function gmailFetch<T = any>(path: string, accessToken: string, ini
   return res.json() as Promise<T>;
 }
 
-export function getHeader(headers: { name: string; value: string }[] | undefined, name: string): string {
+export function getHeader(
+  headers: { name: string; value: string }[] | undefined,
+  name: string,
+): string {
   if (!headers) return "";
   const h = headers.find((h) => h.name.toLowerCase() === name.toLowerCase());
   return h?.value || "";
@@ -83,7 +91,8 @@ export function parseSender(raw: string): { name: string; email: string } {
 export function extractBody(payload: any): { body: string; quotedBody: string | null } {
   const decode = (data: string) =>
     Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8");
-  const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   function walk(part: any): { html?: string; text?: string } {
     if (!part) return {};
@@ -135,7 +144,9 @@ export function extractBody(payload: any): { body: string; quotedBody: string | 
     // Plain-text replies quote with a leading "On ... wrote:" line followed by
     // "> " prefixed lines. Split there the same way.
     const lines = text.split("\n");
-    const quoteStart = lines.findIndex((l) => /^On .+wrote:\s*$/.test(l.trim()) || /^>/.test(l.trim()));
+    const quoteStart = lines.findIndex(
+      (l) => /^On .+wrote:\s*$/.test(l.trim()) || /^>/.test(l.trim()),
+    );
     if (quoteStart > 0) {
       const bodyText = lines.slice(0, quoteStart).join("\n").trim();
       const quotedText = lines.slice(quoteStart).join("\n").trim();
