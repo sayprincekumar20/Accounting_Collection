@@ -9,6 +9,7 @@ import {
   SummaryCell,
   PromiseCell,
   EscalatedCell,
+  RefTag,
   type LastFrom,
 } from "@/components/collections/LogCells";
 import {
@@ -82,7 +83,7 @@ interface ThreadDetail {
   threadId: string;
   subject: string;
   messages: ThreadMessage[];
-  escalations?: { reason: string; recorded_at: string; channel: string }[];
+  escalations?: { reason: string; recorded_at: string; channel: string; ref?: string }[];
 }
 interface ClientRow {
   client_id: string;
@@ -287,13 +288,15 @@ function EmailInbox() {
   const messages = detail?.messages ?? [];
   // One timeline: thread messages plus the AI agents' "notified AR team" events, by time.
   const timeline: (
-    { kind: "msg"; at: number; m: ThreadMessage } | { kind: "esc"; at: number; reason: string }
+    | { kind: "msg"; at: number; m: ThreadMessage }
+    | { kind: "esc"; at: number; reason: string; ref: string }
   )[] = [
     ...messages.map((m) => ({ kind: "msg" as const, at: new Date(m.date).getTime() || 0, m })),
     ...(detail?.escalations ?? []).map((e) => ({
       kind: "esc" as const,
       at: new Date(e.recorded_at).getTime() || 0,
       reason: e.reason,
+      ref: e.ref || "",
     })),
   ].sort((a, b) => a.at - b.at);
 
@@ -620,6 +623,7 @@ function EmailInbox() {
                         AI agent notified the AR team · {formatTs(new Date(item.at).toISOString())}
                       </p>
                       <p className="mt-1 text-sm">{item.reason}</p>
+                      <RefTag refId={item.ref} className="mt-1" />
                     </li>
                   );
                 }

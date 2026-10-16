@@ -18,6 +18,8 @@ export interface EscalationNote {
   reason: string;
   recorded_at: string;
   channel: string;
+  /** Same "Ref" ID as the escalation's post in the Cliq Sales channel (empty for older rows). */
+  ref: string;
 }
 export interface AuthorshipContext {
   convos: Row[];
@@ -36,7 +38,8 @@ const REMINDER_TEXT =
   /(^overdue balance reminder)|(friendly reminder that the following invoice)|(you have \d+ (overdue|current) invoices?)|(overdue (account|accounts) with rare global food)|(would like to follow up if we have available collection)|(your account statement from rare global food)|(please see the attached statement for details)/i;
 
 /** The automatic "Not reached by phone today (...)" alert: not an escalation needing AR action. */
-export const isNotReachedAlert = (reason: unknown) => /^not reached by phone/i.test(String(reason || "").trim());
+export const isNotReachedAlert = (reason: unknown) =>
+  /^not reached by phone/i.test(String(reason || "").trim());
 
 export async function loadAuthorshipContext(): Promise<AuthorshipContext> {
   const [convos, escalations, logs] = await Promise.all([
@@ -107,12 +110,18 @@ export function escalationsFor(
 ): EscalationNote[] {
   const ids = new Set(clientIds);
   return ctx.escalations
-    .filter((e) => ids.has(s(e["client_id"])) && up(e["channel"]) !== "SYSTEM" && !isNotReachedAlert(e["reason"]))
+    .filter(
+      (e) =>
+        ids.has(s(e["client_id"])) &&
+        up(e["channel"]) !== "SYSTEM" &&
+        !isNotReachedAlert(e["reason"]),
+    )
     .filter((e) => !channel || up(e["channel"]) === channel.toUpperCase())
     .map((e) => ({
       reason: s(e["reason"]),
       recorded_at: s(e["timestamp"]) || s(e["createdAt"]),
       channel: up(e["channel"]),
+      ref: s(e["ref"]),
     }))
     .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime());
 }

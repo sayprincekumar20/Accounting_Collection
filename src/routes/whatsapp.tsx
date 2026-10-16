@@ -10,6 +10,7 @@ import {
   PromiseCell,
   EscalatedCell,
   ReadTicks,
+  RefTag,
 } from "@/components/collections/LogCells";
 import {
   LogFilterBar,
@@ -51,7 +52,7 @@ interface WaConversation {
   messages: WaMessage[];
   lastMessageAt: string;
   lastMessagePreview: string;
-  escalations?: { reason: string; recorded_at: string; channel: string }[];
+  escalations?: { reason: string; recorded_at: string; channel: string; ref?: string }[];
 }
 interface ClientRow {
   client_id: string;
@@ -588,6 +589,7 @@ function WhatsAppInbox() {
                         {waTime(e.recorded_at)}
                       </p>
                       <p className="mt-0.5 text-sm">{e.reason}</p>
+                      <RefTag refId={e.ref} className="mt-1" />
                     </div>
                   ))}
                 </div>

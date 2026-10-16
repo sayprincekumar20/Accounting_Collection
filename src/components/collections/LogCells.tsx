@@ -149,7 +149,7 @@ export function PromiseCell({
 export function EscalatedCell({
   escalation,
 }: {
-  escalation?: { reason: string; recorded_at: string } | undefined;
+  escalation?: { reason: string; recorded_at: string; ref?: string | undefined } | undefined;
 }) {
   if (!escalation) return <span className="text-xs text-muted-foreground">—</span>;
   const reason = cleanText(escalation.reason);
@@ -167,6 +167,7 @@ export function EscalatedCell({
           {reason}
         </span>
       ) : null}
+      <RefTag refId={escalation.ref} />
     </span>
   );
 }
@@ -234,5 +235,30 @@ export function ReadTicks({
         />
       ) : null}
     </svg>
+  );
+}
+
+/** The escalation's Cliq "Ref" ID (search it in the Sales channel). Click copies it. */
+export function RefTag({
+  refId,
+  className = "",
+}: {
+  refId?: string | undefined;
+  className?: string;
+}) {
+  if (!refId) return null;
+  return (
+    <button
+      type="button"
+      title="Copy the Ref, then search it in the Cliq Sales channel"
+      onClick={(e) => {
+        e.stopPropagation();
+        void navigator.clipboard?.writeText(refId).catch(() => undefined);
+      }}
+      className={`inline-flex max-w-full items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground hover:bg-secondary ${className}`}
+    >
+      <span aria-hidden="true">🔖</span>
+      <span className="truncate">Ref: {refId}</span>
+    </button>
   );
 }

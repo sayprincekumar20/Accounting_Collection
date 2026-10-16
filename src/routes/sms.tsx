@@ -9,6 +9,7 @@ import {
   SummaryCell,
   PromiseCell,
   EscalatedCell,
+  RefTag,
 } from "@/components/collections/LogCells";
 import {
   LogFilterBar,
@@ -48,7 +49,7 @@ interface SmsConversation {
   notified_ar: boolean;
   promise_recorded: boolean;
   messages: SmsMessage[];
-  escalations?: { reason: string; recorded_at: string; channel: string }[];
+  escalations?: { reason: string; recorded_at: string; channel: string; ref?: string }[];
   lastMessageAt: string;
   lastMessagePreview: string;
 }
@@ -492,6 +493,7 @@ function SmsInbox() {
                       kind: "esc" as const,
                       at: new Date(e.recorded_at).getTime() || 0,
                       reason: e.reason,
+                      ref: e.ref || "",
                     })),
                   ]
                     .sort((a, b) => a.at - b.at)
@@ -506,6 +508,7 @@ function SmsInbox() {
                             {formatTs(new Date(it.at).toISOString())}
                           </p>
                           <p className="mt-0.5 text-sm">{it.reason}</p>
+                          <RefTag refId={it.ref} className="mt-1" />
                         </li>
                       ) : (
                         ((m: SmsMessage) => (

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { PhoneIncoming, PhoneOutgoing, Globe, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
-import { SummaryCell, PromiseCell, EscalatedCell } from "@/components/collections/LogCells";
+import { SummaryCell, PromiseCell, EscalatedCell, RefTag } from "@/components/collections/LogCells";
 import {
   LogFilterBar,
   matchesLogFilters,
@@ -62,7 +62,7 @@ interface CallSatisfaction {
 }
 
 interface CallDetail {
-  escalations?: { reason: string; recorded_at: string; channel: string }[];
+  escalations?: { reason: string; recorded_at: string; channel: string; ref?: string }[];
   callId: string;
   clientName: string;
   phone: string;
@@ -610,6 +610,7 @@ function VoiceLogs() {
                         Grace notified the AR team · {formatClientTime(e.recorded_at)}
                       </p>
                       <p className="mt-0.5 text-sm">{e.reason}</p>
+                      <RefTag refId={e.ref} className="mt-1" />
                     </div>
                   ))}
                 </section>

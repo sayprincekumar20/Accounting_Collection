@@ -29,6 +29,8 @@ export const Route = createFileRoute("/api/escalations")({
             channel: r.channel,
             reason: r.reason,
             recorded_at: r.timestamp,
+            // Same "Ref" ID as the escalation's post in the Cliq Sales channel (empty for older rows).
+            ref: (r as { ref?: string }).ref || "",
           }));
 
           return new Response(JSON.stringify({ escalations }), {
