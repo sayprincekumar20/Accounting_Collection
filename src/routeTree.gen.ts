@@ -18,6 +18,7 @@ import { Route as SmsRouteImport } from './routes/sms'
 import { Route as ViberRouteImport } from './routes/viber'
 import { Route as VoiceRouteImport } from './routes/voice'
 import { Route as WhatsappRouteImport } from './routes/whatsapp'
+import { Route as ApiCallReportsRouteImport } from './routes/api/call-reports'
 import { Route as ApiChannelCountersRouteImport } from './routes/api/channel-counters'
 import { Route as ApiClientsListRouteImport } from './routes/api/clients-list'
 import { Route as ApiDailyRunLogsRouteImport } from './routes/api/daily-run-logs'
@@ -78,6 +79,11 @@ const VoiceRoute = VoiceRouteImport.update({
 const WhatsappRoute = WhatsappRouteImport.update({
   id: '/whatsapp',
   path: '/whatsapp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCallReportsRoute = ApiCallReportsRouteImport.update({
+  id: '/api/call-reports',
+  path: '/api/call-reports',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChannelCountersRoute = ApiChannelCountersRouteImport.update({
@@ -172,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/viber': typeof ViberRoute
   '/voice': typeof VoiceRoute
   '/whatsapp': typeof WhatsappRoute
+  '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
@@ -199,6 +206,7 @@ export interface FileRoutesByTo {
   '/viber': typeof ViberRoute
   '/voice': typeof VoiceRoute
   '/whatsapp': typeof WhatsappRoute
+  '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
@@ -227,6 +235,7 @@ export interface FileRoutesById {
   '/viber': typeof ViberRoute
   '/voice': typeof VoiceRoute
   '/whatsapp': typeof WhatsappRoute
+  '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
@@ -256,6 +265,7 @@ export interface FileRouteTypes {
     | '/viber'
     | '/voice'
     | '/whatsapp'
+    | '/api/call-reports'
     | '/api/channel-counters'
     | '/api/clients-list'
     | '/api/daily-run-logs'
@@ -283,6 +293,7 @@ export interface FileRouteTypes {
     | '/viber'
     | '/voice'
     | '/whatsapp'
+    | '/api/call-reports'
     | '/api/channel-counters'
     | '/api/clients-list'
     | '/api/daily-run-logs'
@@ -310,6 +321,7 @@ export interface FileRouteTypes {
     | '/viber'
     | '/voice'
     | '/whatsapp'
+    | '/api/call-reports'
     | '/api/channel-counters'
     | '/api/clients-list'
     | '/api/daily-run-logs'
@@ -338,6 +350,7 @@ export interface RootRouteChildren {
   ViberRoute: typeof ViberRoute
   VoiceRoute: typeof VoiceRoute
   WhatsappRoute: typeof WhatsappRoute
+  ApiCallReportsRoute: typeof ApiCallReportsRoute
   ApiChannelCountersRoute: typeof ApiChannelCountersRoute
   ApiClientsListRoute: typeof ApiClientsListRoute
   ApiDailyRunLogsRoute: typeof ApiDailyRunLogsRoute
@@ -419,6 +432,13 @@ declare module '@tanstack/react-router' {
       path: '/whatsapp'
       fullPath: '/whatsapp'
       preLoaderRoute: typeof WhatsappRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/call-reports': {
+      id: '/api/call-reports'
+      path: '/api/call-reports'
+      fullPath: '/api/call-reports'
+      preLoaderRoute: typeof ApiCallReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/channel-counters': {
@@ -546,6 +566,7 @@ const rootRouteChildren: RootRouteChildren = {
   ViberRoute: ViberRoute,
   VoiceRoute: VoiceRoute,
   WhatsappRoute: WhatsappRoute,
+  ApiCallReportsRoute: ApiCallReportsRoute,
   ApiChannelCountersRoute: ApiChannelCountersRoute,
   ApiClientsListRoute: ApiClientsListRoute,
   ApiDailyRunLogsRoute: ApiDailyRunLogsRoute,

@@ -87,6 +87,34 @@ function inRange(runDate: string, range: string) {
   return now - t <= (range === "7d" ? 7 : 30) * 86400000;
 }
 
+interface CallReport {
+  id: string;
+  as_of: string;
+  created_at: string;
+  requested_by: string;
+  source: string;
+  client_count: number;
+  invoice_count: number;
+  total: number;
+  overdue: number;
+  current: number;
+  sheet_url: string;
+  xlsx_url: string;
+}
+
+function useCallReports() {
+  return useQuery({
+    queryKey: ["call-reports"],
+    queryFn: async () => {
+      const r = await fetch("/api/call-reports");
+      if (!r.ok) throw new Error("Reports fetch failed");
+      const d = await r.json();
+      return (d.reports ?? []) as CallReport[];
+    },
+    refetchInterval: 14400000,
+  });
+}
+
 function useRunLogs() {
   return useQuery({
     queryKey: ["daily-run-logs"],
@@ -108,6 +136,7 @@ const notRecorded = (
 
 function ReportsPage() {
   const { data, isLoading, isFetching, error, refetch } = useRunLogs();
+  const { data: callReports, refetch: refetchReports } = useCallReports();
   const [filters, setFilters, clearFilters] = useLogFilters();
   const all = data ?? [];
   const runs = all.filter((r) => inRange(r.run_date, filters.range));
@@ -126,8 +155,92 @@ function ReportsPage() {
     <AppShell
       title="Reports"
       subtitle="Weekly runs: what was queued, skipped, and what actually happened · live"
-      actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
+      actions={
+        <RefreshButton
+          isFetching={isFetching}
+          onRefresh={() => {
+            refetch();
+            refetchReports();
+          }}
+        />
+      }
     >
+      <div className="mb-5">
+        <Panel
+          title="AR reports (from /call runs)"
+          description="Built after every /call run: AS OF date, TOTAL, overdue and current, every open invoice with aging, remarks, promise and escalation. Open in Google Sheets or download as Excel (sign in with your @rareglobalfood.com Google account)."
+        >
+          {(callReports ?? []).length === 0 ? (
+            <p className="px-4 py-6 text-sm text-muted-foreground">
+              No AR reports yet. One is created after each /call run.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[860px] text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <th className="px-3 py-2.5 font-semibold">As of</th>
+                    <th className="px-3 py-2.5 font-semibold">Requested by</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Clients</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Invoices</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Total</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Overdue</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Current</th>
+                    <th className="px-3 py-2.5 font-semibold">Report</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border tabular-nums">
+                  {(callReports ?? []).slice(0, 20).map((r) => (
+                    <tr key={r.id}>
+                      <td className="px-3 py-2.5 whitespace-nowrap font-semibold">
+                        {runLabel(r.as_of)}
+                        <span className="block text-[11px] font-normal text-muted-foreground">
+                          {r.created_at
+                            ? new Date(r.created_at).toLocaleTimeString("en-PH", {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })
+                            : ""}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5">{r.requested_by || "—"}</td>
+                      <td className="px-3 py-2.5 text-right">{r.client_count}</td>
+                      <td className="px-3 py-2.5 text-right">{r.invoice_count}</td>
+                      <td className="px-3 py-2.5 text-right whitespace-nowrap">{peso(r.total)}</td>
+                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                        {peso(r.overdue)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                        {peso(r.current)}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        <a
+                          href={r.sheet_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-semibold text-primary hover:underline"
+                        >
+                          Open
+                        </a>
+                        <span className="mx-2 text-muted-foreground">·</span>
+                        <a
+                          href={r.xlsx_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-semibold text-primary hover:underline"
+                        >
+                          Download (Excel)
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+      </div>
+
       <LogFilterBar
         filters={filters}
         onChange={setFilters}
