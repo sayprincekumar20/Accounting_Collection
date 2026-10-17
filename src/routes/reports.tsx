@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { downloadCsv } from "@/lib/csv";
 import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 import { LogFilterBar, useLogFilters } from "@/components/collections/LogFilters";
@@ -341,6 +342,65 @@ function ReportsPage() {
         <Panel
           title="Daily run log"
           description="Every recorded run. Click a run to see its details above."
+          action={
+            <button
+              type="button"
+              onClick={() =>
+                downloadCsv(
+                  "daily-run-log",
+                  [
+                    "Run date",
+                    "Clients",
+                    "Outstanding",
+                    "Email queued",
+                    "SMS queued",
+                    "Calls queued",
+                    "Skipped 5+ branch",
+                    "Skipped sales person",
+                    "Skipped cooldown",
+                    "No contact",
+                    "No contact amount",
+                    "Email only",
+                    "Email only amount",
+                    "Emails sent",
+                    "SMS sent",
+                    "Calls placed",
+                    "Calls failed",
+                    "Client replies",
+                    "Promises",
+                    "Escalated",
+                    "Not reached",
+                  ],
+                  runs.map((r) => [
+                    r.run_date,
+                    r.total_processed,
+                    r.total_outstanding,
+                    r.email_queued,
+                    r.sms_queued,
+                    r.voice_queued,
+                    r.skipped_multibranch,
+                    r.skipped_salesperson,
+                    r.skipped_cooldown,
+                    r.no_contact_count,
+                    r.no_contact_amount,
+                    r.email_only_count,
+                    r.email_only_amount,
+                    r.results.emails_sent,
+                    r.results.sms_sent,
+                    r.results.calls_placed,
+                    r.results.calls_failed,
+                    r.results.client_replies,
+                    r.results.promises,
+                    r.results.escalations,
+                    r.results.not_reached ?? 0,
+                  ]),
+                )
+              }
+              className="rounded-md border border-border px-2.5 py-1 text-xs font-semibold hover:bg-muted"
+            >
+              Export CSV
+            </button>
+          }
         >
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1180px] text-sm">

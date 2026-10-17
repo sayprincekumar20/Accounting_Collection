@@ -10,35 +10,47 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ContactsRouteImport } from './routes/contacts'
 import { Route as EmailRouteImport } from './routes/email'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as PromisesRouteImport } from './routes/promises'
 import { Route as QueueRouteImport } from './routes/queue'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as SmsRouteImport } from './routes/sms'
 import { Route as ViberRouteImport } from './routes/viber'
 import { Route as VoiceRouteImport } from './routes/voice'
 import { Route as WhatsappRouteImport } from './routes/whatsapp'
+import { Route as WorklistRouteImport } from './routes/worklist'
 import { Route as ApiCallReportsRouteImport } from './routes/api/call-reports'
 import { Route as ApiChannelCountersRouteImport } from './routes/api/channel-counters'
+import { Route as ApiClientTimelineRouteImport } from './routes/api/client-timeline'
 import { Route as ApiClientsListRouteImport } from './routes/api/clients-list'
+import { Route as ApiContactsToFixRouteImport } from './routes/api/contacts-to-fix'
 import { Route as ApiDailyRunLogsRouteImport } from './routes/api/daily-run-logs'
 import { Route as ApiEscalationsRouteImport } from './routes/api/escalations'
 import { Route as ApiGmailAttachmentRouteImport } from './routes/api/gmail-attachment'
 import { Route as ApiGmailThreadDetailRouteImport } from './routes/api/gmail-thread-detail'
 import { Route as ApiGmailThreadsListRouteImport } from './routes/api/gmail-threads-list'
 import { Route as ApiPromiseHistoryRouteImport } from './routes/api/promise-history'
+import { Route as ApiPromisesBoardRouteImport } from './routes/api/promises-board'
 import { Route as ApiReminderQueueListRouteImport } from './routes/api/reminder-queue-list'
 import { Route as ApiSmsConversationsRouteImport } from './routes/api/sms-conversations'
 import { Route as ApiVapiCallAudioRouteImport } from './routes/api/vapi-call-audio'
 import { Route as ApiVapiCallDetailRouteImport } from './routes/api/vapi-call-detail'
 import { Route as ApiVapiCallsListRouteImport } from './routes/api/vapi-calls-list'
 import { Route as ApiWhatsappConversationsRouteImport } from './routes/api/whatsapp-conversations'
+import { Route as ApiWorklistRouteImport } from './routes/api/worklist'
 import { Route as ClientsIndexRouteImport } from './routes/clients.index'
 import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactsRoute = ContactsRouteImport.update({
+  id: '/contacts',
+  path: '/contacts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmailRoute = EmailRouteImport.update({
@@ -49,6 +61,11 @@ const EmailRoute = EmailRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PromisesRoute = PromisesRouteImport.update({
+  id: '/promises',
+  path: '/promises',
   getParentRoute: () => rootRouteImport,
 } as any)
 const QueueRoute = QueueRouteImport.update({
@@ -81,6 +98,11 @@ const WhatsappRoute = WhatsappRouteImport.update({
   path: '/whatsapp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WorklistRoute = WorklistRouteImport.update({
+  id: '/worklist',
+  path: '/worklist',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCallReportsRoute = ApiCallReportsRouteImport.update({
   id: '/api/call-reports',
   path: '/api/call-reports',
@@ -91,9 +113,19 @@ const ApiChannelCountersRoute = ApiChannelCountersRouteImport.update({
   path: '/api/channel-counters',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiClientTimelineRoute = ApiClientTimelineRouteImport.update({
+  id: '/api/client-timeline',
+  path: '/api/client-timeline',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiClientsListRoute = ApiClientsListRouteImport.update({
   id: '/api/clients-list',
   path: '/api/clients-list',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiContactsToFixRoute = ApiContactsToFixRouteImport.update({
+  id: '/api/contacts-to-fix',
+  path: '/api/contacts-to-fix',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDailyRunLogsRoute = ApiDailyRunLogsRouteImport.update({
@@ -124,6 +156,11 @@ const ApiGmailThreadsListRoute = ApiGmailThreadsListRouteImport.update({
 const ApiPromiseHistoryRoute = ApiPromiseHistoryRouteImport.update({
   id: '/api/promise-history',
   path: '/api/promise-history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPromisesBoardRoute = ApiPromisesBoardRouteImport.update({
+  id: '/api/promises-board',
+  path: '/api/promises-board',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiReminderQueueListRoute = ApiReminderQueueListRouteImport.update({
@@ -157,6 +194,11 @@ const ApiWhatsappConversationsRoute =
     path: '/api/whatsapp-conversations',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiWorklistRoute = ApiWorklistRouteImport.update({
+  id: '/api/worklist',
+  path: '/api/worklist',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClientsIndexRoute = ClientsIndexRouteImport.update({
   id: '/clients/',
   path: '/clients/',
@@ -170,86 +212,107 @@ const ClientsClientIdRoute = ClientsClientIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
   '/login': typeof LoginRoute
+  '/promises': typeof PromisesRoute
   '/queue': typeof QueueRoute
   '/reports': typeof ReportsRoute
   '/sms': typeof SmsRoute
   '/viber': typeof ViberRoute
   '/voice': typeof VoiceRoute
   '/whatsapp': typeof WhatsappRoute
+  '/worklist': typeof WorklistRoute
   '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
+  '/api/client-timeline': typeof ApiClientTimelineRoute
   '/api/clients-list': typeof ApiClientsListRoute
+  '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
+  '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
   '/api/sms-conversations': typeof ApiSmsConversationsRoute
   '/api/vapi-call-audio': typeof ApiVapiCallAudioRoute
   '/api/vapi-call-detail': typeof ApiVapiCallDetailRoute
   '/api/vapi-calls-list': typeof ApiVapiCallsListRoute
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
+  '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/clients/': typeof ClientsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
   '/login': typeof LoginRoute
+  '/promises': typeof PromisesRoute
   '/queue': typeof QueueRoute
   '/reports': typeof ReportsRoute
   '/sms': typeof SmsRoute
   '/viber': typeof ViberRoute
   '/voice': typeof VoiceRoute
   '/whatsapp': typeof WhatsappRoute
+  '/worklist': typeof WorklistRoute
   '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
+  '/api/client-timeline': typeof ApiClientTimelineRoute
   '/api/clients-list': typeof ApiClientsListRoute
+  '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
+  '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
   '/api/sms-conversations': typeof ApiSmsConversationsRoute
   '/api/vapi-call-audio': typeof ApiVapiCallAudioRoute
   '/api/vapi-call-detail': typeof ApiVapiCallDetailRoute
   '/api/vapi-calls-list': typeof ApiVapiCallsListRoute
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
+  '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/clients': typeof ClientsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
   '/login': typeof LoginRoute
+  '/promises': typeof PromisesRoute
   '/queue': typeof QueueRoute
   '/reports': typeof ReportsRoute
   '/sms': typeof SmsRoute
   '/viber': typeof ViberRoute
   '/voice': typeof VoiceRoute
   '/whatsapp': typeof WhatsappRoute
+  '/worklist': typeof WorklistRoute
   '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
+  '/api/client-timeline': typeof ApiClientTimelineRoute
   '/api/clients-list': typeof ApiClientsListRoute
+  '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
+  '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
   '/api/sms-conversations': typeof ApiSmsConversationsRoute
   '/api/vapi-call-audio': typeof ApiVapiCallAudioRoute
   '/api/vapi-call-detail': typeof ApiVapiCallDetailRoute
   '/api/vapi-calls-list': typeof ApiVapiCallsListRoute
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
+  '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/clients/': typeof ClientsIndexRoute
 }
@@ -257,114 +320,142 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/contacts'
     | '/email'
     | '/login'
+    | '/promises'
     | '/queue'
     | '/reports'
     | '/sms'
     | '/viber'
     | '/voice'
     | '/whatsapp'
+    | '/worklist'
     | '/api/call-reports'
     | '/api/channel-counters'
+    | '/api/client-timeline'
     | '/api/clients-list'
+    | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
     | '/api/escalations'
     | '/api/gmail-attachment'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
     | '/api/promise-history'
+    | '/api/promises-board'
     | '/api/reminder-queue-list'
     | '/api/sms-conversations'
     | '/api/vapi-call-audio'
     | '/api/vapi-call-detail'
     | '/api/vapi-calls-list'
     | '/api/whatsapp-conversations'
+    | '/api/worklist'
     | '/clients/$clientId'
     | '/clients/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/contacts'
     | '/email'
     | '/login'
+    | '/promises'
     | '/queue'
     | '/reports'
     | '/sms'
     | '/viber'
     | '/voice'
     | '/whatsapp'
+    | '/worklist'
     | '/api/call-reports'
     | '/api/channel-counters'
+    | '/api/client-timeline'
     | '/api/clients-list'
+    | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
     | '/api/escalations'
     | '/api/gmail-attachment'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
     | '/api/promise-history'
+    | '/api/promises-board'
     | '/api/reminder-queue-list'
     | '/api/sms-conversations'
     | '/api/vapi-call-audio'
     | '/api/vapi-call-detail'
     | '/api/vapi-calls-list'
     | '/api/whatsapp-conversations'
+    | '/api/worklist'
     | '/clients/$clientId'
     | '/clients'
   id:
     | '__root__'
     | '/'
+    | '/contacts'
     | '/email'
     | '/login'
+    | '/promises'
     | '/queue'
     | '/reports'
     | '/sms'
     | '/viber'
     | '/voice'
     | '/whatsapp'
+    | '/worklist'
     | '/api/call-reports'
     | '/api/channel-counters'
+    | '/api/client-timeline'
     | '/api/clients-list'
+    | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
     | '/api/escalations'
     | '/api/gmail-attachment'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
     | '/api/promise-history'
+    | '/api/promises-board'
     | '/api/reminder-queue-list'
     | '/api/sms-conversations'
     | '/api/vapi-call-audio'
     | '/api/vapi-call-detail'
     | '/api/vapi-calls-list'
     | '/api/whatsapp-conversations'
+    | '/api/worklist'
     | '/clients/$clientId'
     | '/clients/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ContactsRoute: typeof ContactsRoute
   EmailRoute: typeof EmailRoute
   LoginRoute: typeof LoginRoute
+  PromisesRoute: typeof PromisesRoute
   QueueRoute: typeof QueueRoute
   ReportsRoute: typeof ReportsRoute
   SmsRoute: typeof SmsRoute
   ViberRoute: typeof ViberRoute
   VoiceRoute: typeof VoiceRoute
   WhatsappRoute: typeof WhatsappRoute
+  WorklistRoute: typeof WorklistRoute
   ApiCallReportsRoute: typeof ApiCallReportsRoute
   ApiChannelCountersRoute: typeof ApiChannelCountersRoute
+  ApiClientTimelineRoute: typeof ApiClientTimelineRoute
   ApiClientsListRoute: typeof ApiClientsListRoute
+  ApiContactsToFixRoute: typeof ApiContactsToFixRoute
   ApiDailyRunLogsRoute: typeof ApiDailyRunLogsRoute
   ApiEscalationsRoute: typeof ApiEscalationsRoute
   ApiGmailAttachmentRoute: typeof ApiGmailAttachmentRoute
   ApiGmailThreadDetailRoute: typeof ApiGmailThreadDetailRoute
   ApiGmailThreadsListRoute: typeof ApiGmailThreadsListRoute
   ApiPromiseHistoryRoute: typeof ApiPromiseHistoryRoute
+  ApiPromisesBoardRoute: typeof ApiPromisesBoardRoute
   ApiReminderQueueListRoute: typeof ApiReminderQueueListRoute
   ApiSmsConversationsRoute: typeof ApiSmsConversationsRoute
   ApiVapiCallAudioRoute: typeof ApiVapiCallAudioRoute
   ApiVapiCallDetailRoute: typeof ApiVapiCallDetailRoute
   ApiVapiCallsListRoute: typeof ApiVapiCallsListRoute
   ApiWhatsappConversationsRoute: typeof ApiWhatsappConversationsRoute
+  ApiWorklistRoute: typeof ApiWorklistRoute
   ClientsClientIdRoute: typeof ClientsClientIdRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
 }
@@ -376,6 +467,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contacts': {
+      id: '/contacts'
+      path: '/contacts'
+      fullPath: '/contacts'
+      preLoaderRoute: typeof ContactsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/email': {
@@ -390,6 +488,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/promises': {
+      id: '/promises'
+      path: '/promises'
+      fullPath: '/promises'
+      preLoaderRoute: typeof PromisesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/queue': {
@@ -434,6 +539,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WhatsappRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/worklist': {
+      id: '/worklist'
+      path: '/worklist'
+      fullPath: '/worklist'
+      preLoaderRoute: typeof WorklistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/call-reports': {
       id: '/api/call-reports'
       path: '/api/call-reports'
@@ -448,11 +560,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChannelCountersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/client-timeline': {
+      id: '/api/client-timeline'
+      path: '/api/client-timeline'
+      fullPath: '/api/client-timeline'
+      preLoaderRoute: typeof ApiClientTimelineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/clients-list': {
       id: '/api/clients-list'
       path: '/api/clients-list'
       fullPath: '/api/clients-list'
       preLoaderRoute: typeof ApiClientsListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/contacts-to-fix': {
+      id: '/api/contacts-to-fix'
+      path: '/api/contacts-to-fix'
+      fullPath: '/api/contacts-to-fix'
+      preLoaderRoute: typeof ApiContactsToFixRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/daily-run-logs': {
@@ -497,6 +623,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPromiseHistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/promises-board': {
+      id: '/api/promises-board'
+      path: '/api/promises-board'
+      fullPath: '/api/promises-board'
+      preLoaderRoute: typeof ApiPromisesBoardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/reminder-queue-list': {
       id: '/api/reminder-queue-list'
       path: '/api/reminder-queue-list'
@@ -539,6 +672,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWhatsappConversationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/worklist': {
+      id: '/api/worklist'
+      path: '/api/worklist'
+      fullPath: '/api/worklist'
+      preLoaderRoute: typeof ApiWorklistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/clients/': {
       id: '/clients/'
       path: '/clients'
@@ -558,29 +698,36 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ContactsRoute: ContactsRoute,
   EmailRoute: EmailRoute,
   LoginRoute: LoginRoute,
+  PromisesRoute: PromisesRoute,
   QueueRoute: QueueRoute,
   ReportsRoute: ReportsRoute,
   SmsRoute: SmsRoute,
   ViberRoute: ViberRoute,
   VoiceRoute: VoiceRoute,
   WhatsappRoute: WhatsappRoute,
+  WorklistRoute: WorklistRoute,
   ApiCallReportsRoute: ApiCallReportsRoute,
   ApiChannelCountersRoute: ApiChannelCountersRoute,
+  ApiClientTimelineRoute: ApiClientTimelineRoute,
   ApiClientsListRoute: ApiClientsListRoute,
+  ApiContactsToFixRoute: ApiContactsToFixRoute,
   ApiDailyRunLogsRoute: ApiDailyRunLogsRoute,
   ApiEscalationsRoute: ApiEscalationsRoute,
   ApiGmailAttachmentRoute: ApiGmailAttachmentRoute,
   ApiGmailThreadDetailRoute: ApiGmailThreadDetailRoute,
   ApiGmailThreadsListRoute: ApiGmailThreadsListRoute,
   ApiPromiseHistoryRoute: ApiPromiseHistoryRoute,
+  ApiPromisesBoardRoute: ApiPromisesBoardRoute,
   ApiReminderQueueListRoute: ApiReminderQueueListRoute,
   ApiSmsConversationsRoute: ApiSmsConversationsRoute,
   ApiVapiCallAudioRoute: ApiVapiCallAudioRoute,
   ApiVapiCallDetailRoute: ApiVapiCallDetailRoute,
   ApiVapiCallsListRoute: ApiVapiCallsListRoute,
   ApiWhatsappConversationsRoute: ApiWhatsappConversationsRoute,
+  ApiWorklistRoute: ApiWorklistRoute,
   ClientsClientIdRoute: ClientsClientIdRoute,
   ClientsIndexRoute: ClientsIndexRoute,
 }

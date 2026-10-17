@@ -10,12 +10,18 @@ import {
   Mail,
   MessageCircle,
   Smartphone,
+  ClipboardCheck,
+  CalendarClock,
+  UserX,
 } from "lucide-react";
 
 const nav = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
   { to: "/clients", label: "Clients", icon: Users },
   { to: "/queue", label: "Reminder Queue", icon: ListChecks },
+  { to: "/worklist", label: "AR Worklist", icon: ClipboardCheck },
+  { to: "/promises", label: "Promises", icon: CalendarClock },
+  { to: "/contacts", label: "Contacts to Fix", icon: UserX },
   { to: "/reports", label: "Reports", icon: FileBarChart },
 ] as const;
 

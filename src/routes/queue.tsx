@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { downloadCsv } from "@/lib/csv";
 import { AppShell } from "@/components/AppShell";
 import {
   LogFilterBar,
@@ -120,7 +121,48 @@ function QueuePage() {
     <AppShell
       title="Reminder Queue"
       subtitle="Built by the n8n daily overdue run · live"
-      actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
+      actions={
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              downloadCsv(
+                "reminder-queue",
+                [
+                  "Client",
+                  "Contact",
+                  "Channel",
+                  "Amount",
+                  "Due",
+                  "Status",
+                  "Created",
+                  "Sent",
+                  "Source",
+                  "Requested by",
+                  "Invoices",
+                ],
+                visible.map((q) => [
+                  q.client_name,
+                  q.contact_person,
+                  q.preferred_channel,
+                  q.collection_amount,
+                  q.due_date,
+                  q.queue_status,
+                  q.created_date,
+                  q.sent_date,
+                  q.trigger_source ?? "",
+                  q.requested_by ?? "",
+                  q.invoice_numbers,
+                ]),
+              )
+            }
+            className="h-9 rounded-lg border border-border px-3 text-sm font-semibold hover:bg-muted"
+          >
+            Export CSV
+          </button>
+          <RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />
+        </div>
+      }
     >
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="In this cycle's queue" value={String(queue.length)} tone="primary" />

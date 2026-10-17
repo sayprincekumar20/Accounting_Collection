@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { downloadCsv } from "@/lib/csv";
 import { AppShell } from "@/components/AppShell";
 import {
   LogFilterBar,
@@ -155,7 +156,52 @@ function ClientsPage() {
     <AppShell
       title="Clients"
       subtitle="Overdue accounts and the channels we can reach them on · live"
-      actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
+      actions={
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              downloadCsv(
+                "clients",
+                [
+                  "Client",
+                  "Parent",
+                  "Contact",
+                  "Email",
+                  "Phone",
+                  "Amount due",
+                  "Overdue",
+                  "Due date",
+                  "Sales person",
+                  "AR owner",
+                  "Promise until",
+                  "AR handling until",
+                  "Invoices",
+                ],
+                filtered.map((c) => [
+                  c.client_name,
+                  c.parent_name ?? "",
+                  c.contact_person,
+                  c.email,
+                  c.phone,
+                  c.collection_amount,
+                  c.overdue_total ?? "",
+                  c.due_date,
+                  c.sales_person ?? "",
+                  "",
+                  c.promise_suppressed_until ?? "",
+                  c.ar_handoff_until ?? "",
+                  c.invoice_numbers,
+                ]),
+              )
+            }
+            className="h-9 rounded-lg border border-border px-3 text-sm font-semibold hover:bg-muted"
+          >
+            Export CSV
+          </button>
+          <RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />
+        </div>
+      }
     >
       <div className="mb-5">
         <LogFilterBar

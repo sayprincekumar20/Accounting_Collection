@@ -126,3 +126,42 @@ export async function fetchAllDataTableRows<T = Record<string, unknown>>(
 export function truncationHeaders(...results: { truncated: boolean }[]): Record<string, string> {
   return results.some((r) => r.truncated) ? { "X-Data-Truncated": "true" } : {};
 }
+
+/**
+ * Update rows matching `filters` (all must match) in an n8n data table, then clear the read
+ * cache for that table. n8n has used both PATCH /rows/update and PATCH /rows for this, so the
+ * first is tried and the second used if the first is not found.
+ */
+export async function updateDataTableRows(
+  dataTableId: string,
+  filters: { columnName: string; value: string | number | boolean }[],
+  data: Record<string, unknown>,
+): Promise<void> {
+  const apiKey = await getEnv("N8N_API_KEY");
+  if (!apiKey) throw new Error("N8N_API_KEY is not configured");
+  const body = JSON.stringify({
+    filter: {
+      type: "and",
+      filters: filters.map((f) => ({ columnName: f.columnName, condition: "eq", value: f.value })),
+    },
+    data,
+  });
+  const headers = { "X-N8N-API-KEY": apiKey, "Content-Type": "application/json" };
+  let res = await fetch(`${N8N_BASE}/api/v1/data-tables/${dataTableId}/rows/update`, {
+    method: "PATCH",
+    headers,
+    body,
+  });
+  if (res.status === 404 || res.status === 405) {
+    res = await fetch(`${N8N_BASE}/api/v1/data-tables/${dataTableId}/rows`, {
+      method: "PATCH",
+      headers,
+      body,
+    });
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`n8n data table update failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  for (const key of [...cache.keys()]) if (key.includes(dataTableId)) cache.delete(key);
+}

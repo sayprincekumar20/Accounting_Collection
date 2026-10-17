@@ -1,7 +1,15 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { RefTag } from "@/components/collections/LogCells";
+import { downloadCsv } from "@/lib/csv";
 import { AppShell } from "@/components/AppShell";
-import { Panel, ChannelBadge, StatusPill, StatCard, RefreshButton } from "@/components/collections/Bits";
+import {
+  Panel,
+  ChannelBadge,
+  StatusPill,
+  StatCard,
+  RefreshButton,
+} from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/clients/$clientId")({
   head: () => ({
@@ -59,7 +67,11 @@ function peso(v: number) {
 function shortDate(v: string | null | undefined) {
   if (!v) return "—";
   try {
-    return new Date(v).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+    return new Date(v).toLocaleDateString("en-PH", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   } catch {
     return v;
   }
@@ -111,7 +123,9 @@ function useClientDetail(clientId: string) {
       const [clientsRes, queueRes, smsRes, voiceRes, gmailRes, promisesRes] = await Promise.all([
         safeFetchJson("/api/clients-list", { clients: [] as ClientRow[] }),
         safeFetchJson("/api/reminder-queue-list", { queue: [] as QueueRow[] }),
-        safeFetchJson("/api/sms-conversations", { conversations: [] as { client_id: string; messages: any[] }[] }),
+        safeFetchJson("/api/sms-conversations", {
+          conversations: [] as { client_id: string; messages: any[] }[],
+        }),
         safeFetchJson("/api/vapi-calls-list", { calls: [] as any[] }),
         safeFetchJson("/api/gmail-threads-list", { threads: [] as any[] }),
         safeFetchJson("/api/promise-history", { promises: [] as PromiseRow[] }),
@@ -176,7 +190,9 @@ function useClientDetail(clientId: string) {
         }
       }
 
-      timeline.sort((a, b) => new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime());
+      timeline.sort(
+        (a, b) => new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime(),
+      );
 
       return { client, queue, timeline, promises };
     },
@@ -199,7 +215,9 @@ function ClientDetail() {
     return (
       <AppShell title="Couldn't load this client" subtitle="">
         <div className="surface-card p-6 text-sm">
-          <p className="font-semibold text-destructive">Something went wrong loading this client's data.</p>
+          <p className="font-semibold text-destructive">
+            Something went wrong loading this client's data.
+          </p>
           <p className="mt-1 text-muted-foreground">
             {error instanceof Error ? error.message : "Unknown error. Check the server logs."}
           </p>
@@ -254,7 +272,10 @@ function ClientDetail() {
 
       <div className="mt-5 grid gap-5 xl:grid-cols-3">
         <div className="xl:col-span-2">
-          <Panel title="Conversation timeline" description="Everything sent and received, newest at the bottom">
+          <Panel
+            title="Conversation timeline"
+            description="Everything sent and received, newest at the bottom"
+          >
             <ol className="space-y-4 p-4">
               {timeline.length === 0 ? (
                 <li className="text-sm text-muted-foreground">No messages yet.</li>
@@ -262,7 +283,10 @@ function ClientDetail() {
               {timeline.map((m, i) => {
                 const outbound = m.direction === "outbound";
                 return (
-                  <li key={i} className={`flex flex-col gap-1 ${outbound ? "items-end" : "items-start"}`}>
+                  <li
+                    key={i}
+                    className={`flex flex-col gap-1 ${outbound ? "items-end" : "items-start"}`}
+                  >
                     <div className="flex items-center gap-2">
                       <ChannelBadge channel={m.channel} />
                       <span className="text-[11px] text-muted-foreground">
@@ -284,6 +308,9 @@ function ClientDetail() {
               })}
             </ol>
           </Panel>
+          <div className="mt-5">
+            <ClientHistory clientId={clientId} />
+          </div>
         </div>
 
         <div className="space-y-5">
@@ -296,7 +323,9 @@ function ClientDetail() {
                 ["Invoices", client.invoice_numbers || "—"],
               ].map(([label, value]) => (
                 <div key={label} className="px-4 py-2.5">
-                  <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</dt>
+                  <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    {label}
+                  </dt>
                   <dd className="mt-0.5 break-words">{value}</dd>
                 </div>
               ))}
@@ -359,7 +388,8 @@ function ClientDetail() {
                       <StatusPill status={q.queue_status.toLowerCase()} />
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Sent {q.sent_date ? shortDate(q.sent_date) : "not yet"} · {peso(q.collection_amount)}
+                      Sent {q.sent_date ? shortDate(q.sent_date) : "not yet"} ·{" "}
+                      {peso(q.collection_amount)}
                     </p>
                   </li>
                 ))}
@@ -369,5 +399,105 @@ function ClientDetail() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+// Everything that happened with this client, newest first: reminders, calls, messages, promises,
+// AR escalations (with the Cliq Ref) and failures.
+interface HistoryEvent {
+  at: string;
+  kind: string;
+  channel: string;
+  title: string;
+  detail: string;
+  ref?: string;
+  source?: string;
+}
+const KIND_TONE: Record<string, string> = {
+  reminder: "bg-secondary text-secondary-foreground",
+  call: "bg-primary/10 text-primary",
+  client: "bg-muted text-foreground",
+  ai: "bg-primary/10 text-primary",
+  promise: "bg-success/12 text-success",
+  escalation: "bg-destructive/12 text-destructive",
+  failure: "bg-warning/15 text-warning",
+};
+function ClientHistory({ clientId }: { clientId: string }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["client-timeline", clientId],
+    queryFn: async () => {
+      const r = await fetch(`/api/client-timeline?client_id=${encodeURIComponent(clientId)}`);
+      if (!r.ok) throw new Error("Timeline fetch failed");
+      return ((await r.json()).events ?? []) as HistoryEvent[];
+    },
+  });
+  const events = data ?? [];
+  return (
+    <Panel
+      title="Full history"
+      description="Reminders, calls, messages, promises and AR escalations, newest first"
+      action={
+        events.length ? (
+          <button
+            type="button"
+            onClick={() =>
+              downloadCsv(
+                `history-${clientId.split("___")[0]}`,
+                ["When", "Type", "Channel", "Event", "Details", "Ref", "Source"],
+                events.map((e) => [
+                  e.at,
+                  e.kind,
+                  e.channel,
+                  e.title,
+                  e.detail,
+                  e.ref || "",
+                  e.source || "",
+                ]),
+              )
+            }
+            className="rounded-md border border-border px-2.5 py-1 text-xs font-semibold hover:bg-muted"
+          >
+            Export CSV
+          </button>
+        ) : undefined
+      }
+    >
+      {isLoading ? <p className="px-4 py-6 text-sm text-muted-foreground">Loading…</p> : null}
+      {error ? (
+        <p className="px-4 py-6 text-sm text-destructive">Could not load the history.</p>
+      ) : null}
+      {!isLoading && !error && events.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-muted-foreground">Nothing recorded yet.</p>
+      ) : null}
+      <ol className="max-h-[520px] divide-y divide-border overflow-y-auto">
+        {events.map((e, i) => (
+          <li key={i} className="px-4 py-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${KIND_TONE[e.kind] ?? "bg-muted"}`}
+              >
+                {e.title}
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                {e.at
+                  ? new Date(e.at).toLocaleString("en-PH", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })
+                  : ""}
+                {e.source ? ` · ${e.source}` : ""}
+              </span>
+            </div>
+            {e.detail ? (
+              <p className="mt-1 line-clamp-4 whitespace-pre-line text-sm">{e.detail}</p>
+            ) : null}
+            <RefTag refId={e.ref} className="mt-1" />
+          </li>
+        ))}
+      </ol>
+    </Panel>
   );
 }
