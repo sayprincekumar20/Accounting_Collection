@@ -165,3 +165,8 @@ export async function updateDataTableRows(
   }
   for (const key of [...cache.keys()]) if (key.includes(dataTableId)) cache.delete(key);
 }
+
+/** Forget the cached rows of one table, so the next read shows a change made elsewhere. */
+export function clearDataTableCache(dataTableId: string): void {
+  for (const key of [...cache.keys()]) if (key.includes(dataTableId)) cache.delete(key);
+}

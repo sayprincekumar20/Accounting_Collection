@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { fetchAllDataTableRows, updateDataTableRows } from "@/lib/n8n-datatable";
+import { clearDataTableCache, fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { isNotReachedAlert } from "@/lib/authorship";
 
 // AR worklist: every real escalation (not the automatic "Not reached by phone" alert) with its
@@ -9,6 +9,8 @@ const CLIENTS = "rJpqXxmxhqJnlLrJ";
 type Row = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? "" : String(v));
 const STATUSES = ["OPEN", "IN_PROGRESS", "DONE"];
+const WORKLIST_WEBHOOK = "https://rareglobalfood.app.n8n.cloud/webhook/worklist-update";
+const WORKLIST_SECRET = "wl_7c41e9a2b05d4f63a8e1c92f6d0b7a35";
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -75,12 +77,26 @@ export const Route = createFileRoute("/api/worklist")({
           const status = s(b.status).toUpperCase();
           if (!entryId || !STATUSES.includes(status))
             return json({ error: "entry_id and a valid status are required" }, 400);
-          await updateDataTableRows(ESCALATIONS, [{ columnName: "entry_id", value: entryId }], {
-            status,
-            handled_by: s(b.handled_by).trim().slice(0, 80),
-            handled_at: new Date().toISOString(),
-            ar_note: s(b.note).trim().slice(0, 500),
+          // Saved by the n8n workflow 27_Worklist_Update (a data-table update node), so the
+          // dashboard's read-only API key never needs write access.
+          const res = await fetch(WORKLIST_WEBHOOK, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-worklist-secret": WORKLIST_SECRET },
+            body: JSON.stringify({
+              entry_id: entryId,
+              status,
+              handled_by: s(b.handled_by).trim(),
+              note: s(b.note).trim(),
+            }),
           });
+          const out = (await res.json().catch(() => ({}))) as { ok?: boolean; updated?: number };
+          if (!res.ok || !out.ok) throw new Error(`n8n worklist update failed (${res.status})`);
+          if (!out.updated)
+            return json(
+              { error: "This escalation was not found (it may have been archived)." },
+              404,
+            );
+          clearDataTableCache(ESCALATIONS);
           return json({ ok: true });
         } catch (err) {
           console.error("[worklist] POST error:", err);

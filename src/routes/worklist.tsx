@@ -101,9 +101,13 @@ function WorklistPage() {
 
   async function update(item: Item, next: Item["status"]) {
     setErr("");
-    if (!name.trim()) {
-      setErr("Enter your name first (top of the page), so the team can see who handled it.");
-      return;
+    let who = name.trim();
+    if (!who) {
+      // Ask once; remembered for this browser session.
+      const entered = window.prompt("Your name (shown as 'handled by'):", "");
+      if (entered === null || !entered.trim()) return;
+      who = entered.trim();
+      saveName(who);
     }
     let note = item.ar_note;
     if (next === "DONE") {
