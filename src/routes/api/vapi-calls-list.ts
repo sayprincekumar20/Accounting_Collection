@@ -39,7 +39,14 @@ export const Route = createFileRoute("/api/vapi-calls-list")({
             MAX_DAYS,
           );
           const since = new Date(Date.now() - days * 86400000 + SAFETY_MS).toISOString();
-          const assistantId = await getEnv("VAPI_ASSISTANT_ID");
+          // Calls of these assistants are shown: VAPI_ASSISTANT_ID (one id or a comma-separated list)
+          // plus the bilingual pilot. Filtered after fetching, so several assistants can be listed.
+          const BILINGUAL_PILOT_ID = "b3af12b4-661c-4c3c-8c5b-d66f7ea58ce6";
+          const envIds = String((await getEnv("VAPI_ASSISTANT_ID")) || "")
+            .split(",")
+            .map((x) => x.trim())
+            .filter(Boolean);
+          const allowedAssistants = new Set(envIds.length ? [...envIds, BILINGUAL_PILOT_ID] : []);
 
           const rawCalls: any[] = [];
           let before: string | undefined;
@@ -55,7 +62,6 @@ export const Route = createFileRoute("/api/vapi-calls-list")({
             }
             const qs = new URLSearchParams({ limit: String(PAGE_SIZE) });
             if (useDateFilter) qs.set("createdAtGt", since);
-            if (assistantId) qs.set("assistantId", assistantId);
             if (before) qs.set("createdAtLt", before);
             let batch: any[];
             try {
@@ -88,16 +94,22 @@ export const Route = createFileRoute("/api/vapi-calls-list")({
           const assistantNames = new Map<string, string>();
           try {
             const assistants = (await vapiFetch<any[]>("/assistant?limit=100")) || [];
-            for (const a of assistants) if (a?.id) assistantNames.set(a.id, String(a.name || "").trim());
+            for (const a of assistants)
+              if (a?.id) assistantNames.set(a.id, String(a.name || "").trim());
           } catch (err) {
-            console.warn("[vapi-calls-list] could not load assistant names:", String(err).slice(0, 200));
+            console.warn(
+              "[vapi-calls-list] could not load assistant names:",
+              String(err).slice(0, 200),
+            );
           }
 
           // Pages can overlap at the boundary timestamp; keep one entry per call id.
           const seen = new Set<string>();
-          const unique = rawCalls.filter(
-            (c) => c && c.id && !seen.has(c.id) && (seen.add(c.id), true),
-          );
+          const unique = rawCalls
+            .filter(
+              (c) => !allowedAssistants.size || allowedAssistants.has(String(c?.assistantId || "")),
+            )
+            .filter((c) => c && c.id && !seen.has(c.id) && (seen.add(c.id), true));
 
           const calls = unique.map((call) => {
             const { callSummary, satisfaction } = extractSummaryAndSatisfaction(call);
