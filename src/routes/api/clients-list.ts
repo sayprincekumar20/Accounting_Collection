@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { fetchDataTable, truncationHeaders } from "@/lib/n8n-datatable";
+import { fetchAllDataTableRows, fetchDataTable, truncationHeaders } from "@/lib/n8n-datatable";
 
 // Direct n8n Data Table REST API call -- replaces the old N8N_WEBHOOK_BASE_URL
 // webhook proxy. This is a pure read, so it no longer counts against n8n's
@@ -45,6 +45,83 @@ export const Route = createFileRoute("/api/clients-list")({
           const result = await fetchDataTable<ClientTableRow>(CLIENTS_DATA_TABLE_ID, { fresh });
           const rows = result.rows;
 
+          // Last contact per client, whatever started it (weekly run or /call from Cliq): latest text
+          // sent, latest call placed, and that call's result. Matched on the company part of the
+          // client_id, so a client whose contact changed (new row) keeps its earlier activity.
+          type Act = Record<string, unknown>;
+          const [logs, convos, retries] = await Promise.all([
+            fetchAllDataTableRows<Act>("a32Z5oGcNi0xzefb").catch(() => [] as Act[]),
+            fetchAllDataTableRows<Act>("2WtfkEaHiBSzgItW").catch(() => [] as Act[]),
+            fetchAllDataTableRows<Act>("OgCEYfz7eGjS3dPz").catch(() => [] as Act[]),
+          ]);
+          const str = (v: unknown) => (v == null ? "" : String(v));
+          const key = (id: unknown) => str(id).split("___")[0]!.trim().toLowerCase();
+          const at = (r: Act) =>
+            new Date(str(r["timestamp"]) || str(r["createdAt"])).getTime() || 0;
+          const lastText = new Map<string, Act>();
+          const lastCall = new Map<string, Act>();
+          for (const l of logs) {
+            const ev = str(l["event_type"]).toUpperCase();
+            const ch = str(l["channel"]).toUpperCase();
+            const k = key(l["client_id"]);
+            if (!k) continue;
+            const target =
+              ev === "SEND_SUCCESS" && ch !== "VOICE"
+                ? lastText
+                : ch === "VOICE" && ev === "CALL_INITIATED"
+                  ? lastCall
+                  : null;
+            if (!target) continue;
+            const prev = target.get(k);
+            if (!prev || at(l) > at(prev)) target.set(k, l);
+          }
+          const answeredAfter = (k: string, t: number) =>
+            convos.some(
+              (c) =>
+                key(c["client_id"]) === k &&
+                str(c["channel"]).toUpperCase() === "VOICE" &&
+                at(c) >= t - 60000,
+            );
+          const retryOf = (k: string) =>
+            retries.filter((r) => key(r["client_id"]) === k).sort((a, b) => at(b) - at(a))[0];
+          const sourceLabel = (r?: Act) => {
+            const src = str(r?.["trigger_source"]).toUpperCase();
+            const who = str(r?.["requested_by"]);
+            if (src === "CLIQ_CALL") return "/call" + (who ? " · " + who : "");
+            if (src === "RETRY") return "Retry";
+            if (src === "MANUAL_RUN") return "Manual run";
+            return src ? "Weekly run" : "Weekly run";
+          };
+          const activityFor = (clientId: string) => {
+            const k = key(clientId);
+            const tx = lastText.get(k);
+            const cl = lastCall.get(k);
+            let callResult = "";
+            if (cl) {
+              const t = at(cl);
+              const rt = retryOf(k);
+              const rtAt = rt ? new Date(str(rt["updatedAt"])).getTime() || 0 : 0;
+              if (answeredAfter(k, t)) callResult = "Answered";
+              else if (rt && rtAt >= t - 60000 && str(rt["status"]).toUpperCase() === "PENDING")
+                callResult = "Retry pending";
+              else if (rt && rtAt >= t - 60000 && str(rt["status"]).toUpperCase() === "EXHAUSTED")
+                callResult = "Not reached";
+              else if (Date.now() - t < 15 * 60000) callResult = "In progress";
+              else callResult = "No answer";
+            }
+            return {
+              last_text_at: tx ? str(tx["timestamp"]) : "",
+              last_text_channel: tx ? str(tx["channel"]).toUpperCase() : "",
+              last_text_source: tx ? sourceLabel(tx) : "",
+              last_call_at: cl ? str(cl["timestamp"]) : "",
+              last_call_source: cl ? sourceLabel(cl) : "",
+              last_call_result: callResult,
+              contacted_via_call_command: [tx, cl].some(
+                (r) => str(r?.["trigger_source"]).toUpperCase() === "CLIQ_CALL",
+              ),
+            };
+          };
+
           // v3 retires stale duplicate rows (e.g. after a CRM contact change) as
           // INACTIVE; hide them so each customer appears once with current data.
           const clients = rows
@@ -76,6 +153,7 @@ export const Route = createFileRoute("/api/clients-list")({
               sales_person: r.sales_person || "",
               segment: r.segment || "",
               ar_owner: r.ar_owner || "",
+              ...activityFor(r.client_id),
             }));
 
           return new Response(JSON.stringify({ clients, truncated: result.truncated }), {

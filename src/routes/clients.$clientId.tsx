@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { RefTag } from "@/components/collections/LogCells";
@@ -157,8 +158,15 @@ function useClientDetail(clientId: string) {
         }
       }
 
+      // Calls of this client (also under an earlier client_id, e.g. after a contact change).
+      const companyKey = clientId.split("___")[0]!.trim().toLowerCase();
       const calls = (voiceRes.calls || []).filter(
-        (c: { client_id: string }) => c.client_id === clientId,
+        (c: { client_id: string }) =>
+          c.client_id === clientId ||
+          String(c.client_id || "")
+            .split("___")[0]!
+            .trim()
+            .toLowerCase() === companyKey,
       );
       for (const c of calls) {
         timeline.push({
@@ -183,7 +191,7 @@ function useClientDetail(clientId: string) {
           timeline.push({
             channel: "email",
             direction: t.lastDirection,
-            body: t.lastMessagePreview,
+            body: (t.subject ? t.subject + ": " : "") + t.lastMessagePreview,
             occurred_at: t.lastMessageAt,
             status: "",
           });
@@ -194,7 +202,7 @@ function useClientDetail(clientId: string) {
         (a, b) => new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime(),
       );
 
-      return { client, queue, timeline, promises };
+      return { client, queue, timeline, promises, calls };
     },
     refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
@@ -308,6 +316,9 @@ function ClientDetail() {
               })}
             </ol>
           </Panel>
+          <div className="mt-5">
+            <ClientCalls calls={data?.calls ?? []} />
+          </div>
           <div className="mt-5">
             <ClientHistory clientId={clientId} />
           </div>
@@ -499,5 +510,145 @@ function ClientHistory({ clientId }: { clientId: string }) {
         ))}
       </ol>
     </Panel>
+  );
+}
+
+// Every call to this client (weekly run, /call from Cliq, retries): outcome, summary, and the full
+// transcript + recording on demand (loaded only when opened, so the page stays fast).
+interface CallItem {
+  call_id: string;
+  startedAt: string;
+  endedAt: string;
+  endedReason: string;
+  status: string;
+  callSummary?: string;
+  satisfactionOverall?: number | null;
+  assistantName?: string;
+  triggerSource?: string;
+  requestedBy?: string;
+}
+const CALL_OUTCOME: Record<string, string> = {
+  "customer-ended-call": "Answered (client ended)",
+  "assistant-ended-call": "Answered (Grace ended)",
+  "customer-did-not-answer": "No answer",
+  "customer-busy": "Busy / declined",
+  "silence-timed-out": "No response (silence)",
+  voicemail: "Voicemail",
+  "twilio-failed-to-connect-call": "Line failed",
+};
+function ClientCalls({ calls }: { calls: CallItem[] }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const sorted = [...calls].sort(
+    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+  );
+  const src = (c: CallItem) => {
+    const t = String(c.triggerSource || "").toUpperCase();
+    if (t === "CLIQ_CALL") return "/call" + (c.requestedBy ? " · " + c.requestedBy : "");
+    if (t === "RETRY") return "Automatic retry";
+    return t ? "Weekly run" : "";
+  };
+  return (
+    <Panel
+      title={`Calls (${sorted.length})`}
+      description="Every call by Grace, newest first: outcome, summary, transcript and recording"
+    >
+      {sorted.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-muted-foreground">No calls in the last 14 days.</p>
+      ) : null}
+      <ul className="divide-y divide-border">
+        {sorted.map((c) => {
+          const secs =
+            c.endedAt && c.startedAt
+              ? Math.max(
+                  0,
+                  Math.round(
+                    (new Date(c.endedAt).getTime() - new Date(c.startedAt).getTime()) / 1000,
+                  ),
+                )
+              : 0;
+          return (
+            <li key={c.call_id} className="px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="font-semibold">
+                  {c.startedAt
+                    ? new Date(c.startedAt).toLocaleString("en-PH", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })
+                    : ""}
+                </span>
+                <span className="rounded-full bg-muted px-2 py-0.5 font-semibold">
+                  {CALL_OUTCOME[c.endedReason] || c.endedReason || c.status}
+                </span>
+                {secs ? (
+                  <span className="text-muted-foreground">
+                    {Math.floor(secs / 60)}m {secs % 60}s
+                  </span>
+                ) : null}
+                {src(c) ? <span className="text-muted-foreground">· {src(c)}</span> : null}
+                {c.assistantName ? (
+                  <span className="text-muted-foreground">· {c.assistantName}</span>
+                ) : null}
+                {c.satisfactionOverall != null ? (
+                  <span className="text-muted-foreground">
+                    · satisfaction {c.satisfactionOverall}/5
+                  </span>
+                ) : null}
+              </div>
+              {c.callSummary ? <p className="mt-1 text-sm">{c.callSummary}</p> : null}
+              <button
+                type="button"
+                onClick={() => setOpen(open === c.call_id ? null : c.call_id)}
+                className="mt-1.5 rounded-md border border-border px-2 py-0.5 text-xs font-semibold hover:bg-muted"
+              >
+                {open === c.call_id ? "Hide transcript" : "Transcript & recording"}
+              </button>
+              {open === c.call_id ? <CallTranscript callId={c.call_id} /> : null}
+            </li>
+          );
+        })}
+      </ul>
+    </Panel>
+  );
+}
+function CallTranscript({ callId }: { callId: string }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["vapi-call-detail", callId],
+    queryFn: async () => {
+      const r = await fetch(`/api/vapi-call-detail?callId=${encodeURIComponent(callId)}`);
+      if (!r.ok) throw new Error("Call detail fetch failed");
+      return (await r.json()) as {
+        recordingUrl?: string;
+        turns?: { role: string; text: string }[];
+      };
+    },
+  });
+  if (isLoading) return <p className="mt-2 text-xs text-muted-foreground">Loading…</p>;
+  if (error || !data)
+    return <p className="mt-2 text-xs text-destructive">Could not load this call.</p>;
+  return (
+    <div className="mt-2 space-y-2 rounded-lg bg-muted/40 p-3">
+      {data.recordingUrl ? (
+        <audio controls preload="none" src={data.recordingUrl} className="w-full" />
+      ) : (
+        <p className="text-xs text-muted-foreground">No recording for this call.</p>
+      )}
+      {(data.turns ?? []).length ? (
+        <ol className="max-h-72 space-y-1 overflow-y-auto text-sm">
+          {(data.turns ?? []).map((t, i) => (
+            <li key={i}>
+              <span className="font-semibold">{t.role === "client" ? "Client" : "Grace"}:</span>{" "}
+              {t.text}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          No conversation (the call was not answered).
+        </p>
+      )}
+    </div>
   );
 }

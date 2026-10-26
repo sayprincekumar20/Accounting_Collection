@@ -241,6 +241,17 @@ function Overview() {
   );
   const outstanding = visibleClients.reduce((sum, c) => sum + Number(c.collection_amount), 0);
   const replies = recentAll.filter((m) => m.direction === "inbound").length;
+  // Clients contacted today through /call in #Sales (their queue row was sent today by /call).
+  const todayManila = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+  const callCmdToday = (
+    queue as { trigger_source?: string; sent_date?: string; collection_amount?: number }[]
+  ).filter(
+    (q) =>
+      String(q.trigger_source || "").toUpperCase() === "CLIQ_CALL" &&
+      !!q.sent_date &&
+      new Date(new Date(q.sent_date).getTime() + 8 * 3600000).toISOString().slice(0, 10) ===
+        todayManila,
+  );
   // Without filters, use the same this-cycle numbers as Reports so both pages agree.
   const filtersActive = !!(filters.q || channelFilter || filters.range !== "all");
   const cycle = (
@@ -315,6 +326,15 @@ function Overview() {
               0,
             ),
           )}
+        />
+        <StatCard
+          label="Via /call today"
+          value={String(callCmdToday.length)}
+          hint={
+            callCmdToday.length
+              ? `clients contacted from #Sales · ${peso(callCmdToday.reduce((t, q) => t + Number(q.collection_amount || 0), 0))}`
+              : "No /call from #Sales yet today"
+          }
         />
       </div>
 

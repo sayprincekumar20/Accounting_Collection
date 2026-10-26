@@ -45,6 +45,13 @@ interface ClientRow {
   promise_suppressed_until?: string;
   suppression_reason?: string;
   ar_handoff_until?: string;
+  last_text_at?: string;
+  last_text_channel?: string;
+  last_text_source?: string;
+  last_call_at?: string;
+  last_call_source?: string;
+  last_call_result?: string;
+  contacted_via_call_command?: boolean;
   sales_person?: string;
 }
 
@@ -56,6 +63,8 @@ const CLIENT_STATUSES = [
   { value: "c_sms", label: "Phone only (SMS)" },
   { value: "c_nocontact", label: "No contact channel" },
   { value: "c_overdue", label: "Has overdue invoices" },
+  { value: "c_callcmd", label: "Contacted via /call" },
+  { value: "c_notreached", label: "Last call: not reached" },
 ];
 const todayStart = () => {
   const d = new Date();
@@ -75,6 +84,10 @@ function clientStatusMatch(c: ClientRow, status: string) {
       return !c.email && !!c.phone;
     case "c_nocontact":
       return !c.email && !c.phone;
+    case "c_callcmd":
+      return !!c.contacted_via_call_command;
+    case "c_notreached":
+      return c.last_call_result === "Not reached" || c.last_call_result === "No answer";
     case "c_overdue":
       return Number(c.overdue_total || 0) > 0;
     default:
@@ -177,6 +190,11 @@ function ClientsPage() {
                   "Promise until",
                   "AR handling until",
                   "Invoices",
+                  "Last text",
+                  "Last text by",
+                  "Last call",
+                  "Last call by",
+                  "Last call result",
                 ],
                 filtered.map((c) => [
                   c.client_name,
@@ -192,6 +210,11 @@ function ClientsPage() {
                   c.promise_suppressed_until ?? "",
                   c.ar_handoff_until ?? "",
                   c.invoice_numbers,
+                  ((c.last_text_channel || "") + " " + (c.last_text_at || "")).trim(),
+                  c.last_text_source ?? "",
+                  c.last_call_at ?? "",
+                  c.last_call_source ?? "",
+                  c.last_call_result ?? "",
                 ]),
               )
             }
@@ -227,6 +250,7 @@ function ClientsPage() {
                 <th className="px-4 py-2.5 text-right font-semibold">Amount due</th>
                 <th className="px-4 py-2.5 font-semibold">Due date</th>
                 <th className="px-4 py-2.5 font-semibold">Status</th>
+                <th className="px-4 py-2.5 font-semibold">Last contact</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -290,12 +314,15 @@ function ClientsPage() {
                         </span>
                       ) : null}
                     </td>
+                    <td className="px-4 py-3 text-xs">
+                      <LastContact c={c} />
+                    </td>
                   </tr>
                 );
               })}
               {!isLoading && filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     No clients found.
                   </td>
                 </tr>
@@ -320,4 +347,48 @@ function DueText({ due }: { due: string | null | undefined }) {
   if (days > 0) return <p className="text-xs text-destructive">{days} days overdue</p>;
   if (days === 0) return <p className="text-xs font-semibold text-warning">Due today</p>;
   return <p className="text-xs text-muted-foreground">Due in {-days} days</p>;
+}
+
+/** Latest text and call (weekly run or /call), with who started it and the call result. */
+function LastContact({ c }: { c: ClientRow }) {
+  const when = (v?: string) =>
+    v
+      ? new Date(v).toLocaleString("en-PH", {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "";
+  const tone: Record<string, string> = {
+    Answered: "text-success",
+    "Retry pending": "text-warning",
+    "In progress": "text-warning",
+    "Not reached": "text-destructive",
+    "No answer": "text-destructive",
+  };
+  if (!c.last_text_at && !c.last_call_at)
+    return <span className="text-muted-foreground">Not contacted yet</span>;
+  return (
+    <div className="space-y-1">
+      {c.last_text_at ? (
+        <p>
+          <span className="font-semibold">{c.last_text_channel === "SMS" ? "SMS" : "Email"}</span> ·{" "}
+          {when(c.last_text_at)}
+          <span className="block text-[11px] text-muted-foreground">{c.last_text_source}</span>
+        </p>
+      ) : null}
+      {c.last_call_at ? (
+        <p>
+          <span className="font-semibold">Call</span> · {when(c.last_call_at)}
+          {c.last_call_result ? (
+            <span className={`ml-1 font-semibold ${tone[c.last_call_result] ?? ""}`}>
+              {c.last_call_result}
+            </span>
+          ) : null}
+          <span className="block text-[11px] text-muted-foreground">{c.last_call_source}</span>
+        </p>
+      ) : null}
+    </div>
+  );
 }
