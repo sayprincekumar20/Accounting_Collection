@@ -58,7 +58,8 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 // Login gate (single shared ID + password). Off until DASHBOARD_PASSWORD is set in Cloudflare.
 const PUBLIC_PATHS = new Set(["/login", "/api/auth/login", "/api/auth/logout"]);
-const isStaticAsset = (path: string) => /\.(js|css|map|png|jpe?g|svg|ico|webp|gif|woff2?|ttf|txt|json)$/i.test(path);
+const isStaticAsset = (path: string) =>
+  /\.(js|css|map|png|jpe?g|svg|ico|webp|gif|woff2?|ttf|txt|json)$/i.test(path);
 
 async function handleAuth(request: Request): Promise<Response | null> {
   // Read the login settings the same way as every other secret (cloudflare:workers env binding):
@@ -89,7 +90,10 @@ async function handleAuth(request: Request): Promise<Response | null> {
     });
   }
   if (path === "/api/auth/logout") {
-    return new Response(null, { status: 303, headers: { location: "/login", "set-cookie": clearedSessionCookie() } });
+    return new Response(null, {
+      status: 303,
+      headers: { location: "/login", "set-cookie": clearedSessionCookie() },
+    });
   }
   if (PUBLIC_PATHS.has(path) || isStaticAsset(path)) return null;
 
@@ -107,13 +111,59 @@ async function handleAuth(request: Request): Promise<Response | null> {
   });
 }
 
+// Shared 2-minute cache for the slow list APIs that call outside services (Gmail, Vapi, Telerivet,
+// Twilio). Cloudflare's Cache API is shared by all servers in a location, unlike in-memory caches.
+// Only reached after the login check; '?fresh=1' bypasses it; only successful responses are stored.
+const SHARED_CACHE_PATHS = new Set([
+  "/api/gmail-threads-list",
+  "/api/vapi-calls-list",
+  "/api/sms-conversations",
+  "/api/whatsapp-conversations",
+]);
+const SHARED_CACHE_SECONDS = 120;
+function sharedCacheKey(request: Request): Request | null {
+  if (request.method !== "GET") return null;
+  const url = new URL(request.url);
+  if (!SHARED_CACHE_PATHS.has(url.pathname) || url.searchParams.get("fresh") === "1") return null;
+  return new Request(url.toString(), { method: "GET" });
+}
+function edgeCache(): Cache | null {
+  const c = (globalThis as unknown as { caches?: { default?: Cache } }).caches;
+  return (c && c.default) || null;
+}
+async function readSharedCache(request: Request): Promise<Response | null> {
+  try {
+    const key = sharedCacheKey(request);
+    const cache = edgeCache();
+    if (!key || !cache) return null;
+    return (await cache.match(key)) || null;
+  } catch {
+    return null;
+  }
+}
+async function writeSharedCache(request: Request, response: Response): Promise<void> {
+  try {
+    const key = sharedCacheKey(request);
+    const cache = edgeCache();
+    if (!key || !cache || response.status !== 200) return;
+    const copy = new Response(response.clone().body, response);
+    copy.headers.set("Cache-Control", `public, max-age=${SHARED_CACHE_SECONDS}`);
+    await cache.put(key, copy);
+  } catch {
+    // caching is best-effort
+  }
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const authResponse = await handleAuth(request);
       if (authResponse) return authResponse;
       const handler = await getServerEntry();
+      const cached = await readSharedCache(request);
+      if (cached) return cached;
       const response = await handler.fetch(request, env, ctx);
+      await writeSharedCache(request, response);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
       console.error(error);

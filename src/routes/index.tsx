@@ -71,38 +71,58 @@ function reasonLabel(reason: string) {
   return map[reason] ?? reason;
 }
 
+// Fast core data (n8n tables): shown as soon as it arrives.
 function useOverviewData() {
   return useQuery({
-    queryKey: ["overview-data"],
+    queryKey: ["overview-core"],
     queryFn: async () => {
-      const [clientsRes, queueRes, countersRes, runsRes, smsRes, voiceRes, gmailRes, promisesRes] =
-        await Promise.all([
-          fetch("/api/clients-list").then((r) => r.json()),
-          fetch("/api/reminder-queue-list").then((r) => r.json()),
-          fetch("/api/channel-counters").then((r) => r.json()),
-          fetch("/api/daily-run-logs").then((r) => r.json()),
-          fetch("/api/sms-conversations").then((r) => r.json()),
-          fetch("/api/vapi-calls-list").then((r) => r.json()),
-          fetch("/api/gmail-threads-list").then((r) => r.json()),
-          fetch("/api/promise-history").then((r) => r.json()),
-        ]);
+      const [clientsRes, queueRes, countersRes, runsRes, promisesRes] = await Promise.all([
+        fetch("/api/clients-list").then((r) => r.json()),
+        fetch("/api/reminder-queue-list").then((r) => r.json()),
+        fetch("/api/channel-counters").then((r) => r.json()),
+        fetch("/api/daily-run-logs").then((r) => r.json()),
+        fetch("/api/promise-history").then((r) => r.json()),
+      ]);
+      return {
+        clients: clientsRes.clients || [],
+        queue: queueRes.queue || [],
+        counters: countersRes.counters || [],
+        latestRun: (runsRes.runs || [])[0],
+        promises: promisesRes.promises || [],
+      };
+    },
+    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
+  });
+}
 
-      const clients = clientsRes.clients || [];
-      const queue = queueRes.queue || [];
-      const counters = countersRes.counters || [];
-      const latestRun = (runsRes.runs || [])[0];
-      const promises = promisesRes.promises || [];
+interface RecentItem {
+  channel: string;
+  client_name: string;
+  preview: string;
+  direction: string;
+  occurred_at: string;
+  status: string;
+}
 
-      const recent: {
-        channel: string;
-        client_name: string;
-        preview: string;
-        direction: string;
-        occurred_at: string;
-        status: string;
-      }[] = [];
-
-      for (const c of smsRes.conversations || []) {
+// Slower outside services (Telerivet SMS, Vapi calls, Gmail): loaded separately so they never
+// hold up the page; a source that fails is simply left out.
+function useRecentActivity() {
+  return useQuery({
+    queryKey: ["overview-recent"],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      type AnyJson = Record<string, any>;
+      const get = (u: string): Promise<AnyJson> =>
+        fetch(u)
+          .then((r) => (r.ok ? r.json() : {}))
+          .catch(() => ({}));
+      const [smsRes, voiceRes, gmailRes] = await Promise.all([
+        get("/api/sms-conversations"),
+        get("/api/vapi-calls-list"),
+        get("/api/gmail-threads-list"),
+      ]);
+      const recent: RecentItem[] = [];
+      for (const c of smsRes["conversations"] || []) {
         const last = c.messages[c.messages.length - 1];
         if (last) {
           recent.push({
@@ -115,7 +135,7 @@ function useOverviewData() {
           });
         }
       }
-      for (const c of voiceRes.calls || []) {
+      for (const c of voiceRes["calls"] || []) {
         recent.push({
           channel: "voice",
           client_name: c.client_name,
@@ -125,7 +145,7 @@ function useOverviewData() {
           status: c.status,
         });
       }
-      for (const t of gmailRes.threads || []) {
+      for (const t of gmailRes["threads"] || []) {
         recent.push({
           channel: "email",
           client_name: t.client_name,
@@ -136,15 +156,15 @@ function useOverviewData() {
         });
       }
       recent.sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime());
-
-      return { clients, queue, counters, latestRun, recent, promises };
+      return recent;
     },
-    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
+    refetchInterval: 14400000,
   });
 }
 
 function Overview() {
   const { data, isLoading, isFetching, error, refetch } = useOverviewData();
+  const recentQ = useRecentActivity();
   const clients = data?.clients ?? [];
   const queue = data?.queue ?? [];
   const counters = data?.counters ?? [];
@@ -162,7 +182,7 @@ function Overview() {
       ? filters.status.slice(3)
       : "";
   const base = { ...filters, status: "all", source: "all" as const };
-  const allRecent = data?.recent ?? [];
+  const allRecent = recentQ.data ?? [];
   const recentAll = allRecent.filter(
     (m) =>
       (!channelFilter || m.channel === channelFilter) &&
@@ -233,7 +253,15 @@ function Overview() {
     <AppShell
       title="Collections Overview"
       subtitle={`Daily overdue run · ${latestRun ? shortDate(latestRun.run_date) : "no runs yet"} · live`}
-      actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
+      actions={
+        <RefreshButton
+          isFetching={isFetching || recentQ.isFetching}
+          onRefresh={() => {
+            refetch();
+            recentQ.refetch();
+          }}
+        />
+      }
     >
       <div className="mb-5">
         <LogFilterBar

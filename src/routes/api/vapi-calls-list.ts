@@ -48,47 +48,55 @@ export const Route = createFileRoute("/api/vapi-calls-list")({
             .filter(Boolean);
           const allowedAssistants = new Set(envIds.length ? [...envIds, BILINGUAL_PILOT_ID] : []);
 
-          const rawCalls: any[] = [];
-          let before: string | undefined;
+          // Ask Vapi only for the allowed assistants' calls (in parallel), instead of every agent's
+          // calls followed by filtering: far fewer pages when other agents (Sales, Logistics) are busy.
           let truncated = false;
-          let useDateFilter = true;
-          for (let page = 0; ; page++) {
-            if (page >= MAX_PAGES) {
-              truncated = true;
-              console.warn(
-                `[vapi-calls-list] more than ${MAX_PAGES * PAGE_SIZE} calls in ${days} days; truncated`,
-              );
-              break;
-            }
-            const qs = new URLSearchParams({ limit: String(PAGE_SIZE) });
-            if (useDateFilter) qs.set("createdAtGt", since);
-            if (before) qs.set("createdAtLt", before);
-            let batch: any[];
-            try {
-              batch = (await vapiFetch<any[]>(`/call?${qs.toString()}`)) || [];
-            } catch (err) {
-              // Retention window rejected the date filter: retry this page without it.
-              if (useDateFilter && /\(400\)/.test(String(err))) {
+          const fetchCalls = async (assistantId?: string): Promise<any[]> => {
+            const out: any[] = [];
+            let before: string | undefined;
+            let useDateFilter = true;
+            for (let page = 0; ; page++) {
+              if (page >= MAX_PAGES) {
+                truncated = true;
                 console.warn(
-                  "[vapi-calls-list] date filter rejected by Vapi, retrying without it:",
-                  String(err).slice(0, 200),
+                  `[vapi-calls-list] more than ${MAX_PAGES * PAGE_SIZE} calls in ${days} days; truncated`,
                 );
-                useDateFilter = false;
-                page--;
-                continue;
+                break;
               }
-              throw err;
+              const qs = new URLSearchParams({ limit: String(PAGE_SIZE) });
+              if (assistantId) qs.set("assistantId", assistantId);
+              if (useDateFilter) qs.set("createdAtGt", since);
+              if (before) qs.set("createdAtLt", before);
+              let batch: any[];
+              try {
+                batch = (await vapiFetch<any[]>(`/call?${qs.toString()}`)) || [];
+              } catch (err) {
+                // Retention window rejected the date filter: retry this page without it.
+                if (useDateFilter && /\(400\)/.test(String(err))) {
+                  console.warn(
+                    "[vapi-calls-list] date filter rejected by Vapi, retrying without it:",
+                    String(err).slice(0, 200),
+                  );
+                  useDateFilter = false;
+                  page--;
+                  continue;
+                }
+                throw err;
+              }
+              out.push(...batch);
+              if (batch.length < PAGE_SIZE) break;
+              // Next page: everything strictly older than the oldest call we have so far.
+              const oldest = batch.reduce((min: string, c: any) => {
+                const t = c.createdAt || c.startedAt || "";
+                return t && (!min || t < min) ? t : min;
+              }, "");
+              if (!oldest || oldest === before) break;
+              before = oldest;
             }
-            rawCalls.push(...batch);
-            if (batch.length < PAGE_SIZE) break;
-            // Next page: everything strictly older than the oldest call we have so far.
-            const oldest = batch.reduce((min: string, c: any) => {
-              const t = c.createdAt || c.startedAt || "";
-              return t && (!min || t < min) ? t : min;
-            }, "");
-            if (!oldest || oldest === before) break;
-            before = oldest;
-          }
+            return out;
+          };
+          const targets = allowedAssistants.size ? [...allowedAssistants] : [undefined];
+          const rawCalls: any[] = (await Promise.all(targets.map((a) => fetchCalls(a)))).flat();
 
           // Real assistant names for the Assistant column (one request; falls back to the id).
           const assistantNames = new Map<string, string>();
