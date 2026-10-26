@@ -43,7 +43,7 @@ export const Route = createFileRoute("/email")({
 
 interface ThreadListItem {
   client_id: string;
-  client_name: string;
+  client_name: string | null;
   contact_person: string;
   thread_id: string;
   notified_ar: boolean;
@@ -87,8 +87,8 @@ interface ThreadDetail {
 }
 interface ClientRow {
   client_id: string;
-  client_name: string;
-  parent_name: string;
+  client_name: string | null;
+  parent_name: string | null;
   contact_person: string;
   email: string;
   collection_amount: number;
@@ -300,15 +300,20 @@ function EmailInbox() {
     })),
   ].sort((a, b) => a.at - b.at);
 
-  function findClient(clientId: string, clientName: string) {
-    return (
-      clients.find((cl) => cl.client_id === clientId) ??
-      clients.find(
-        (cl) =>
-          cl.client_name.toLowerCase().includes(clientName.toLowerCase()) ||
-          clientName.toLowerCase().includes(cl.client_name.toLowerCase()),
-      )
-    );
+  function findClient(clientId: string, clientName: string | null | undefined) {
+    const matchingId = clients.find((cl) => cl.client_id === clientId);
+    if (matchingId) return matchingId;
+
+    const normalizedName = String(clientName ?? "").trim().toLowerCase();
+    if (!normalizedName) return undefined;
+
+    return clients.find((cl) => {
+      const candidateName = String(cl.client_name ?? "").trim().toLowerCase();
+      return (
+        candidateName &&
+        (candidateName.includes(normalizedName) || normalizedName.includes(candidateName))
+      );
+    });
   }
 
   const activeClient = activeItem
@@ -345,7 +350,7 @@ function EmailInbox() {
     const client = findClient(t.client_id, t.client_name);
     const q = sourceByClient.get(t.client_id);
     return {
-      name: client?.parent_name || client?.client_name || t.client_name,
+      name: client?.parent_name || client?.client_name || t.client_name || "",
       contact: t.contact_person || client?.contact_person,
       extra: `${client?.email || ""} ${t.client_id}`,
       clientReplies: t.clientReplyCount ?? (t.lastDirection === "inbound" ? 1 : 0),
