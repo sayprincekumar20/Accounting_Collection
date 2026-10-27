@@ -373,8 +373,16 @@ function LastContact({ c }: { c: ClientRow }) {
     <div className="space-y-1">
       {c.last_text_at ? (
         <p>
-          <span className="font-semibold">{c.last_text_channel === "SMS" ? "SMS" : "Email"}</span> ·{" "}
-          {when(c.last_text_at)}
+          <span className="font-semibold">
+            {c.last_text_channel === "SMS"
+              ? "SMS"
+              : c.last_text_channel === "VIBER"
+                ? "Viber"
+                : c.last_text_channel === "WHATSAPP"
+                  ? "WhatsApp"
+                  : "Email"}
+          </span>{" "}
+          · {when(c.last_text_at)}
           <span className="block text-[11px] text-muted-foreground">{c.last_text_source}</span>
         </p>
       ) : null}

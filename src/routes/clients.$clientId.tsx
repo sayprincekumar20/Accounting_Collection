@@ -121,16 +121,20 @@ function useClientDetail(clientId: string) {
   return useQuery({
     queryKey: ["client-detail", clientId],
     queryFn: async () => {
-      const [clientsRes, queueRes, smsRes, voiceRes, gmailRes, promisesRes] = await Promise.all([
-        safeFetchJson("/api/clients-list", { clients: [] as ClientRow[] }),
-        safeFetchJson("/api/reminder-queue-list", { queue: [] as QueueRow[] }),
-        safeFetchJson("/api/sms-conversations", {
-          conversations: [] as { client_id: string; messages: any[] }[],
-        }),
-        safeFetchJson("/api/vapi-calls-list", { calls: [] as any[] }),
-        safeFetchJson("/api/gmail-threads-list", { threads: [] as any[] }),
-        safeFetchJson("/api/promise-history", { promises: [] as PromiseRow[] }),
-      ]);
+      const [clientsRes, queueRes, smsRes, voiceRes, gmailRes, promisesRes, viberRes] =
+        await Promise.all([
+          safeFetchJson("/api/clients-list", { clients: [] as ClientRow[] }),
+          safeFetchJson("/api/reminder-queue-list", { queue: [] as QueueRow[] }),
+          safeFetchJson("/api/sms-conversations", {
+            conversations: [] as { client_id: string; messages: any[] }[],
+          }),
+          safeFetchJson("/api/vapi-calls-list", { calls: [] as any[] }),
+          safeFetchJson("/api/gmail-threads-list", { threads: [] as any[] }),
+          safeFetchJson("/api/promise-history", { promises: [] as PromiseRow[] }),
+          safeFetchJson("/api/viber-conversations", {
+            conversations: [] as { client_id: string; messages: any[] }[],
+          }),
+        ]);
 
       const client = (clientsRes.clients as ClientRow[]).find((c) => c.client_id === clientId);
       const queue = (queueRes.queue as QueueRow[]).filter((q) => q.client_id === clientId);
@@ -155,6 +159,23 @@ function useClientDetail(clientId: string) {
               status: m.status || "",
             });
           }
+        }
+      }
+
+      // Viber conversation (reminders from "Rare Global Food", client replies, AI answers).
+      if (client?.phone) {
+        const phoneDigits = digits(client.phone);
+        const vconv = (viberRes.conversations || []).find(
+          (c: { client_id: string }) => digits(c.client_id) === phoneDigits,
+        );
+        for (const m of vconv?.messages || []) {
+          timeline.push({
+            channel: "viber",
+            direction: m.role === "ai" ? "outbound" : "inbound",
+            body: m.content,
+            occurred_at: m.ts,
+            status: m.status || "",
+          });
         }
       }
 

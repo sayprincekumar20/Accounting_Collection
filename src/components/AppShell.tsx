@@ -27,7 +27,7 @@ const nav = [
 
 const inboxes = [
   { channel: "whatsapp", label: "WhatsApp", icon: MessageSquare, to: "/whatsapp" as const },
-  { channel: "viber", label: "Viber (paused)", icon: MessageCircle, to: "/viber" as const },
+  { channel: "viber", label: "Viber", icon: MessageCircle, to: "/viber" as const },
   { channel: "sms", label: "SMS", icon: Smartphone, to: "/sms" as const },
   { channel: "email", label: "Email", icon: Mail, to: "/email" as const },
   { channel: "voice", label: "Voice", icon: Phone, to: "/voice" as const },

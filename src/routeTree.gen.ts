@@ -38,6 +38,7 @@ import { Route as ApiSmsConversationsRouteImport } from './routes/api/sms-conver
 import { Route as ApiVapiCallAudioRouteImport } from './routes/api/vapi-call-audio'
 import { Route as ApiVapiCallDetailRouteImport } from './routes/api/vapi-call-detail'
 import { Route as ApiVapiCallsListRouteImport } from './routes/api/vapi-calls-list'
+import { Route as ApiViberConversationsRouteImport } from './routes/api/viber-conversations'
 import { Route as ApiWhatsappConversationsRouteImport } from './routes/api/whatsapp-conversations'
 import { Route as ApiWorklistRouteImport } from './routes/api/worklist'
 import { Route as ClientsIndexRouteImport } from './routes/clients.index'
@@ -188,6 +189,11 @@ const ApiVapiCallsListRoute = ApiVapiCallsListRouteImport.update({
   path: '/api/vapi-calls-list',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiViberConversationsRoute = ApiViberConversationsRouteImport.update({
+  id: '/api/viber-conversations',
+  path: '/api/viber-conversations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWhatsappConversationsRoute =
   ApiWhatsappConversationsRouteImport.update({
     id: '/api/whatsapp-conversations',
@@ -240,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/api/vapi-call-audio': typeof ApiVapiCallAudioRoute
   '/api/vapi-call-detail': typeof ApiVapiCallDetailRoute
   '/api/vapi-calls-list': typeof ApiVapiCallsListRoute
+  '/api/viber-conversations': typeof ApiViberConversationsRoute
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
@@ -275,6 +282,7 @@ export interface FileRoutesByTo {
   '/api/vapi-call-audio': typeof ApiVapiCallAudioRoute
   '/api/vapi-call-detail': typeof ApiVapiCallDetailRoute
   '/api/vapi-calls-list': typeof ApiVapiCallsListRoute
+  '/api/viber-conversations': typeof ApiViberConversationsRoute
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
@@ -311,6 +319,7 @@ export interface FileRoutesById {
   '/api/vapi-call-audio': typeof ApiVapiCallAudioRoute
   '/api/vapi-call-detail': typeof ApiVapiCallDetailRoute
   '/api/vapi-calls-list': typeof ApiVapiCallsListRoute
+  '/api/viber-conversations': typeof ApiViberConversationsRoute
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
@@ -348,6 +357,7 @@ export interface FileRouteTypes {
     | '/api/vapi-call-audio'
     | '/api/vapi-call-detail'
     | '/api/vapi-calls-list'
+    | '/api/viber-conversations'
     | '/api/whatsapp-conversations'
     | '/api/worklist'
     | '/clients/$clientId'
@@ -383,6 +393,7 @@ export interface FileRouteTypes {
     | '/api/vapi-call-audio'
     | '/api/vapi-call-detail'
     | '/api/vapi-calls-list'
+    | '/api/viber-conversations'
     | '/api/whatsapp-conversations'
     | '/api/worklist'
     | '/clients/$clientId'
@@ -418,6 +429,7 @@ export interface FileRouteTypes {
     | '/api/vapi-call-audio'
     | '/api/vapi-call-detail'
     | '/api/vapi-calls-list'
+    | '/api/viber-conversations'
     | '/api/whatsapp-conversations'
     | '/api/worklist'
     | '/clients/$clientId'
@@ -454,6 +466,7 @@ export interface RootRouteChildren {
   ApiVapiCallAudioRoute: typeof ApiVapiCallAudioRoute
   ApiVapiCallDetailRoute: typeof ApiVapiCallDetailRoute
   ApiVapiCallsListRoute: typeof ApiVapiCallsListRoute
+  ApiViberConversationsRoute: typeof ApiViberConversationsRoute
   ApiWhatsappConversationsRoute: typeof ApiWhatsappConversationsRoute
   ApiWorklistRoute: typeof ApiWorklistRoute
   ClientsClientIdRoute: typeof ClientsClientIdRoute
@@ -665,6 +678,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiVapiCallsListRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/viber-conversations': {
+      id: '/api/viber-conversations'
+      path: '/api/viber-conversations'
+      fullPath: '/api/viber-conversations'
+      preLoaderRoute: typeof ApiViberConversationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/whatsapp-conversations': {
       id: '/api/whatsapp-conversations'
       path: '/api/whatsapp-conversations'
@@ -726,6 +746,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiVapiCallAudioRoute: ApiVapiCallAudioRoute,
   ApiVapiCallDetailRoute: ApiVapiCallDetailRoute,
   ApiVapiCallsListRoute: ApiVapiCallsListRoute,
+  ApiViberConversationsRoute: ApiViberConversationsRoute,
   ApiWhatsappConversationsRoute: ApiWhatsappConversationsRoute,
   ApiWorklistRoute: ApiWorklistRoute,
   ClientsClientIdRoute: ClientsClientIdRoute,

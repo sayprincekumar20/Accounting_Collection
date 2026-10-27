@@ -119,6 +119,7 @@ const SHARED_CACHE_PATHS = new Set([
   "/api/vapi-calls-list",
   "/api/sms-conversations",
   "/api/whatsapp-conversations",
+  "/api/viber-conversations",
 ]);
 const SHARED_CACHE_SECONDS = 120;
 function sharedCacheKey(request: Request): Request | null {

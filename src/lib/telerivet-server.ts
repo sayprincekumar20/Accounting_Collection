@@ -38,10 +38,12 @@ export interface TelerivetMessage {
  */
 export async function fetchRecentMessages(opts: {
   phoneId?: string;
+  /** Telerivet project to read (default: TELERIVET_PROJECT_ID). Viber lives in the Main Sales project. */
+  projectId?: string;
   pageSize?: number;
   maxPages?: number;
 }): Promise<TelerivetMessage[]> {
-  const projectId = (await getEnv("TELERIVET_PROJECT_ID")) || "";
+  const projectId = opts.projectId || (await getEnv("TELERIVET_PROJECT_ID")) || "";
   const pageSize = opts.pageSize ?? 200;
   // Reduced from 5: this is a "recent activity" view, not a full export, and each
   // extra page is another sequential Telerivet call inside a route that already
@@ -68,9 +70,12 @@ export async function fetchRecentMessages(opts: {
     if (opts.phoneId) params.set("phone_id", opts.phoneId);
     if (cursor) params.set("cursor", cursor);
 
-    const res = await fetch(`${TELERIVET_API}/projects/${projectId}/messages?${params.toString()}`, {
-      headers: await authHeader(),
-    });
+    const res = await fetch(
+      `${TELERIVET_API}/projects/${projectId}/messages?${params.toString()}`,
+      {
+        headers: await authHeader(),
+      },
+    );
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`Telerivet messages fetch failed (${res.status}): ${body}`);
