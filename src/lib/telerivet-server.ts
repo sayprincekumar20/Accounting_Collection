@@ -28,6 +28,9 @@ export interface TelerivetMessage {
   phone_id: string;
   time_created: number; // unix seconds
   status: string;
+  /** Attachments (e.g. the statement PDF on a Viber reminder). */
+  media?:
+    { url: string; type?: string | null; filename?: string | null; size?: number | null }[] | null;
 }
 
 /**

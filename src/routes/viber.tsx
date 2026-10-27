@@ -42,6 +42,7 @@ interface SmsMessage {
   notified_ar?: boolean;
   promise_recorded?: boolean;
   author?: string;
+  media?: { url: string; type: string; filename: string }[];
 }
 interface SmsConversation {
   client_id: string;
@@ -205,10 +206,10 @@ function SmsInbox() {
     ? clients.find((cl) => digits(cl.phone) === digits(activeItem.client_id))
     : undefined;
   const activePromise = activeItem
-    ? latestForPhone(promises, digits(activeItem.client_id), "sms", clients)
+    ? latestForPhone(promises, digits(activeItem.client_id), "viber", clients)
     : undefined;
   const activeEscalation = activeItem
-    ? latestForPhone(escalations, digits(activeItem.client_id), "sms", clients)
+    ? latestForPhone(escalations, digits(activeItem.client_id), "viber", clients)
     : undefined;
 
   useEffect(() => {
@@ -236,8 +237,8 @@ function SmsInbox() {
       clientReplies: c.messages.filter((m) => m.role === "client").length,
       lastFrom: last ? (last.role === "client" ? "client" : "us") : "",
       hasPromise:
-        !!latestForPhone(promises, digits(c.client_id), "sms", clients) || !!c.promise_recorded,
-      hasEscalation: !!latestForPhone(escalations, digits(c.client_id), "sms", clients),
+        !!latestForPhone(promises, digits(c.client_id), "viber", clients) || !!c.promise_recorded,
+      hasEscalation: !!latestForPhone(escalations, digits(c.client_id), "viber", clients),
       lastActivity: c.lastMessageAt,
       source: q?.trigger_source,
     };
@@ -315,8 +316,13 @@ function SmsInbox() {
                   const cl = clientForPhone(c.client_id);
                   return cl ? sourceByClient.get(cl.client_id) : undefined;
                 })();
-                const promise = latestForPhone(promises, digits(c.client_id), "sms", clients);
-                const escalation = latestForPhone(escalations, digits(c.client_id), "sms", clients);
+                const promise = latestForPhone(promises, digits(c.client_id), "viber", clients);
+                const escalation = latestForPhone(
+                  escalations,
+                  digits(c.client_id),
+                  "viber",
+                  clients,
+                );
                 const client = clients.find((cl) => digits(cl.phone) === digits(c.client_id));
                 return (
                   <tr
@@ -449,7 +455,7 @@ function SmsInbox() {
                   ) : null}
                 </dl>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <ChannelBadge channel="sms" />
+                  <ChannelBadge channel="viber" />
                   {activePromise ? (
                     <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
                       Promised {shortDate(activePromise.promise_date)} ·{" "}
@@ -536,7 +542,27 @@ function SmsInbox() {
                                     : "border-border bg-muted"
                               }`}
                             >
-                              <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
+                              {m.content ? (
+                                <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
+                              ) : null}
+                              {(m.media || []).map((f, fi) => (
+                                <a
+                                  key={fi}
+                                  href={f.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className={`${m.content ? "mt-2 " : ""}flex items-center gap-2 rounded-lg bg-black/15 px-3 py-2 text-xs font-semibold underline-offset-2 hover:underline`}
+                                  title="Open the attached file"
+                                >
+                                  <span aria-hidden="true">📎</span>
+                                  <span className="truncate">{f.filename}</span>
+                                  {/pdf/i.test(f.type) || /\.pdf$/i.test(f.filename) ? (
+                                    <span className="ml-auto rounded bg-white/25 px-1.5 py-0.5 text-[10px]">
+                                      PDF
+                                    </span>
+                                  ) : null}
+                                </a>
+                              ))}
                             </div>
                             <div className="flex flex-wrap gap-1.5">
                               {m.status ? (

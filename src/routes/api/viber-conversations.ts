@@ -42,7 +42,13 @@ interface ConversationOut {
   client_name: string;
   notified_ar: boolean;
   promise_recorded: boolean;
-  messages: { role: "ai" | "client"; content: string; ts: string; author?: string }[];
+  messages: {
+    role: "ai" | "client";
+    content: string;
+    ts: string;
+    author?: string;
+    media?: { url: string; type: string; filename: string }[];
+  }[];
   escalations?: EscalationNote[];
   lastMessageAt: string;
   lastMessagePreview: string;
@@ -166,9 +172,21 @@ export const Route = createFileRoute("/api/viber-conversations")({
                 role: m.direction === "outgoing" ? "ai" : "client",
                 content: m.content || "",
                 ts,
+                media: (m.media || [])
+                  .filter((x) => x && x.url)
+                  .map((x) => ({
+                    url: x.url,
+                    type: x.type || "",
+                    filename: x.filename || "attachment",
+                  })),
               });
               convo.lastMessageAt = ts;
-              convo.lastMessagePreview = (m.content || "").slice(0, 140);
+              convo.lastMessagePreview = (
+                m.content ||
+                ((m.media || []).length
+                  ? "📎 " + ((m.media || [])[0]?.filename || "Attachment")
+                  : "")
+              ).slice(0, 140);
             } catch (msgErr) {
               // One malformed message entry should never take down the whole
               // conversation list -- skip it and keep going.
