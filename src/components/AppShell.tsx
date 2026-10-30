@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   CalendarClock,
   UserX,
+  FileCheck2,
 } from "lucide-react";
 
 const nav = [
@@ -23,6 +24,7 @@ const nav = [
   { to: "/promises", label: "Promises", icon: CalendarClock },
   { to: "/contacts", label: "Contacts to Fix", icon: UserX },
   { to: "/reports", label: "Reports", icon: FileBarChart },
+  { to: "/verification", label: "Document Verification", icon: FileCheck2 },
 ] as const;
 
 const inboxes = [

@@ -27,6 +27,7 @@ import { Route as ApiClientTimelineRouteImport } from './routes/api/client-timel
 import { Route as ApiClientsListRouteImport } from './routes/api/clients-list'
 import { Route as ApiContactsToFixRouteImport } from './routes/api/contacts-to-fix'
 import { Route as ApiDailyRunLogsRouteImport } from './routes/api/daily-run-logs'
+import { Route as ApiDvReviewsRouteImport } from './routes/api/dv-reviews'
 import { Route as ApiEscalationsRouteImport } from './routes/api/escalations'
 import { Route as ApiGmailAttachmentRouteImport } from './routes/api/gmail-attachment'
 import { Route as ApiGmailThreadDetailRouteImport } from './routes/api/gmail-thread-detail'
@@ -43,6 +44,12 @@ import { Route as ApiWhatsappConversationsRouteImport } from './routes/api/whats
 import { Route as ApiWorklistRouteImport } from './routes/api/worklist'
 import { Route as ClientsIndexRouteImport } from './routes/clients.index'
 import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
+import { Route as VerificationIndexRouteImport } from './routes/verification.index'
+import { Route as VerificationReviewIdRouteImport } from './routes/verification.$reviewId'
+import { Route as ApiDvReviewsReviewIdRouteImport } from './routes/api/dv-reviews.$reviewId'
+import { Route as ApiDvReviewsReviewIdActionRouteImport } from './routes/api/dv-reviews.$reviewId.$action'
+import { Route as ApiDvReviewsReviewIdPagesNRouteImport } from './routes/api/dv-reviews.$reviewId.pages.$n'
+import { Route as ApiDvReviewsReviewIdRowsRowIdRouteImport } from './routes/api/dv-reviews.$reviewId.rows.$rowId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -134,6 +141,11 @@ const ApiDailyRunLogsRoute = ApiDailyRunLogsRouteImport.update({
   path: '/api/daily-run-logs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDvReviewsRoute = ApiDvReviewsRouteImport.update({
+  id: '/api/dv-reviews',
+  path: '/api/dv-reviews',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiEscalationsRoute = ApiEscalationsRouteImport.update({
   id: '/api/escalations',
   path: '/api/escalations',
@@ -215,6 +227,39 @@ const ClientsClientIdRoute = ClientsClientIdRouteImport.update({
   path: '/clients/$clientId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerificationIndexRoute = VerificationIndexRouteImport.update({
+  id: '/verification/',
+  path: '/verification/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerificationReviewIdRoute = VerificationReviewIdRouteImport.update({
+  id: '/verification/$reviewId',
+  path: '/verification/$reviewId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDvReviewsReviewIdRoute = ApiDvReviewsReviewIdRouteImport.update({
+  id: '/$reviewId',
+  path: '/$reviewId',
+  getParentRoute: () => ApiDvReviewsRoute,
+} as any)
+const ApiDvReviewsReviewIdActionRoute =
+  ApiDvReviewsReviewIdActionRouteImport.update({
+    id: '/$action',
+    path: '/$action',
+    getParentRoute: () => ApiDvReviewsReviewIdRoute,
+  } as any)
+const ApiDvReviewsReviewIdPagesNRoute =
+  ApiDvReviewsReviewIdPagesNRouteImport.update({
+    id: '/pages/$n',
+    path: '/pages/$n',
+    getParentRoute: () => ApiDvReviewsReviewIdRoute,
+  } as any)
+const ApiDvReviewsReviewIdRowsRowIdRoute =
+  ApiDvReviewsReviewIdRowsRowIdRouteImport.update({
+    id: '/rows/$rowId',
+    path: '/rows/$rowId',
+    getParentRoute: () => ApiDvReviewsReviewIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -235,6 +280,7 @@ export interface FileRoutesByFullPath {
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
+  '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
@@ -250,7 +296,13 @@ export interface FileRoutesByFullPath {
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
+  '/verification/$reviewId': typeof VerificationReviewIdRoute
   '/clients/': typeof ClientsIndexRoute
+  '/verification/': typeof VerificationIndexRoute
+  '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
+  '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
+  '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
+  '/api/dv-reviews/$reviewId/rows/$rowId': typeof ApiDvReviewsReviewIdRowsRowIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -271,6 +323,7 @@ export interface FileRoutesByTo {
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
+  '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
@@ -286,7 +339,13 @@ export interface FileRoutesByTo {
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
+  '/verification/$reviewId': typeof VerificationReviewIdRoute
   '/clients': typeof ClientsIndexRoute
+  '/verification': typeof VerificationIndexRoute
+  '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
+  '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
+  '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
+  '/api/dv-reviews/$reviewId/rows/$rowId': typeof ApiDvReviewsReviewIdRowsRowIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -308,6 +367,7 @@ export interface FileRoutesById {
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
+  '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
@@ -323,7 +383,13 @@ export interface FileRoutesById {
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
+  '/verification/$reviewId': typeof VerificationReviewIdRoute
   '/clients/': typeof ClientsIndexRoute
+  '/verification/': typeof VerificationIndexRoute
+  '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
+  '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
+  '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
+  '/api/dv-reviews/$reviewId/rows/$rowId': typeof ApiDvReviewsReviewIdRowsRowIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -346,6 +412,7 @@ export interface FileRouteTypes {
     | '/api/clients-list'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
+    | '/api/dv-reviews'
     | '/api/escalations'
     | '/api/gmail-attachment'
     | '/api/gmail-thread-detail'
@@ -361,7 +428,13 @@ export interface FileRouteTypes {
     | '/api/whatsapp-conversations'
     | '/api/worklist'
     | '/clients/$clientId'
+    | '/verification/$reviewId'
     | '/clients/'
+    | '/verification/'
+    | '/api/dv-reviews/$reviewId'
+    | '/api/dv-reviews/$reviewId/$action'
+    | '/api/dv-reviews/$reviewId/pages/$n'
+    | '/api/dv-reviews/$reviewId/rows/$rowId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -382,6 +455,7 @@ export interface FileRouteTypes {
     | '/api/clients-list'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
+    | '/api/dv-reviews'
     | '/api/escalations'
     | '/api/gmail-attachment'
     | '/api/gmail-thread-detail'
@@ -397,7 +471,13 @@ export interface FileRouteTypes {
     | '/api/whatsapp-conversations'
     | '/api/worklist'
     | '/clients/$clientId'
+    | '/verification/$reviewId'
     | '/clients'
+    | '/verification'
+    | '/api/dv-reviews/$reviewId'
+    | '/api/dv-reviews/$reviewId/$action'
+    | '/api/dv-reviews/$reviewId/pages/$n'
+    | '/api/dv-reviews/$reviewId/rows/$rowId'
   id:
     | '__root__'
     | '/'
@@ -418,6 +498,7 @@ export interface FileRouteTypes {
     | '/api/clients-list'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
+    | '/api/dv-reviews'
     | '/api/escalations'
     | '/api/gmail-attachment'
     | '/api/gmail-thread-detail'
@@ -433,7 +514,13 @@ export interface FileRouteTypes {
     | '/api/whatsapp-conversations'
     | '/api/worklist'
     | '/clients/$clientId'
+    | '/verification/$reviewId'
     | '/clients/'
+    | '/verification/'
+    | '/api/dv-reviews/$reviewId'
+    | '/api/dv-reviews/$reviewId/$action'
+    | '/api/dv-reviews/$reviewId/pages/$n'
+    | '/api/dv-reviews/$reviewId/rows/$rowId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -455,6 +542,7 @@ export interface RootRouteChildren {
   ApiClientsListRoute: typeof ApiClientsListRoute
   ApiContactsToFixRoute: typeof ApiContactsToFixRoute
   ApiDailyRunLogsRoute: typeof ApiDailyRunLogsRoute
+  ApiDvReviewsRoute: typeof ApiDvReviewsRouteWithChildren
   ApiEscalationsRoute: typeof ApiEscalationsRoute
   ApiGmailAttachmentRoute: typeof ApiGmailAttachmentRoute
   ApiGmailThreadDetailRoute: typeof ApiGmailThreadDetailRoute
@@ -470,7 +558,9 @@ export interface RootRouteChildren {
   ApiWhatsappConversationsRoute: typeof ApiWhatsappConversationsRoute
   ApiWorklistRoute: typeof ApiWorklistRoute
   ClientsClientIdRoute: typeof ClientsClientIdRoute
+  VerificationReviewIdRoute: typeof VerificationReviewIdRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
+  VerificationIndexRoute: typeof VerificationIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -601,6 +691,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDailyRunLogsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dv-reviews': {
+      id: '/api/dv-reviews'
+      path: '/api/dv-reviews'
+      fullPath: '/api/dv-reviews'
+      preLoaderRoute: typeof ApiDvReviewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/escalations': {
       id: '/api/escalations'
       path: '/api/escalations'
@@ -713,8 +810,77 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientsClientIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/verification/': {
+      id: '/verification/'
+      path: '/verification'
+      fullPath: '/verification/'
+      preLoaderRoute: typeof VerificationIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verification/$reviewId': {
+      id: '/verification/$reviewId'
+      path: '/verification/$reviewId'
+      fullPath: '/verification/$reviewId'
+      preLoaderRoute: typeof VerificationReviewIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dv-reviews/$reviewId': {
+      id: '/api/dv-reviews/$reviewId'
+      path: '/$reviewId'
+      fullPath: '/api/dv-reviews/$reviewId'
+      preLoaderRoute: typeof ApiDvReviewsReviewIdRouteImport
+      parentRoute: typeof ApiDvReviewsRoute
+    }
+    '/api/dv-reviews/$reviewId/$action': {
+      id: '/api/dv-reviews/$reviewId/$action'
+      path: '/$action'
+      fullPath: '/api/dv-reviews/$reviewId/$action'
+      preLoaderRoute: typeof ApiDvReviewsReviewIdActionRouteImport
+      parentRoute: typeof ApiDvReviewsReviewIdRoute
+    }
+    '/api/dv-reviews/$reviewId/pages/$n': {
+      id: '/api/dv-reviews/$reviewId/pages/$n'
+      path: '/pages/$n'
+      fullPath: '/api/dv-reviews/$reviewId/pages/$n'
+      preLoaderRoute: typeof ApiDvReviewsReviewIdPagesNRouteImport
+      parentRoute: typeof ApiDvReviewsReviewIdRoute
+    }
+    '/api/dv-reviews/$reviewId/rows/$rowId': {
+      id: '/api/dv-reviews/$reviewId/rows/$rowId'
+      path: '/rows/$rowId'
+      fullPath: '/api/dv-reviews/$reviewId/rows/$rowId'
+      preLoaderRoute: typeof ApiDvReviewsReviewIdRowsRowIdRouteImport
+      parentRoute: typeof ApiDvReviewsReviewIdRoute
+    }
   }
 }
+
+interface ApiDvReviewsReviewIdRouteChildren {
+  ApiDvReviewsReviewIdActionRoute: typeof ApiDvReviewsReviewIdActionRoute
+  ApiDvReviewsReviewIdPagesNRoute: typeof ApiDvReviewsReviewIdPagesNRoute
+  ApiDvReviewsReviewIdRowsRowIdRoute: typeof ApiDvReviewsReviewIdRowsRowIdRoute
+}
+
+const ApiDvReviewsReviewIdRouteChildren: ApiDvReviewsReviewIdRouteChildren = {
+  ApiDvReviewsReviewIdActionRoute: ApiDvReviewsReviewIdActionRoute,
+  ApiDvReviewsReviewIdPagesNRoute: ApiDvReviewsReviewIdPagesNRoute,
+  ApiDvReviewsReviewIdRowsRowIdRoute: ApiDvReviewsReviewIdRowsRowIdRoute,
+}
+
+const ApiDvReviewsReviewIdRouteWithChildren =
+  ApiDvReviewsReviewIdRoute._addFileChildren(ApiDvReviewsReviewIdRouteChildren)
+
+interface ApiDvReviewsRouteChildren {
+  ApiDvReviewsReviewIdRoute: typeof ApiDvReviewsReviewIdRouteWithChildren
+}
+
+const ApiDvReviewsRouteChildren: ApiDvReviewsRouteChildren = {
+  ApiDvReviewsReviewIdRoute: ApiDvReviewsReviewIdRouteWithChildren,
+}
+
+const ApiDvReviewsRouteWithChildren = ApiDvReviewsRoute._addFileChildren(
+  ApiDvReviewsRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -735,6 +901,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiClientsListRoute: ApiClientsListRoute,
   ApiContactsToFixRoute: ApiContactsToFixRoute,
   ApiDailyRunLogsRoute: ApiDailyRunLogsRoute,
+  ApiDvReviewsRoute: ApiDvReviewsRouteWithChildren,
   ApiEscalationsRoute: ApiEscalationsRoute,
   ApiGmailAttachmentRoute: ApiGmailAttachmentRoute,
   ApiGmailThreadDetailRoute: ApiGmailThreadDetailRoute,
@@ -750,7 +917,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWhatsappConversationsRoute: ApiWhatsappConversationsRoute,
   ApiWorklistRoute: ApiWorklistRoute,
   ClientsClientIdRoute: ClientsClientIdRoute,
+  VerificationReviewIdRoute: VerificationReviewIdRoute,
   ClientsIndexRoute: ClientsIndexRoute,
+  VerificationIndexRoute: VerificationIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
