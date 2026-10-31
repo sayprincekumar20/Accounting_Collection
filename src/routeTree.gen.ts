@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as ContactsRouteImport } from './routes/contacts'
 import { Route as EmailRouteImport } from './routes/email'
 import { Route as LoginRouteImport } from './routes/login'
@@ -25,6 +26,7 @@ import { Route as ApiCallReportsRouteImport } from './routes/api/call-reports'
 import { Route as ApiChannelCountersRouteImport } from './routes/api/channel-counters'
 import { Route as ApiClientTimelineRouteImport } from './routes/api/client-timeline'
 import { Route as ApiClientsListRouteImport } from './routes/api/clients-list'
+import { Route as ApiContactApprovalsRouteImport } from './routes/api/contact-approvals'
 import { Route as ApiContactsToFixRouteImport } from './routes/api/contacts-to-fix'
 import { Route as ApiDailyRunLogsRouteImport } from './routes/api/daily-run-logs'
 import { Route as ApiDvReviewsRouteImport } from './routes/api/dv-reviews'
@@ -54,6 +56,11 @@ import { Route as ApiDvReviewsReviewIdRowsRowIdRouteImport } from './routes/api/
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApprovalsRoute = ApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContactsRoute = ContactsRouteImport.update({
@@ -129,6 +136,11 @@ const ApiClientTimelineRoute = ApiClientTimelineRouteImport.update({
 const ApiClientsListRoute = ApiClientsListRouteImport.update({
   id: '/api/clients-list',
   path: '/api/clients-list',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiContactApprovalsRoute = ApiContactApprovalsRouteImport.update({
+  id: '/api/contact-approvals',
+  path: '/api/contact-approvals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiContactsToFixRoute = ApiContactsToFixRouteImport.update({
@@ -263,6 +275,7 @@ const ApiDvReviewsReviewIdRowsRowIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/approvals': typeof ApprovalsRoute
   '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
   '/login': typeof LoginRoute
@@ -278,6 +291,7 @@ export interface FileRoutesByFullPath {
   '/api/channel-counters': typeof ApiChannelCountersRoute
   '/api/client-timeline': typeof ApiClientTimelineRoute
   '/api/clients-list': typeof ApiClientsListRoute
+  '/api/contact-approvals': typeof ApiContactApprovalsRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
@@ -306,6 +320,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/approvals': typeof ApprovalsRoute
   '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
   '/login': typeof LoginRoute
@@ -321,6 +336,7 @@ export interface FileRoutesByTo {
   '/api/channel-counters': typeof ApiChannelCountersRoute
   '/api/client-timeline': typeof ApiClientTimelineRoute
   '/api/clients-list': typeof ApiClientsListRoute
+  '/api/contact-approvals': typeof ApiContactApprovalsRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
@@ -350,6 +366,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/approvals': typeof ApprovalsRoute
   '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
   '/login': typeof LoginRoute
@@ -365,6 +382,7 @@ export interface FileRoutesById {
   '/api/channel-counters': typeof ApiChannelCountersRoute
   '/api/client-timeline': typeof ApiClientTimelineRoute
   '/api/clients-list': typeof ApiClientsListRoute
+  '/api/contact-approvals': typeof ApiContactApprovalsRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
@@ -395,6 +413,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/approvals'
     | '/contacts'
     | '/email'
     | '/login'
@@ -410,6 +429,7 @@ export interface FileRouteTypes {
     | '/api/channel-counters'
     | '/api/client-timeline'
     | '/api/clients-list'
+    | '/api/contact-approvals'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
     | '/api/dv-reviews'
@@ -438,6 +458,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/approvals'
     | '/contacts'
     | '/email'
     | '/login'
@@ -453,6 +474,7 @@ export interface FileRouteTypes {
     | '/api/channel-counters'
     | '/api/client-timeline'
     | '/api/clients-list'
+    | '/api/contact-approvals'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
     | '/api/dv-reviews'
@@ -481,6 +503,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/approvals'
     | '/contacts'
     | '/email'
     | '/login'
@@ -496,6 +519,7 @@ export interface FileRouteTypes {
     | '/api/channel-counters'
     | '/api/client-timeline'
     | '/api/clients-list'
+    | '/api/contact-approvals'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
     | '/api/dv-reviews'
@@ -525,6 +549,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApprovalsRoute: typeof ApprovalsRoute
   ContactsRoute: typeof ContactsRoute
   EmailRoute: typeof EmailRoute
   LoginRoute: typeof LoginRoute
@@ -540,6 +565,7 @@ export interface RootRouteChildren {
   ApiChannelCountersRoute: typeof ApiChannelCountersRoute
   ApiClientTimelineRoute: typeof ApiClientTimelineRoute
   ApiClientsListRoute: typeof ApiClientsListRoute
+  ApiContactApprovalsRoute: typeof ApiContactApprovalsRoute
   ApiContactsToFixRoute: typeof ApiContactsToFixRoute
   ApiDailyRunLogsRoute: typeof ApiDailyRunLogsRoute
   ApiDvReviewsRoute: typeof ApiDvReviewsRouteWithChildren
@@ -570,6 +596,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/approvals': {
+      id: '/approvals'
+      path: '/approvals'
+      fullPath: '/approvals'
+      preLoaderRoute: typeof ApprovalsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contacts': {
@@ -675,6 +708,13 @@ declare module '@tanstack/react-router' {
       path: '/api/clients-list'
       fullPath: '/api/clients-list'
       preLoaderRoute: typeof ApiClientsListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/contact-approvals': {
+      id: '/api/contact-approvals'
+      path: '/api/contact-approvals'
+      fullPath: '/api/contact-approvals'
+      preLoaderRoute: typeof ApiContactApprovalsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/contacts-to-fix': {
@@ -884,6 +924,7 @@ const ApiDvReviewsRouteWithChildren = ApiDvReviewsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApprovalsRoute: ApprovalsRoute,
   ContactsRoute: ContactsRoute,
   EmailRoute: EmailRoute,
   LoginRoute: LoginRoute,
@@ -899,6 +940,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChannelCountersRoute: ApiChannelCountersRoute,
   ApiClientTimelineRoute: ApiClientTimelineRoute,
   ApiClientsListRoute: ApiClientsListRoute,
+  ApiContactApprovalsRoute: ApiContactApprovalsRoute,
   ApiContactsToFixRoute: ApiContactsToFixRoute,
   ApiDailyRunLogsRoute: ApiDailyRunLogsRoute,
   ApiDvReviewsRoute: ApiDvReviewsRouteWithChildren,

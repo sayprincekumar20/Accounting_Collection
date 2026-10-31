@@ -14,12 +14,14 @@ import {
   CalendarClock,
   UserX,
   FileCheck2,
+  ShieldCheck,
 } from "lucide-react";
 
 const nav = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
   { to: "/clients", label: "Clients", icon: Users },
   { to: "/queue", label: "Reminder Queue", icon: ListChecks },
+  { to: "/approvals", label: "Contact Approvals", icon: ShieldCheck },
   { to: "/worklist", label: "AR Worklist", icon: ClipboardCheck },
   { to: "/promises", label: "Promises", icon: CalendarClock },
   { to: "/contacts", label: "Contacts to Fix", icon: UserX },
