@@ -17,7 +17,8 @@ export function authConfig(env: unknown): AuthConfig | null {
   const password = String(e["DASHBOARD_PASSWORD"] || "");
   if (!password) return null;
   const user = String(e["DASHBOARD_USER"] || "admin");
-  const secret = String(e["DASHBOARD_SESSION_SECRET"] || "") || `rgf-dashboard::${user}::${password}`;
+  const secret =
+    String(e["DASHBOARD_SESSION_SECRET"] || "") || `rgf-dashboard::${user}::${password}`;
   return { user, password, secret };
 }
 
@@ -31,9 +32,13 @@ function b64url(bytes: ArrayBuffer | Uint8Array): string {
 }
 
 async function sign(secret: string, data: string): Promise<string> {
-  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
-    "sign",
-  ]);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
   return b64url(await crypto.subtle.sign("HMAC", key, enc.encode(data)));
 }
 
@@ -48,7 +53,9 @@ export function safeEqual(a: string, b: string): boolean {
 }
 
 export async function createSessionToken(cfg: AuthConfig): Promise<string> {
-  const payload = b64url(enc.encode(JSON.stringify({ u: cfg.user, exp: Date.now() + SESSION_MAX_AGE * 1000 })));
+  const payload = b64url(
+    enc.encode(JSON.stringify({ u: cfg.user, exp: Date.now() + SESSION_MAX_AGE * 1000 })),
+  );
   return `${payload}.${await sign(cfg.secret, payload)}`;
 }
 
@@ -58,7 +65,10 @@ export async function isValidSession(token: string | undefined, cfg: AuthConfig)
   if (!payload || !sig) return false;
   if (!safeEqual(sig, await sign(cfg.secret, payload))) return false;
   try {
-    const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))) as { u?: string; exp?: number };
+    const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))) as {
+      u?: string;
+      exp?: number;
+    };
     return json.u === cfg.user && typeof json.exp === "number" && json.exp > Date.now();
   } catch {
     return false;
@@ -85,5 +95,9 @@ export function clearedSessionCookie(): string {
 /** Only allow redirects back into this dashboard (no open redirect). */
 export function safeNext(next: string | null | undefined): string {
   const n = String(next || "/");
-  return n.startsWith("/") && !n.startsWith("//") && !n.startsWith("/api/") ? n : "/";
+  // Same-site paths only. Browsers treat a backslash like a slash, so "/\\evil.example" means
+  // "//evil.example" (another site): reject any backslash, and control characters (tab/newline tricks).
+  if (!n.startsWith("/") || n.startsWith("//") || n.startsWith("/api/")) return "/";
+  if (n.includes("\\") || [...n].some((ch) => ch.charCodeAt(0) < 32)) return "/";
+  return n;
 }

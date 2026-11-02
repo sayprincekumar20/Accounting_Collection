@@ -6,6 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { type ReactNode } from "react";
 
@@ -33,7 +34,9 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error: thrown, reset }: ErrorComponentProps) {
+  // The router passes whatever was thrown (unknown); show it as an Error.
+  const error = thrown instanceof Error ? thrown : new Error(String(thrown ?? "Unknown error"));
   console.error(error);
   const router = useRouter();
 

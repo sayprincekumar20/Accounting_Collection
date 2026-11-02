@@ -41,7 +41,7 @@ type InboxItem = {
   channel: string;
   label: string;
   icon: typeof Mail;
-  to?: "/email" | "/sms" | "/voice" | "/whatsapp" | "/viber";
+  to: "/email" | "/sms" | "/voice" | "/whatsapp" | "/viber";
 };
 
 function InboxLink({ item, className }: { item: InboxItem; className: string }) {
