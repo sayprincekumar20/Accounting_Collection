@@ -44,6 +44,15 @@ interface Item {
   approval_note: string;
   branch_count: number;
   multibranch: boolean;
+  approval_expired: boolean;
+  text_this_cycle: boolean;
+  call_this_cycle: boolean;
+  last_text_at: string;
+  last_text_channel: string;
+  last_text_source: string;
+  last_call_at: string;
+  last_call_source: string;
+  last_call_result: string;
 }
 
 const peso = (v: number) =>
@@ -181,7 +190,7 @@ function ApprovalsPage() {
   return (
     <AppShell
       title="Contact Approvals"
-      subtitle="Accounting approves which clients may be texted and called · applies to /call and the automation"
+      subtitle="Accounting approves which clients may be texted and called this cycle (Wed to Tue) · applies to /call and the automation"
       actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
     >
       <div className="grid gap-4 sm:grid-cols-3">
@@ -408,6 +417,7 @@ function ApprovalsPage() {
                             <p className="mt-1 text-[11px] text-muted-foreground">
                               {i.approved_by} · {when(i.approved_at)}
                             </p>
+                            <CycleStatus i={i} />
                             <button
                               type="button"
                               disabled={busy}
@@ -422,6 +432,13 @@ function ApprovalsPage() {
                             <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-[11px] font-semibold text-warning">
                               Pending
                             </span>
+                            {i.approval_expired ? (
+                              <p className="mt-1 text-[11px] text-muted-foreground">
+                                Approved last cycle{i.approved_by ? ` by ${i.approved_by}` : ""}:
+                                approve again for this cycle
+                              </p>
+                            ) : null}
+                            <CycleStatus i={i} />
                             {i.approval_note ? (
                               <p className="mt-1 text-[11px] text-muted-foreground">
                                 Note: {i.approval_note}
@@ -560,5 +577,53 @@ function ApprovalsPage() {
         </Panel>
       </div>
     </AppShell>
+  );
+}
+
+/** What has happened with this client in the current cycle (texts and calls via /call or the automation). */
+function CycleStatus({ i }: { i: Item }) {
+  const t = (v: string) =>
+    v
+      ? new Date(v).toLocaleString("en-PH", {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "";
+  const ch = (c: string) =>
+    c === "SMS" ? "SMS" : c === "VIBER" ? "Viber" : c === "WHATSAPP" ? "WhatsApp" : "Email";
+  const tone: Record<string, string> = {
+    Answered: "text-success",
+    "Retry pending": "text-warning",
+    "In progress": "text-warning",
+    "Not reached": "text-destructive",
+    "No answer": "text-destructive",
+  };
+  if (!i.text_this_cycle && !i.call_this_cycle)
+    return <p className="mt-1 text-[11px] text-muted-foreground">Not contacted yet this cycle</p>;
+  return (
+    <div className="mt-1 space-y-0.5 text-[11px]">
+      {i.text_this_cycle ? (
+        <p>
+          <span className="font-semibold">Text sent</span> · {ch(i.last_text_channel)} ·{" "}
+          {t(i.last_text_at)}
+          <span className="text-muted-foreground"> · {i.last_text_source}</span>
+        </p>
+      ) : (
+        <p className="text-muted-foreground">No text this cycle</p>
+      )}
+      {i.call_this_cycle ? (
+        <p>
+          <span className="font-semibold">Called</span> · {t(i.last_call_at)}{" "}
+          <span className={`font-semibold ${tone[i.last_call_result] ?? ""}`}>
+            {i.last_call_result}
+          </span>
+          <span className="text-muted-foreground"> · {i.last_call_source}</span>
+        </p>
+      ) : (
+        <p className="text-muted-foreground">Not called this cycle</p>
+      )}
+    </div>
   );
 }

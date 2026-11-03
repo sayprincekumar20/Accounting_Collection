@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { clearDataTableCache, fetchAllDataTableRows } from "@/lib/n8n-datatable";
+import { buildActivity, cycleStart, loadActivityTables } from "@/lib/client-activity";
 
 // Contact Approvals: every active client with unpaid invoices, its contact, amounts, invoices and
 // the Accounting team's approval. Texts and calls (via /call or the automation) only go to approved
@@ -22,10 +23,17 @@ export const Route = createFileRoute("/api/contact-approvals")({
     handlers: {
       GET: async () => {
         try {
-          const [clients, approvals] = await Promise.all([
+          const [clients, approvals, activityTables] = await Promise.all([
             fetchAllDataTableRows<Row>(CLIENTS),
             fetchAllDataTableRows<Row>(APPROVALS).catch(() => [] as Row[]),
+            loadActivityTables(),
           ]);
+          // An approval is valid for ONE reminder cycle only (Wednesday 00:00 to Tuesday, Manila):
+          // every new cycle, Accounting approves again.
+          const cycle = cycleStart();
+          const cycleMs = cycle.getTime();
+          const activityFor = buildActivity(...activityTables);
+          const ms = (v: unknown) => new Date(s(v)).getTime() || 0;
           const byCompany = new Map(approvals.map((a) => [s(a["company_key"]), a]));
           // 5+ branch rule (same as /call and the weekly run): count the distinct branches of each parent company
           // across all its active rows; such accounts are never texted or called (AR handles them manually).
@@ -87,6 +95,9 @@ export const Route = createFileRoute("/api/contact-approvals")({
                 // keep the row even if its invoice details cannot be read
               }
               const a = byCompany.get(companyKey(c["client_id"]));
+              const everApproved = !!(a && (a["approved"] === true || s(a["approved"]) === "true"));
+              const approvedThisCycle = everApproved && ms(a?.["approved_at"]) >= cycleMs;
+              const act = activityFor(s(c["client_id"]));
               return {
                 client_id: s(c["client_id"]),
                 client_name: s(c["client_name"]),
@@ -105,7 +116,11 @@ export const Route = createFileRoute("/api/contact-approvals")({
                 ar_handoff_until: s(c["ar_handoff_until"]),
                 refreshed_at: s(c["updatedAt"]),
                 invoices,
-                approved: !!(a && (a["approved"] === true || s(a["approved"]) === "true")),
+                approved: approvedThisCycle,
+                approval_expired: everApproved && !approvedThisCycle,
+                text_this_cycle: ms(act.last_text_at) >= cycleMs,
+                call_this_cycle: ms(act.last_call_at) >= cycleMs,
+                ...act,
                 approved_by: a ? s(a["approved_by"]) : "",
                 approved_at: a ? s(a["approved_at"]) : "",
                 approval_note: a ? s(a["note"]) : "",
@@ -119,7 +134,7 @@ export const Route = createFileRoute("/api/contact-approvals")({
                 y.overdue - x.overdue ||
                 y.total - x.total,
             );
-          return json({ items });
+          return json({ items, cycle_start: cycle.toISOString() });
         } catch (err) {
           console.error("[contact-approvals] GET error:", err);
           return json({ error: "Failed to load", detail: String(err).slice(0, 300) }, 500);

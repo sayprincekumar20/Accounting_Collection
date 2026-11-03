@@ -99,7 +99,9 @@ describe("GET /api/contact-approvals", () => {
   });
   it("keeps the approval after a contact change (matched per company, case-insensitive)", async () => {
     tables[CLIENTS] = [client("ALPHA CORP___new.contact@x.co")];
-    tables[APPROVALS] = [{ company_key: "alpha corp", approved: "true" }];
+    tables[APPROVALS] = [
+      { company_key: "alpha corp", approved: "true", approved_at: new Date().toISOString() },
+    ];
     const items = (await (await call("contact-approvals", "GET")).json()).items;
     expect(items[0].approved).toBe(true);
   });
@@ -309,5 +311,86 @@ describe("Contact Approvals: 5+ branch accounts", () => {
     expect(by["BIG GROUP___a@x.co"]).toMatchObject({ multibranch: true, branch_count: 5 });
     expect(by["BIG GROUP___b@x.co"]).toMatchObject({ multibranch: true, branch_count: 5 });
     expect(by["SMALL CO___c@x.co"]).toMatchObject({ multibranch: false, branch_count: 2 });
+  });
+});
+
+describe("cycleStart (reminder cycle = Wednesday 00:00 Manila)", async () => {
+  const { cycleStart } = await import("../src/lib/client-activity");
+  const manila = (iso: string) => new Date(iso + "+08:00");
+  it("returns the most recent Wednesday 00:00 Manila for every weekday", () => {
+    const wed = manila("2026-11-04T00:00:00").toISOString();
+    for (const d of [
+      "2026-11-04T00:00:01",
+      "2026-11-04T23:59:00",
+      "2026-11-06T12:00:00",
+      "2026-11-10T23:59:59",
+    ]) {
+      expect(cycleStart(manila(d)).toISOString()).toBe(wed);
+    }
+  });
+  it("Tuesday still belongs to the previous cycle", () => {
+    expect(cycleStart(manila("2026-11-03T10:00:00")).toISOString()).toBe(
+      manila("2026-10-28T00:00:00").toISOString(),
+    );
+  });
+});
+
+describe("Contact Approvals: approval valid for one cycle, contact status this cycle", () => {
+  const LOGS = "a32Z5oGcNi0xzefb";
+  it("an approval from a previous cycle is expired (Pending again)", async () => {
+    tables["rJpqXxmxhqJnlLrJ"] = [client("Old Co___o@x.co")];
+    tables["3IvKKI4AwrBlDeOo"] = [
+      {
+        company_key: "old co",
+        approved: true,
+        approved_by: "Maria",
+        approved_at: "2026-01-01T00:00:00Z",
+      },
+    ];
+    const item = (await (await call("contact-approvals", "GET")).json()).items[0];
+    expect(item).toMatchObject({ approved: false, approval_expired: true, approved_by: "Maria" });
+  });
+  it("shows the text and call of this cycle", async () => {
+    const now = new Date().toISOString();
+    tables["rJpqXxmxhqJnlLrJ"] = [client("Busy Co___b@x.co")];
+    tables["3IvKKI4AwrBlDeOo"] = [{ company_key: "busy co", approved: true, approved_at: now }];
+    tables[LOGS] = [
+      {
+        client_id: "Busy Co___b@x.co",
+        channel: "VIBER",
+        event_type: "SEND_SUCCESS",
+        timestamp: now,
+        trigger_source: "CLIQ_CALL",
+        requested_by: "Juan",
+      },
+      {
+        client_id: "Busy Co___b@x.co",
+        channel: "VOICE",
+        event_type: "CALL_INITIATED",
+        timestamp: now,
+        trigger_source: "CLIQ_CALL",
+      },
+    ];
+    const item = (await (await call("contact-approvals", "GET")).json()).items[0];
+    expect(item).toMatchObject({
+      approved: true,
+      text_this_cycle: true,
+      call_this_cycle: true,
+      last_text_channel: "VIBER",
+      last_text_source: "/call · Juan",
+    });
+  });
+  it("a client contacted only in an earlier cycle shows as not contacted this cycle", async () => {
+    tables["rJpqXxmxhqJnlLrJ"] = [client("Quiet Co___q@x.co")];
+    tables[LOGS] = [
+      {
+        client_id: "Quiet Co___q@x.co",
+        channel: "EMAIL",
+        event_type: "SEND_SUCCESS",
+        timestamp: "2026-01-05T02:00:00Z",
+      },
+    ];
+    const item = (await (await call("contact-approvals", "GET")).json()).items[0];
+    expect(item).toMatchObject({ text_this_cycle: false, call_this_cycle: false });
   });
 });
