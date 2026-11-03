@@ -42,6 +42,8 @@ interface Item {
   approved_by: string;
   approved_at: string;
   approval_note: string;
+  branch_count: number;
+  multibranch: boolean;
 }
 
 const peso = (v: number) =>
@@ -73,7 +75,10 @@ function ApprovalsPage() {
     },
     refetchInterval: 600000,
   });
-  const items = useMemo(() => data ?? [], [data]);
+  const all = useMemo(() => data ?? [], [data]);
+  // 5+ branch accounts are never texted or called (AR handles them): not in the approval list, shown apart.
+  const items = useMemo(() => all.filter((i) => !i.multibranch), [all]);
+  const multibranch = useMemo(() => all.filter((i) => i.multibranch), [all]);
   const [status, setStatus] = useState<"PENDING" | "APPROVED" | "ALL">("PENDING");
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [q, setQ] = useState("");
@@ -483,6 +488,69 @@ function ApprovalsPage() {
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
                       Nothing here.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      </div>
+
+      <div className="mt-5">
+        <Panel
+          title={`Not contacted: 5+ branches (${multibranch.length})`}
+          description="These accounts are NOT texted or called by /call or the automation. AR handles them manually."
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px] text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-2.5 font-semibold">Client</th>
+                  <th className="px-3 py-2.5 font-semibold">Contact</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Branches</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Overdue</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Total</th>
+                  <th className="px-3 py-2.5 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {multibranch.map((i) => (
+                  <tr key={i.client_id}>
+                    <td className="px-3 py-3">
+                      <p className="font-semibold">{i.client_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {[
+                          i.sales_person && `Sales: ${i.sales_person}`,
+                          i.ar_owner && `AR: ${i.ar_owner}`,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </td>
+                    <td className="px-3 py-3 text-xs">
+                      <p className="font-semibold">{i.contact_person || "No contact person"}</p>
+                      <p>{i.phone || "No phone"}</p>
+                      <p className="truncate">{i.email || "No email"}</p>
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums">{i.branch_count}</td>
+                    <td className="px-3 py-3 text-right font-semibold tabular-nums text-destructive">
+                      {i.overdue ? peso(i.overdue) : "–"}
+                    </td>
+                    <td className="px-3 py-3 text-right font-semibold tabular-nums">
+                      {peso(i.total)}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-semibold">
+                        Not called: AR handles manually
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {multibranch.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                      None.
                     </td>
                   </tr>
                 ) : null}

@@ -27,6 +27,24 @@ export const Route = createFileRoute("/api/contact-approvals")({
             fetchAllDataTableRows<Row>(APPROVALS).catch(() => [] as Row[]),
           ]);
           const byCompany = new Map(approvals.map((a) => [s(a["company_key"]), a]));
+          // 5+ branch rule (same as /call and the weekly run): count the distinct branches of each parent company
+          // across all its active rows; such accounts are never texted or called (AR handles them manually).
+          const MIN_BRANCHES = 5;
+          const parentKey = (c: Row) =>
+            s(c["parent_name"] || c["client_name"])
+              .trim()
+              .toLowerCase();
+          const branchesByParent = new Map<string, Set<string>>();
+          for (const c of clients) {
+            if (s(c["status"]).toUpperCase() === "INACTIVE") continue;
+            const set = branchesByParent.get(parentKey(c)) ?? new Set<string>();
+            for (const id of s(c["branch_customer_ids"])
+              .split(",")
+              .map((x) => x.trim())
+              .filter(Boolean))
+              set.add(id);
+            branchesByParent.set(parentKey(c), set);
+          }
           const items = clients
             .filter(
               (c) =>
@@ -91,6 +109,8 @@ export const Route = createFileRoute("/api/contact-approvals")({
                 approved_by: a ? s(a["approved_by"]) : "",
                 approved_at: a ? s(a["approved_at"]) : "",
                 approval_note: a ? s(a["note"]) : "",
+                branch_count: branchesByParent.get(parentKey(c))?.size ?? 0,
+                multibranch: (branchesByParent.get(parentKey(c))?.size ?? 0) >= MIN_BRANCHES,
               };
             })
             .sort(

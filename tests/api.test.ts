@@ -291,3 +291,23 @@ describe("GET /api/client-timeline", () => {
     expect((await r.json()).events).toEqual([]);
   });
 });
+
+describe("Contact Approvals: 5+ branch accounts", () => {
+  it("flags parent companies with 5 or more branches (across contacts) and leaves smaller ones approvable", async () => {
+    const CL = "rJpqXxmxhqJnlLrJ";
+    tables[CL] = [
+      client("BIG GROUP___a@x.co", { parent_name: "BIG GROUP", branch_customer_ids: "1,2,3" }),
+      client("BIG GROUP___b@x.co", { parent_name: "BIG GROUP", branch_customer_ids: "4,5" }),
+      client("SMALL CO___c@x.co", { parent_name: "SMALL CO", branch_customer_ids: "9,10" }),
+    ];
+    const items = (await (await call("contact-approvals", "GET")).json()).items as {
+      client_id: string;
+      multibranch: boolean;
+      branch_count: number;
+    }[];
+    const by = Object.fromEntries(items.map((i) => [i.client_id, i]));
+    expect(by["BIG GROUP___a@x.co"]).toMatchObject({ multibranch: true, branch_count: 5 });
+    expect(by["BIG GROUP___b@x.co"]).toMatchObject({ multibranch: true, branch_count: 5 });
+    expect(by["SMALL CO___c@x.co"]).toMatchObject({ multibranch: false, branch_count: 2 });
+  });
+});
