@@ -30,10 +30,23 @@ export const Route = createFileRoute("/api/promises-board")({
             )
               latest.set(id, p);
           }
+          const companyKey = (id: unknown) => s(id).split("___")[0]!.trim().toLowerCase();
+          const activeByCompany = new Map<string, Row>();
+          for (const c of clients)
+            if (s(c["status"]).toUpperCase() !== "INACTIVE")
+              activeByCompany.set(companyKey(c["client_id"]), c);
           const today = manilaDay(new Date());
           const items = [...latest.values()]
             .map((p) => {
-              const c = byId.get(s(p["client_id"])) || {};
+              // The promise's own client row, or (after a contact change, which retires that row and
+              // creates a new client_id) the ACTIVE row of the same company, so a missed promise is
+              // not shown as KEPT just because the old row is INACTIVE.
+              const own = byId.get(s(p["client_id"]));
+              const c =
+                (own && s(own["status"]).toUpperCase() !== "INACTIVE" ? own : undefined) ||
+                activeByCompany.get(companyKey(p["client_id"])) ||
+                own ||
+                {};
               const date = s(p["promise_date"]).slice(0, 10);
               const pd = date
                 ? manilaDay(
