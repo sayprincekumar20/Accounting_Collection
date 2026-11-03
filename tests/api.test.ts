@@ -394,3 +394,50 @@ describe("Contact Approvals: approval valid for one cycle, contact status this c
     expect(item).toMatchObject({ text_this_cycle: false, call_this_cycle: false });
   });
 });
+
+describe("Last contact: source of a text sent by /call", () => {
+  it("labels an email / Viber send (no source in its log) with the /call that placed the call right after it", async () => {
+    const { buildActivity } = await import("../src/lib/client-activity");
+    const t0 = Date.now() - 60000;
+    const logs = [
+      {
+        client_id: "A Co___a@x.co",
+        channel: "EMAIL",
+        event_type: "SEND_SUCCESS",
+        timestamp: new Date(t0).toISOString(),
+      },
+      {
+        client_id: "A Co___a@x.co",
+        channel: "VIBER",
+        event_type: "SEND_SUCCESS",
+        timestamp: new Date(t0 + 20000).toISOString(),
+      },
+      {
+        client_id: "A Co___a@x.co",
+        channel: "VOICE",
+        event_type: "CALL_INITIATED",
+        timestamp: new Date(t0 + 21000).toISOString(),
+        trigger_source: "CLIQ_CALL",
+        requested_by: "PRINCE KUMAR",
+      },
+    ];
+    const a = buildActivity(logs, [], [])("A Co___a@x.co");
+    expect(a).toMatchObject({
+      last_text_channel: "VIBER",
+      last_text_source: "/call · PRINCE KUMAR",
+      contacted_via_call_command: true,
+    });
+  });
+  it("keeps 'Weekly run' when no /call call follows the text", async () => {
+    const { buildActivity } = await import("../src/lib/client-activity");
+    const logs = [
+      {
+        client_id: "B Co___b@x.co",
+        channel: "EMAIL",
+        event_type: "SEND_SUCCESS",
+        timestamp: new Date().toISOString(),
+      },
+    ];
+    expect(buildActivity(logs, [], [])("B Co___b@x.co").last_text_source).toBe("Weekly run");
+  });
+});

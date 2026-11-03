@@ -78,6 +78,21 @@ export function buildActivity(
     if (src === "MANUAL_RUN") return "Manual run";
     return "Weekly run";
   };
+  // The email / Viber / SMS send logs do not record who started them; the call log of the same /call run
+  // does. Take the source of a text from a call of the same company placed up to 15 minutes after it.
+  const textSource = (k: string, tx: Act) => {
+    if (str(tx["trigger_source"])) return sourceLabel(tx);
+    const t = at(tx);
+    const call = logs.find(
+      (l) =>
+        companyKey(l["client_id"]) === k &&
+        str(l["channel"]).toUpperCase() === "VOICE" &&
+        str(l["trigger_source"]) &&
+        at(l) >= t &&
+        at(l) - t <= 15 * 60000,
+    );
+    return call ? sourceLabel(call) : sourceLabel(tx);
+  };
   return (clientId: string) => {
     const k = companyKey(clientId);
     const tx = lastText.get(k);
@@ -98,7 +113,7 @@ export function buildActivity(
     return {
       last_text_at: tx ? str(tx["timestamp"]) : "",
       last_text_channel: tx ? str(tx["channel"]).toUpperCase() : "",
-      last_text_source: tx ? sourceLabel(tx) : "",
+      last_text_source: tx ? textSource(k, tx) : "",
       last_call_at: cl ? str(cl["timestamp"]) : "",
       last_call_source: cl ? sourceLabel(cl) : "",
       last_call_result: callResult,
