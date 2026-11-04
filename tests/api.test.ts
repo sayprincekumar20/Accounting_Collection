@@ -474,3 +474,19 @@ describe("GET /api/reminder-queue-list", () => {
     expect(by).toEqual({ "Live Co": "WAITING_APPROVAL", "Old Co": "STALE", "Gone Co": "STALE" });
   });
 });
+
+describe("Sales Team rule on Contact Approvals", () => {
+  it("returns sales_team true / false / null (not yet refreshed)", async () => {
+    tables["rJpqXxmxhqJnlLrJ"] = [
+      client("In Team___a@x.co", { sales_team: true }),
+      client("Out Team___b@x.co", { sales_team: false }),
+      client("Unknown___c@x.co"),
+    ];
+    const items = (await (await call("contact-approvals", "GET")).json()).items as {
+      client_name: string;
+      sales_team: boolean | null;
+    }[];
+    const by = Object.fromEntries(items.map((i) => [i.client_name, i.sales_team]));
+    expect(by).toEqual({ "In Team": true, "Out Team": false, Unknown: null });
+  });
+});

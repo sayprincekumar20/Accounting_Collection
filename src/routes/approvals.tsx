@@ -44,6 +44,7 @@ interface Item {
   approval_note: string;
   branch_count: number;
   multibranch: boolean;
+  sales_team: boolean | null;
   approval_expired: boolean;
   text_this_cycle: boolean;
   call_this_cycle: boolean;
@@ -84,7 +85,9 @@ function ApprovalsPage() {
     },
     refetchInterval: 600000,
   });
-  const all = useMemo(() => data ?? [], [data]);
+  // Clients whose CRM Account Owner is not in the 'Sales Team' group are never contacted: they are on the
+  // 'Other Accounts' tab, not here.
+  const all = useMemo(() => (data ?? []).filter((i) => i.sales_team !== false), [data]);
   // 5+ branch accounts are never texted or called (AR handles them): not in the approval list, shown apart.
   const items = useMemo(() => all.filter((i) => !i.multibranch), [all]);
   const multibranch = useMemo(() => all.filter((i) => i.multibranch), [all]);

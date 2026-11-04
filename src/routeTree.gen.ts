@@ -14,6 +14,7 @@ import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as ContactsRouteImport } from './routes/contacts'
 import { Route as EmailRouteImport } from './routes/email'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as OtherAccountsRouteImport } from './routes/other-accounts'
 import { Route as PromisesRouteImport } from './routes/promises'
 import { Route as QueueRouteImport } from './routes/queue'
 import { Route as ReportsRouteImport } from './routes/reports'
@@ -76,6 +77,11 @@ const EmailRoute = EmailRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OtherAccountsRoute = OtherAccountsRouteImport.update({
+  id: '/other-accounts',
+  path: '/other-accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PromisesRoute = PromisesRouteImport.update({
@@ -279,6 +285,7 @@ export interface FileRoutesByFullPath {
   '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
   '/login': typeof LoginRoute
+  '/other-accounts': typeof OtherAccountsRoute
   '/promises': typeof PromisesRoute
   '/queue': typeof QueueRoute
   '/reports': typeof ReportsRoute
@@ -324,6 +331,7 @@ export interface FileRoutesByTo {
   '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
   '/login': typeof LoginRoute
+  '/other-accounts': typeof OtherAccountsRoute
   '/promises': typeof PromisesRoute
   '/queue': typeof QueueRoute
   '/reports': typeof ReportsRoute
@@ -370,6 +378,7 @@ export interface FileRoutesById {
   '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
   '/login': typeof LoginRoute
+  '/other-accounts': typeof OtherAccountsRoute
   '/promises': typeof PromisesRoute
   '/queue': typeof QueueRoute
   '/reports': typeof ReportsRoute
@@ -417,6 +426,7 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/email'
     | '/login'
+    | '/other-accounts'
     | '/promises'
     | '/queue'
     | '/reports'
@@ -462,6 +472,7 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/email'
     | '/login'
+    | '/other-accounts'
     | '/promises'
     | '/queue'
     | '/reports'
@@ -507,6 +518,7 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/email'
     | '/login'
+    | '/other-accounts'
     | '/promises'
     | '/queue'
     | '/reports'
@@ -553,6 +565,7 @@ export interface RootRouteChildren {
   ContactsRoute: typeof ContactsRoute
   EmailRoute: typeof EmailRoute
   LoginRoute: typeof LoginRoute
+  OtherAccountsRoute: typeof OtherAccountsRoute
   PromisesRoute: typeof PromisesRoute
   QueueRoute: typeof QueueRoute
   ReportsRoute: typeof ReportsRoute
@@ -624,6 +637,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/other-accounts': {
+      id: '/other-accounts'
+      path: '/other-accounts'
+      fullPath: '/other-accounts'
+      preLoaderRoute: typeof OtherAccountsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/promises': {
@@ -928,6 +948,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactsRoute: ContactsRoute,
   EmailRoute: EmailRoute,
   LoginRoute: LoginRoute,
+  OtherAccountsRoute: OtherAccountsRoute,
   PromisesRoute: PromisesRoute,
   QueueRoute: QueueRoute,
   ReportsRoute: ReportsRoute,
