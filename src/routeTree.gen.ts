@@ -28,6 +28,7 @@ import { Route as ApiChannelCountersRouteImport } from './routes/api/channel-cou
 import { Route as ApiClientTimelineRouteImport } from './routes/api/client-timeline'
 import { Route as ApiClientsListRouteImport } from './routes/api/clients-list'
 import { Route as ApiContactApprovalsRouteImport } from './routes/api/contact-approvals'
+import { Route as ApiContactNowRouteImport } from './routes/api/contact-now'
 import { Route as ApiContactsToFixRouteImport } from './routes/api/contacts-to-fix'
 import { Route as ApiDailyRunLogsRouteImport } from './routes/api/daily-run-logs'
 import { Route as ApiDvReviewsRouteImport } from './routes/api/dv-reviews'
@@ -147,6 +148,11 @@ const ApiClientsListRoute = ApiClientsListRouteImport.update({
 const ApiContactApprovalsRoute = ApiContactApprovalsRouteImport.update({
   id: '/api/contact-approvals',
   path: '/api/contact-approvals',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiContactNowRoute = ApiContactNowRouteImport.update({
+  id: '/api/contact-now',
+  path: '/api/contact-now',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiContactsToFixRoute = ApiContactsToFixRouteImport.update({
@@ -299,6 +305,7 @@ export interface FileRoutesByFullPath {
   '/api/client-timeline': typeof ApiClientTimelineRoute
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/contact-approvals': typeof ApiContactApprovalsRoute
+  '/api/contact-now': typeof ApiContactNowRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
@@ -345,6 +352,7 @@ export interface FileRoutesByTo {
   '/api/client-timeline': typeof ApiClientTimelineRoute
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/contact-approvals': typeof ApiContactApprovalsRoute
+  '/api/contact-now': typeof ApiContactNowRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
@@ -392,6 +400,7 @@ export interface FileRoutesById {
   '/api/client-timeline': typeof ApiClientTimelineRoute
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/contact-approvals': typeof ApiContactApprovalsRoute
+  '/api/contact-now': typeof ApiContactNowRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
@@ -440,6 +449,7 @@ export interface FileRouteTypes {
     | '/api/client-timeline'
     | '/api/clients-list'
     | '/api/contact-approvals'
+    | '/api/contact-now'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
     | '/api/dv-reviews'
@@ -486,6 +496,7 @@ export interface FileRouteTypes {
     | '/api/client-timeline'
     | '/api/clients-list'
     | '/api/contact-approvals'
+    | '/api/contact-now'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
     | '/api/dv-reviews'
@@ -532,6 +543,7 @@ export interface FileRouteTypes {
     | '/api/client-timeline'
     | '/api/clients-list'
     | '/api/contact-approvals'
+    | '/api/contact-now'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
     | '/api/dv-reviews'
@@ -579,6 +591,7 @@ export interface RootRouteChildren {
   ApiClientTimelineRoute: typeof ApiClientTimelineRoute
   ApiClientsListRoute: typeof ApiClientsListRoute
   ApiContactApprovalsRoute: typeof ApiContactApprovalsRoute
+  ApiContactNowRoute: typeof ApiContactNowRoute
   ApiContactsToFixRoute: typeof ApiContactsToFixRoute
   ApiDailyRunLogsRoute: typeof ApiDailyRunLogsRoute
   ApiDvReviewsRoute: typeof ApiDvReviewsRouteWithChildren
@@ -735,6 +748,13 @@ declare module '@tanstack/react-router' {
       path: '/api/contact-approvals'
       fullPath: '/api/contact-approvals'
       preLoaderRoute: typeof ApiContactApprovalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/contact-now': {
+      id: '/api/contact-now'
+      path: '/api/contact-now'
+      fullPath: '/api/contact-now'
+      preLoaderRoute: typeof ApiContactNowRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/contacts-to-fix': {
@@ -962,6 +982,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiClientTimelineRoute: ApiClientTimelineRoute,
   ApiClientsListRoute: ApiClientsListRoute,
   ApiContactApprovalsRoute: ApiContactApprovalsRoute,
+  ApiContactNowRoute: ApiContactNowRoute,
   ApiContactsToFixRoute: ApiContactsToFixRoute,
   ApiDailyRunLogsRoute: ApiDailyRunLogsRoute,
   ApiDvReviewsRoute: ApiDvReviewsRouteWithChildren,

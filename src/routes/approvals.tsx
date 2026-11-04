@@ -42,6 +42,7 @@ interface Item {
   approved_by: string;
   approved_at: string;
   approval_note: string;
+  allow_multibranch?: boolean;
   branch_count: number;
   multibranch: boolean;
   sales_team: boolean | null;
@@ -134,6 +135,57 @@ function ApprovalsPage() {
     }
     return who;
   };
+
+  // 5+ branch accounts: approve (5+ branches allowed) and start the contact right away (same as /call).
+  const [selectedMulti, setSelectedMulti] = useState<Set<string>>(new Set());
+  async function approveAndContact(list: Item[]) {
+    setMsg("");
+    if (!list.length) return;
+    const who = askName();
+    if (!who) return;
+    if (
+      !window.confirm(
+        `Approve and contact now ${list.length} account(s) with 5+ branches?\n\n${list.map((i) => "- " + i.client_name).join("\n")}\n\nEach gets its statement (email / Viber, SMS fallback) and a call from Grace now.`,
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const r1 = await fetch("/api/contact-approvals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          approved_by: who,
+          items: list.map((i) => ({
+            client_id: i.client_id,
+            client_name: i.client_name,
+            approved: true,
+            allow_multibranch: true,
+            note: "5+ branches: approved by AR for contact",
+          })),
+        }),
+      });
+      if (!r1.ok) throw new Error("Saving the approval failed");
+      const r2 = await fetch("/api/contact-now", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requested_by: who, names: list.map((i) => i.client_name) }),
+      });
+      const out = (await r2.json().catch(() => ({}))) as {
+        reply?: string;
+        error?: string;
+        detail?: string;
+      };
+      if (!r2.ok) throw new Error(out.detail || out.error || "Starting the contact failed");
+      setSelectedMulti(new Set());
+      setMsg("Started. " + (out.reply || "Results will be posted in #Sales."));
+      await qc.invalidateQueries({ queryKey: ["contact-approvals"] });
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function save(list: Item[], approve: boolean) {
     setMsg("");
@@ -520,12 +572,29 @@ function ApprovalsPage() {
       <div className="mt-5">
         <Panel
           title={`Not contacted: 5+ branches (${multibranch.length})`}
-          description="These accounts are NOT texted or called by /call or the automation. AR handles them manually."
+          description="Not texted or called automatically. AR can choose to contact one or several: tick them and click 'Approve & contact selected', or 'Approve & contact now' on a row."
         >
+          <div className="flex flex-wrap items-center gap-2 px-3 pb-3">
+            <button
+              type="button"
+              disabled={busy || !selectedMulti.size}
+              onClick={() =>
+                approveAndContact(multibranch.filter((i) => selectedMulti.has(i.client_id)))
+              }
+              className="h-9 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+            >
+              Approve &amp; contact selected ({selectedMulti.size})
+            </button>
+            <span className="text-xs text-muted-foreground">
+              One statement and one call per contact, covering all its branches. Results are posted
+              in #Sales.
+            </span>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px] text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-2.5"></th>
                   <th className="px-3 py-2.5 font-semibold">Client</th>
                   <th className="px-3 py-2.5 font-semibold">Contact</th>
                   <th className="px-3 py-2.5 text-right font-semibold">Branches</th>
@@ -537,6 +606,21 @@ function ApprovalsPage() {
               <tbody className="divide-y divide-border">
                 {multibranch.map((i) => (
                   <tr key={i.client_id}>
+                    <td className="px-3 py-3 align-top">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${i.client_name}`}
+                        checked={selectedMulti.has(i.client_id)}
+                        onChange={() =>
+                          setSelectedMulti((prev) => {
+                            const n = new Set(prev);
+                            if (n.has(i.client_id)) n.delete(i.client_id);
+                            else n.add(i.client_id);
+                            return n;
+                          })
+                        }
+                      />
+                    </td>
                     <td className="px-3 py-3">
                       <p className="font-semibold">{i.client_name}</p>
                       <p className="text-xs text-muted-foreground">
@@ -561,15 +645,30 @@ function ApprovalsPage() {
                       {peso(i.total)}
                     </td>
                     <td className="px-3 py-3">
-                      <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-semibold">
-                        Not called: AR handles manually
-                      </span>
+                      {i.approved && i.allow_multibranch ? (
+                        <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
+                          Approved for contact
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-semibold">
+                          Not called: AR handles manually
+                        </span>
+                      )}
+                      <CycleStatus i={i} />
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => approveAndContact([i])}
+                        className="mt-1 block rounded-md border border-border px-2 py-0.5 text-xs font-semibold hover:bg-muted disabled:opacity-50"
+                      >
+                        Approve &amp; contact now
+                      </button>
                     </td>
                   </tr>
                 ))}
                 {multibranch.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                    <td colSpan={7} className="px-4 py-6 text-center text-sm text-muted-foreground">
                       None.
                     </td>
                   </tr>

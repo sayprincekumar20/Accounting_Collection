@@ -490,3 +490,28 @@ describe("Sales Team rule on Contact Approvals", () => {
     expect(by).toEqual({ "In Team": true, "Out Team": false, Unknown: null });
   });
 });
+
+describe("POST /api/contact-now (Approve & contact now for 5+ branch accounts)", () => {
+  it("rejects a request without a requester or without names", async () => {
+    expect((await call("contact-now", "POST", "/", { names: ["A"] })).status).toBe(400);
+    expect(
+      (await call("contact-now", "POST", "/", { requested_by: "Maria", names: [] })).status,
+    ).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("runs the /call command as #Sales with the requester's name (max 20 names)", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ reply: "Running now" }), { status: 200 }),
+    );
+    const names = Array.from({ length: 25 }, (_, i) => `Client ${i}`);
+    const r = await call("contact-now", "POST", "/", { requested_by: "Maria", names });
+    expect(r.status).toBe(200);
+    expect((await r.json()).reply).toBe("Running now");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/webhook/cliq-call-command");
+    expect((init.headers as Record<string, string>)["x-cliq-secret"]).toBeTruthy();
+    const body = JSON.parse(String(init.body));
+    expect(body).toMatchObject({ channel_unique_name: "sales", user_name: "Maria (dashboard)" });
+    expect(String(body.text).split("\n")).toHaveLength(20);
+  });
+});

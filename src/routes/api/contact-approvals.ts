@@ -124,6 +124,9 @@ export const Route = createFileRoute("/api/contact-approvals")({
                 approved_by: a ? s(a["approved_by"]) : "",
                 approved_at: a ? s(a["approved_at"]) : "",
                 approval_note: a ? s(a["note"]) : "",
+                allow_multibranch:
+                  approvedThisCycle &&
+                  (a?.["allow_multibranch"] === true || s(a?.["allow_multibranch"]) === "true"),
                 // CRM Account Owner in the 'Sales Team' group (set by the weekly / /call refresh); false = never contacted.
                 sales_team:
                   c["sales_team"] === false || s(c["sales_team"]) === "false"
