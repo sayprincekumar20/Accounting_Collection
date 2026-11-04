@@ -52,6 +52,7 @@ interface QueueRow {
 
 const QUEUE_STATUSES = [
   { value: "all", label: "All statuses" },
+  { value: "q_WAITING_APPROVAL", label: "Waiting for approval" },
   { value: "q_PENDING", label: "Pending" },
   { value: "q_WAITING_QUOTA", label: "Waiting on quota" },
   { value: "q_SENT", label: "Sent" },
@@ -98,6 +99,8 @@ function QueuePage() {
   const sent = queue.filter((q) => q.queue_status.toUpperCase() === "SENT");
   const waiting = queue.filter((q) => q.queue_status.toUpperCase() === "WAITING_QUOTA");
   const skipped = queue.filter((q) => q.queue_status.toUpperCase().startsWith("SKIPPED"));
+  // Not approved by Accounting yet this cycle: never texted or called until approved (Contact Approvals).
+  const awaitingApproval = queue.filter((q) => q.queue_status.toUpperCase() === "WAITING_APPROVAL");
   const [filters, setFilters, clearFilters] = useLogFilters();
   const statusIsMine = QUEUE_STATUSES.some((o) => o.value === filters.status);
   const wanted = statusIsMine && filters.status !== "all" ? filters.status.slice(2) : "";
@@ -164,8 +167,18 @@ function QueuePage() {
         </div>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="In this cycle's queue" value={String(queue.length)} tone="primary" />
+        <StatCard
+          label="Waiting for approval"
+          value={String(awaitingApproval.length)}
+          hint={
+            peso(awaitingApproval.reduce((s, q) => s + Number(q.collection_amount), 0)) +
+            " · approve on Contact Approvals"
+          }
+          onClick={() => toggle("q_WAITING_APPROVAL")}
+          active={filters.status === "q_WAITING_APPROVAL"}
+        />
         <StatCard
           label="Sent"
           value={String(sent.length)}

@@ -59,19 +59,30 @@ export function StatCard({
       </p>
       <p className="mt-2 text-2xl font-bold tabular-nums">{value}</p>
       {hint ? (
-        <p className={tone === "primary" ? "mt-1 text-xs opacity-80" : "mt-1 text-xs text-muted-foreground"}>
+        <p
+          className={
+            tone === "primary" ? "mt-1 text-xs opacity-80" : "mt-1 text-xs text-muted-foreground"
+          }
+        >
           {hint}
         </p>
       ) : null}
       {onClick ? (
-        <p className={`mt-1 text-[10px] font-semibold ${tone === "primary" ? "opacity-80" : "text-primary"}`}>
+        <p
+          className={`mt-1 text-[10px] font-semibold ${tone === "primary" ? "opacity-80" : "text-primary"}`}
+        >
           {active ? "Filtering, click to clear" : "Click to filter"}
         </p>
       ) : null}
     </>
   );
   return onClick ? (
-    <button type="button" onClick={onClick} aria-pressed={active} className={base + interactive + activeRing}>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={base + interactive + activeRing}
+    >
       {body}
     </button>
   ) : (
@@ -89,16 +100,14 @@ export function ChannelBadge({ channel }: { channel: string }) {
         backgroundColor: `color-mix(in oklab, ${meta.colorVar} 14%, transparent)`,
       }}
     >
-      <span
-        className="h-1.5 w-1.5 rounded-full"
-        style={{ backgroundColor: meta.colorVar }}
-      />
+      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: meta.colorVar }} />
       {meta.label}
     </span>
   );
 }
 
 const statusTone: Record<string, string> = {
+  waiting_approval: "bg-warning/15 text-warning",
   delivered: "bg-success/12 text-success",
   read: "bg-success/12 text-success",
   sent: "bg-secondary text-secondary-foreground",
