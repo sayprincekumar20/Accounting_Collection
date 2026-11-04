@@ -441,3 +441,36 @@ describe("Last contact: source of a text sent by /call", () => {
     expect(buildActivity(logs, [], [])("B Co___b@x.co").last_text_source).toBe("Weekly run");
   });
 });
+
+describe("GET /api/reminder-queue-list", () => {
+  it("shows queue rows of retired (INACTIVE) or missing clients as STALE", async () => {
+    tables["rJpqXxmxhqJnlLrJ"] = [
+      client("Live Co___l@x.co"),
+      client("Old Co___old@x.co", { status: "INACTIVE" }),
+    ];
+    tables["LixqhIFzsJKk3dll"] = [
+      {
+        client_id: "Live Co___l@x.co",
+        client_name: "Live Co",
+        queue_status: "WAITING_APPROVAL",
+        collection_amount: 100,
+      },
+      {
+        client_id: "Old Co___old@x.co",
+        client_name: "Old Co",
+        queue_status: "WAITING_APPROVAL",
+        collection_amount: 100,
+      },
+      {
+        client_id: "Gone Co___g@x.co",
+        client_name: "Gone Co",
+        queue_status: "SENT",
+        collection_amount: 100,
+      },
+    ];
+    const q = (await (await call("reminder-queue-list", "GET", "/api/reminder-queue-list")).json())
+      .queue as { client_name: string; queue_status: string }[];
+    const by = Object.fromEntries(q.map((r) => [r.client_name, r.queue_status]));
+    expect(by).toEqual({ "Live Co": "WAITING_APPROVAL", "Old Co": "STALE", "Gone Co": "STALE" });
+  });
+});

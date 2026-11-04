@@ -229,6 +229,7 @@ function Overview() {
   );
   type QueueLite = {
     client_name: string;
+    queue_status?: string;
     preferred_channel?: string;
     sent_date?: string;
     created_date?: string;
@@ -236,6 +237,7 @@ function Overview() {
   };
   const visibleQueue = (queue as QueueLite[]).filter(
     (q) =>
+      String(q.queue_status || "").toUpperCase() !== "STALE" &&
       (!channelFilter || String(q.preferred_channel || "").toLowerCase() === channelFilter) &&
       matchesLogFilters({ name: q.client_name, lastActivity: q.sent_date || q.created_date }, base),
   );

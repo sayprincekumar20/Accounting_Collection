@@ -95,7 +95,9 @@ function useQueue() {
 
 function QueuePage() {
   const { data, isLoading, isFetching, error, refetch } = useQueue();
-  const queue = data ?? [];
+  const all = data ?? [];
+  // Live queue = everything except STALE rows (retired clients / old cycles); Stale stays available via the filter.
+  const queue = all.filter((q) => q.queue_status.toUpperCase() !== "STALE");
   const sent = queue.filter((q) => q.queue_status.toUpperCase() === "SENT");
   const waiting = queue.filter((q) => q.queue_status.toUpperCase() === "WAITING_QUOTA");
   const skipped = queue.filter((q) => q.queue_status.toUpperCase().startsWith("SKIPPED"));
@@ -104,7 +106,7 @@ function QueuePage() {
   const [filters, setFilters, clearFilters] = useLogFilters();
   const statusIsMine = QUEUE_STATUSES.some((o) => o.value === filters.status);
   const wanted = statusIsMine && filters.status !== "all" ? filters.status.slice(2) : "";
-  const visible = queue.filter(
+  const visible = (wanted === "STALE" ? all : queue).filter(
     (q) =>
       (!wanted || q.queue_status.toUpperCase() === wanted) &&
       matchesLogFilters(

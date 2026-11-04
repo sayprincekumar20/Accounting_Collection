@@ -32,15 +32,29 @@ export const Route = createFileRoute("/api/reminder-queue-list")({
       GET: async ({ request }) => {
         try {
           const fresh = new URL(request.url).searchParams.get("fresh") === "1";
-          const result = await fetchDataTable<QueueRow>(REMINDER_QUEUE_TABLE_ID, { fresh });
+          const [result, clientsRes] = await Promise.all([
+            fetchDataTable<QueueRow>(REMINDER_QUEUE_TABLE_ID, { fresh }),
+            fetchDataTable<Record<string, unknown>>("rJpqXxmxhqJnlLrJ", { fresh }).catch(
+              () => null,
+            ),
+          ]);
           const rows = result.rows;
+          // A queue row whose client row is retired (INACTIVE after a contact change or regrouping under
+          // the CRM parent) or gone is never sent: show it as STALE so the counts match the Clients tab.
+          const activeIds = clientsRes
+            ? new Set(
+                clientsRes.rows
+                  .filter((c) => s(c["status"]).toUpperCase() !== "INACTIVE")
+                  .map((c) => s(c["client_id"])),
+              )
+            : null;
           const queue = rows.map((r) => ({
             queue_id: s(r.queue_id),
             client_id: s(r.client_id),
             client_name: s(r.client_name),
             contact_person: s(r.contact_person),
             preferred_channel: s(r.preferred_channel),
-            queue_status: s(r.queue_status),
+            queue_status: activeIds && !activeIds.has(s(r.client_id)) ? "STALE" : s(r.queue_status),
             fallback_channel: s(r.fallback_channel),
             fallback_status: s(r.fallback_status),
             collection_amount: Number(r.collection_amount || 0),
