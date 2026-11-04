@@ -82,7 +82,7 @@ describe("GET /api/contact-approvals", () => {
         company_key: "alpha corp",
         approved: true,
         approved_by: "Maria",
-        approved_at: "2026-11-01T00:00:00Z",
+        approved_at: new Date().toISOString(),
       },
     ];
     const r = await call("contact-approvals", "GET");
