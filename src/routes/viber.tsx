@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
+import { DeliveryBadge } from "@/components/collections/DeliveryBadge";
+import { isFailed } from "@/lib/delivery";
 import {
   ConversationStatus,
   SummaryCell,
@@ -39,6 +41,7 @@ interface SmsMessage {
   content: string;
   ts: string;
   status?: string;
+  error?: string;
   notified_ar?: boolean;
   promise_recorded?: boolean;
   author?: string;
@@ -53,6 +56,7 @@ interface SmsConversation {
   escalations?: { reason: string; recorded_at: string; channel: string; ref?: string }[];
   lastMessageAt: string;
   lastMessagePreview: string;
+  failed_count?: number;
 }
 interface ClientRow {
   client_id: string;
@@ -243,8 +247,16 @@ function SmsInbox() {
       source: q?.trigger_source,
     };
   };
-  const visible = conversations.filter((c) => matchesLogFilters(rowFor(c), filters));
-  const toggleStatus = (st: "replied" | "no_reply" | "promised") =>
+  const failedConvos = conversations.filter((c) => (c.failed_count ?? 0) > 0).length;
+  const visible =
+    filters.status === "failed"
+      ? conversations.filter(
+          (c) =>
+            (c.failed_count ?? 0) > 0 &&
+            matchesLogFilters(rowFor(c), { ...filters, status: "all" }),
+        )
+      : conversations.filter((c) => matchesLogFilters(rowFor(c), filters));
+  const toggleStatus = (st: "replied" | "no_reply" | "promised" | "failed") =>
     setFilters({ status: filters.status === st ? "all" : st });
 
   return (
@@ -253,8 +265,15 @@ function SmsInbox() {
       subtitle="Viber conversations · sender Rare Global Food · Telerivet (SMS is used only when Viber fails)"
       actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
     >
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total conversations" value={String(conversations.length)} tone="primary" />
+        <StatCard
+          label="Failed sends"
+          value={String(failedConvos)}
+          hint="Conversations with a message that was not delivered"
+          onClick={() => toggleStatus("failed")}
+          active={filters.status === "failed"}
+        />
         <StatCard
           label="Replied"
           value={String(replied)}
@@ -370,6 +389,11 @@ function SmsInbox() {
                           c.lastMessagePreview
                         }
                       />
+                      {(c.failed_count ?? 0) > 0 ? (
+                        <span className="mt-1 inline-block rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
+                          ✕ {c.failed_count} failed
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <PromiseCell promise={promise} />
@@ -534,7 +558,7 @@ function SmsInbox() {
                               {formatTs(m.ts)}
                             </div>
                             <div
-                              className={`max-w-[80%] rounded-xl border px-3.5 py-2.5 text-sm ${
+                              className={`max-w-[80%] rounded-xl border px-3.5 py-2.5 text-sm ${m.role === "ai" && isFailed(m.status) ? "ring-2 ring-destructive " : ""}${
                                 m.role === "ai" && m.author === "ar_team"
                                   ? "border-transparent bg-success text-white"
                                   : m.role === "ai"
@@ -565,10 +589,8 @@ function SmsInbox() {
                               ))}
                             </div>
                             <div className="flex flex-wrap gap-1.5">
-                              {m.status ? (
-                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                                  {m.status}
-                                </span>
+                              {m.role === "ai" ? (
+                                <DeliveryBadge status={m.status} error={m.error} />
                               ) : null}
                               {m.promise_recorded ? (
                                 <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">

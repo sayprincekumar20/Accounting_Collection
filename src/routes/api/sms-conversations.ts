@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { isFailed } from "@/lib/delivery";
 import { fetchRecentMessages } from "@/lib/telerivet-server";
 import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { getEnv } from "@/lib/env";
@@ -43,10 +44,19 @@ interface ConversationOut {
   client_name: string;
   notified_ar: boolean;
   promise_recorded: boolean;
-  messages: { role: "ai" | "client"; content: string; ts: string; author?: string }[];
+  messages: {
+    role: "ai" | "client";
+    content: string;
+    ts: string;
+    author?: string;
+    status?: string;
+    error?: string;
+  }[];
   escalations?: EscalationNote[];
   lastMessageAt: string;
   lastMessagePreview: string;
+  /** Outgoing messages that failed to deliver (Telerivet status failed / not_delivered). */
+  failed_count?: number;
 }
 
 function digits(v: string | null | undefined) {
@@ -164,6 +174,9 @@ export const Route = createFileRoute("/api/sms-conversations")({
                 role: m.direction === "outgoing" ? "ai" : "client",
                 content: m.content || "",
                 ts,
+                ...(m.direction === "outgoing"
+                  ? { status: String(m.status || ""), error: String(m.error_message || "") }
+                  : {}),
               });
               convo.lastMessageAt = ts;
               convo.lastMessagePreview = (m.content || "").slice(0, 140);
@@ -201,6 +214,8 @@ export const Route = createFileRoute("/api/sms-conversations")({
             }
           }
 
+          for (const c of byPhone.values())
+            c.failed_count = c.messages.filter((m) => m.role === "ai" && isFailed(m.status)).length;
           const conversations = Array.from(byPhone.values()).sort(
             (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime(),
           );

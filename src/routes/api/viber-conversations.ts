@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { isFailed } from "@/lib/delivery";
 import { fetchRecentMessages } from "@/lib/telerivet-server";
 import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import {
@@ -47,11 +48,15 @@ interface ConversationOut {
     content: string;
     ts: string;
     author?: string;
+    status?: string;
+    error?: string;
     media?: { url: string; type: string; filename: string }[];
   }[];
   escalations?: EscalationNote[];
   lastMessageAt: string;
   lastMessagePreview: string;
+  /** Outgoing messages that failed to deliver (Telerivet status failed / not_delivered). */
+  failed_count?: number;
 }
 
 function digits(v: string | null | undefined) {
@@ -172,6 +177,9 @@ export const Route = createFileRoute("/api/viber-conversations")({
                 role: m.direction === "outgoing" ? "ai" : "client",
                 content: m.content || "",
                 ts,
+                ...(m.direction === "outgoing"
+                  ? { status: String(m.status || ""), error: String(m.error_message || "") }
+                  : {}),
                 media: (m.media || [])
                   .filter((x) => x && x.url)
                   .map((x) => ({
@@ -221,6 +229,8 @@ export const Route = createFileRoute("/api/viber-conversations")({
             }
           }
 
+          for (const c of byPhone.values())
+            c.failed_count = c.messages.filter((m) => m.role === "ai" && isFailed(m.status)).length;
           const conversations = Array.from(byPhone.values()).sort(
             (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime(),
           );

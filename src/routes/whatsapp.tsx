@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
+import { DeliveryBadge } from "@/components/collections/DeliveryBadge";
+import { isFailed } from "@/lib/delivery";
 import {
   ConversationStatus,
   SummaryCell,
@@ -390,6 +392,12 @@ function WhatsAppInbox() {
                           c.lastMessagePreview
                         }
                       />
+                      {c.messages.some((m) => m.role === "ai" && isFailed(m.status)) ? (
+                        <span className="mt-1 inline-block rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
+                          ✕ {c.messages.filter((m) => m.role === "ai" && isFailed(m.status)).length}{" "}
+                          failed
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <PromiseCell promise={promise} />
@@ -559,6 +567,9 @@ function WhatsAppInbox() {
                             <div
                               className={`mt-1 flex gap-1.5 ${ours ? "justify-end" : "justify-start"}`}
                             >
+                              {ours && isFailed(m.status) ? (
+                                <DeliveryBadge status={m.status} />
+                              ) : null}
                               {m.promise_recorded ? (
                                 <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
                                   Promise to pay

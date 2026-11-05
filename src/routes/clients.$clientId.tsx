@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { DeliveryBadge } from "@/components/collections/DeliveryBadge";
+import { isFailed } from "@/lib/delivery";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { RefTag } from "@/components/collections/LogCells";
@@ -86,6 +88,7 @@ function digits(v: string | null | undefined) {
 }
 
 interface TimelineItem {
+  error?: string;
   channel: string;
   direction: "outbound" | "inbound";
   body: string;
@@ -157,6 +160,7 @@ function useClientDetail(clientId: string) {
               body: m.content,
               occurred_at: m.ts,
               status: m.status || "",
+              error: m.error || "",
             });
           }
         }
@@ -175,6 +179,7 @@ function useClientDetail(clientId: string) {
             body: m.content,
             occurred_at: m.ts,
             status: m.status || "",
+            error: m.error || "",
           });
         }
       }
@@ -331,7 +336,13 @@ function ClientDetail() {
                     >
                       <p className="whitespace-pre-wrap">{m.body}</p>
                     </div>
-                    {m.status ? <StatusPill status={m.status} /> : null}
+                    {m.status ? (
+                      isFailed(m.status) ? (
+                        <DeliveryBadge status={m.status} error={m.error} />
+                      ) : (
+                        <StatusPill status={m.status} />
+                      )
+                    ) : null}
                   </li>
                 );
               })}
