@@ -141,6 +141,15 @@ function ReportsPage() {
   const [filters, setFilters, clearFilters] = useLogFilters();
   const all = data ?? [];
   const runs = all.filter((r) => inRange(r.run_date, filters.range));
+  // AR report built by the weekly run (25, source WEEKLY_RUN) on the run's date: newest one that day.
+  const weeklyReportFor = (runDate: string) =>
+    (callReports ?? [])
+      .filter(
+        (rep) =>
+          String(rep.source || "").toUpperCase() === "WEEKLY_RUN" &&
+          String(rep.as_of || "").slice(0, 10) === String(runDate).slice(0, 10),
+      )
+      .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0];
   const [selected, setSelected] = useState<string | null>(null);
   const current = runs.find((r) => r.run_date === selected) || runs[0];
   const q = filters.q.trim().toLowerCase();
@@ -168,7 +177,7 @@ function ReportsPage() {
     >
       <div className="mb-5">
         <Panel
-          title="AR reports (from /call runs)"
+          title="AR reports (from /call and weekly runs)"
           description="Built after every /call run: AS OF date, TOTAL, overdue and current, every open invoice with aging, remarks, promise and escalation. Open in Google Sheets or download as Excel (sign in with your @rareglobalfood.com Google account)."
         >
           {(callReports ?? []).length === 0 ? (
@@ -422,6 +431,7 @@ function ReportsPage() {
                   <th className="px-3 py-2.5 text-right font-semibold">Replies</th>
                   <th className="px-3 py-2.5 text-right font-semibold">Promises</th>
                   <th className="px-3 py-2.5 text-right font-semibold">Escalated</th>
+                  <th className="px-3 py-2.5 font-semibold">Report</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -465,12 +475,41 @@ function ReportsPage() {
                     <td className="px-3 py-3 text-right">{r.results.client_replies}</td>
                     <td className="px-3 py-3 text-right">{r.results.promises}</td>
                     <td className="px-3 py-3 text-right">{r.results.escalations}</td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {(() => {
+                        const rep = weeklyReportFor(r.run_date);
+                        if (!rep) return <span className="text-muted-foreground">–</span>;
+                        return (
+                          <>
+                            <a
+                              href={rep.sheet_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="font-semibold text-primary hover:underline"
+                            >
+                              Open
+                            </a>
+                            <span className="mx-2 text-muted-foreground">·</span>
+                            <a
+                              href={rep.xlsx_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="font-semibold text-primary hover:underline"
+                            >
+                              Download (Excel)
+                            </a>
+                          </>
+                        );
+                      })()}
+                    </td>
                   </tr>
                 ))}
                 {!isLoading && runs.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={16}
+                      colSpan={17}
                       className="px-4 py-8 text-center text-sm text-muted-foreground"
                     >
                       No runs in this period.
