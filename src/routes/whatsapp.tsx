@@ -353,6 +353,9 @@ function WhatsAppInbox() {
                     </td>
                     <td className="px-4 py-3">
                       <ConversationStatus
+                        failedCount={
+                          c.messages.filter((m) => m.role === "ai" && isFailed(m.status)).length
+                        }
                         clientReplies={c.messages.filter((m) => m.role === "client").length}
                         lastFrom={
                           c.messages.length
@@ -392,12 +395,6 @@ function WhatsAppInbox() {
                           c.lastMessagePreview
                         }
                       />
-                      {c.messages.some((m) => m.role === "ai" && isFailed(m.status)) ? (
-                        <span className="mt-1 inline-block rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
-                          ✕ {c.messages.filter((m) => m.role === "ai" && isFailed(m.status)).length}{" "}
-                          failed
-                        </span>
-                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <PromiseCell promise={promise} />

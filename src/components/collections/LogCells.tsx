@@ -57,17 +57,20 @@ export function ConversationStatus({
   lastFrom,
   bounced = false,
   failed = false,
+  failedCount = 0,
 }: {
   clientReplies: number;
   lastFrom: LastFrom;
   bounced?: boolean | undefined;
   failed?: boolean | undefined;
+  /** Outgoing messages that were not delivered (SMS / Viber / WhatsApp); shown as 'Send failed (n)'. */
+  failedCount?: number | undefined;
 }) {
   let label: string;
   let tone: string;
-  if (failed) {
-    // Gmail refused to send it (no thread exists).
-    label = "Send failed";
+  if (failed || failedCount > 0) {
+    // Email: Gmail refused to send it. SMS / Viber / WhatsApp: the provider reported it as not delivered.
+    label = failedCount > 1 ? `Send failed (${failedCount})` : "Send failed";
     tone = "bg-destructive/12 text-destructive border-destructive/30";
   } else if (bounced && clientReplies === 0) {
     // The reminder never arrived: the address on file is wrong or blocked.

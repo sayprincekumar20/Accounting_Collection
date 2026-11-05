@@ -369,6 +369,7 @@ function SmsInbox() {
                     </td>
                     <td className="px-4 py-3">
                       <ConversationStatus
+                        failedCount={c.failed_count ?? 0}
                         clientReplies={c.messages.filter((m) => m.role === "client").length}
                         lastFrom={
                           c.messages.length
@@ -389,11 +390,6 @@ function SmsInbox() {
                           c.lastMessagePreview
                         }
                       />
-                      {(c.failed_count ?? 0) > 0 ? (
-                        <span className="mt-1 inline-block rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
-                          ✕ {c.failed_count} failed
-                        </span>
-                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <PromiseCell promise={promise} />
