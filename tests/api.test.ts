@@ -515,3 +515,22 @@ describe("POST /api/contact-now (Approve & contact now for 5+ branch accounts)",
     expect(String(body.text).split("\n")).toHaveLength(20);
   });
 });
+
+describe("authorship: SMS fallback after a failed Viber is an automated reminder", () => {
+  it("matches the fallback SMS wording", async () => {
+    const mod = await import("../src/lib/authorship");
+    const ctx = { sendLog: [], conversations: [], escalations: [] } as unknown as Parameters<
+      typeof mod.classifyOutbound
+    >[0];
+    const text =
+      "Hi Eliza, you have an overdue balance with Rare Global Food Trading Corp totaling PHP 83,820.00. Please settle or reply with your payment date. Thank you!";
+    expect(
+      mod.classifyOutbound(ctx, {
+        text,
+        at: new Date().toISOString(),
+        channel: "SMS",
+        clientIds: [],
+      } as never),
+    ).toBe("reminder");
+  });
+});

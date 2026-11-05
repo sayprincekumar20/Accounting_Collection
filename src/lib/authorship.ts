@@ -35,7 +35,7 @@ const norm = (t: string) => t.toLowerCase().replace(/\s+/g, " ").trim();
 // Wording of every reminder template (email, SMS, WhatsApp/Viber, old and new). Reminders are also
 // matched exactly by their message id in the send log (EMAIL / SMS SEND_SUCCESS).
 const REMINDER_TEXT =
-  /(^overdue balance reminder)|(friendly reminder that the following invoice)|(you have \d+ (overdue|current) invoices?)|(overdue (account|accounts) with rare global food)|(would like to follow up if we have available collection)|(your account statement from rare global food)|(please see the attached statement for details)/i;
+  /(^overdue balance reminder)|(friendly reminder that the following invoice)|(you have \d+ (overdue|current) invoices?)|(overdue (account|accounts) with rare global food)|(would like to follow up if we have available collection)|(your account statement from rare global food)|(please see the attached statement for details)|(you have an? (overdue|outstanding) balance with rare global food)/i;
 
 /** The automatic "Not reached by phone today (...)" alert: not an escalation needing AR action. */
 export const isNotReachedAlert = (reason: unknown) =>
