@@ -272,3 +272,14 @@ export function LogFilterBar({
     </div>
   );
 }
+
+/** Set the shared filters from outside a page (used by the AI assistant's navigate action). */
+export function setLogFilters(patch: Partial<LogFilterState>): void {
+  const next = { ...read(), ...patch };
+  try {
+    sessionStorage.setItem(KEY, JSON.stringify(next));
+  } catch {
+    // storage unavailable
+  }
+  window.dispatchEvent(new Event(EVT));
+}

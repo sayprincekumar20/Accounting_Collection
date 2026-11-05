@@ -1,3 +1,4 @@
+import { Assistant } from "@/components/assistant/Assistant";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import {
@@ -165,6 +166,7 @@ export function AppShell({
           </nav>
         </header>
         <main className="flex-1 px-5 py-6 md:px-8">{children}</main>
+        <Assistant />
       </div>
     </div>
   );

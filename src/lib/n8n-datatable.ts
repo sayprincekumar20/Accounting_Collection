@@ -170,3 +170,20 @@ export async function updateDataTableRows(
 export function clearDataTableCache(dataTableId: string): void {
   for (const key of [...cache.keys()]) if (key.includes(dataTableId)) cache.delete(key);
 }
+
+/** Insert rows into an n8n data table (used by the assistant's audit log). */
+export async function insertDataTableRows(dataTableId: string, rows: Record<string, unknown>[]): Promise<void> {
+  if (!rows.length) return;
+  const apiKey = await getEnv("N8N_API_KEY");
+  if (!apiKey) throw new Error("N8N_API_KEY is not configured");
+  const res = await fetch(`${N8N_BASE}/api/v1/data-tables/${dataTableId}/rows`, {
+    method: "POST",
+    headers: { "X-N8N-API-KEY": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ data: rows, returnType: "count" }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`n8n data table insert failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  for (const key of [...cache.keys()]) if (key.includes(dataTableId)) cache.delete(key);
+}

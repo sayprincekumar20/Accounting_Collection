@@ -50,6 +50,7 @@ import { Route as ClientsIndexRouteImport } from './routes/clients.index'
 import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
 import { Route as VerificationIndexRouteImport } from './routes/verification.index'
 import { Route as VerificationReviewIdRouteImport } from './routes/verification.$reviewId'
+import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant.chat'
 import { Route as ApiDvReviewsReviewIdRouteImport } from './routes/api/dv-reviews.$reviewId'
 import { Route as ApiDvReviewsReviewIdActionRouteImport } from './routes/api/dv-reviews.$reviewId.$action'
 import { Route as ApiDvReviewsReviewIdPagesNRouteImport } from './routes/api/dv-reviews.$reviewId.pages.$n'
@@ -261,6 +262,11 @@ const VerificationReviewIdRoute = VerificationReviewIdRouteImport.update({
   path: '/verification/$reviewId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
+  id: '/api/assistant/chat',
+  path: '/api/assistant/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDvReviewsReviewIdRoute = ApiDvReviewsReviewIdRouteImport.update({
   id: '/$reviewId',
   path: '/$reviewId',
@@ -327,6 +333,7 @@ export interface FileRoutesByFullPath {
   '/verification/$reviewId': typeof VerificationReviewIdRoute
   '/clients/': typeof ClientsIndexRoute
   '/verification/': typeof VerificationIndexRoute
+  '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
@@ -374,6 +381,7 @@ export interface FileRoutesByTo {
   '/verification/$reviewId': typeof VerificationReviewIdRoute
   '/clients': typeof ClientsIndexRoute
   '/verification': typeof VerificationIndexRoute
+  '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
@@ -422,6 +430,7 @@ export interface FileRoutesById {
   '/verification/$reviewId': typeof VerificationReviewIdRoute
   '/clients/': typeof ClientsIndexRoute
   '/verification/': typeof VerificationIndexRoute
+  '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
@@ -471,6 +480,7 @@ export interface FileRouteTypes {
     | '/verification/$reviewId'
     | '/clients/'
     | '/verification/'
+    | '/api/assistant/chat'
     | '/api/dv-reviews/$reviewId'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/dv-reviews/$reviewId/pages/$n'
@@ -518,6 +528,7 @@ export interface FileRouteTypes {
     | '/verification/$reviewId'
     | '/clients'
     | '/verification'
+    | '/api/assistant/chat'
     | '/api/dv-reviews/$reviewId'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/dv-reviews/$reviewId/pages/$n'
@@ -565,6 +576,7 @@ export interface FileRouteTypes {
     | '/verification/$reviewId'
     | '/clients/'
     | '/verification/'
+    | '/api/assistant/chat'
     | '/api/dv-reviews/$reviewId'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/dv-reviews/$reviewId/pages/$n'
@@ -613,6 +625,7 @@ export interface RootRouteChildren {
   VerificationReviewIdRoute: typeof VerificationReviewIdRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
   VerificationIndexRoute: typeof VerificationIndexRoute
+  ApiAssistantChatRoute: typeof ApiAssistantChatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -904,6 +917,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerificationReviewIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/assistant/chat': {
+      id: '/api/assistant/chat'
+      path: '/api/assistant/chat'
+      fullPath: '/api/assistant/chat'
+      preLoaderRoute: typeof ApiAssistantChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dv-reviews/$reviewId': {
       id: '/api/dv-reviews/$reviewId'
       path: '/$reviewId'
@@ -1004,6 +1024,7 @@ const rootRouteChildren: RootRouteChildren = {
   VerificationReviewIdRoute: VerificationReviewIdRoute,
   ClientsIndexRoute: ClientsIndexRoute,
   VerificationIndexRoute: VerificationIndexRoute,
+  ApiAssistantChatRoute: ApiAssistantChatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
