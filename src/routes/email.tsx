@@ -19,6 +19,7 @@ import {
   useLogFilters,
   type FilterableRow,
 } from "@/components/collections/LogFilters";
+import { ReplyComposer } from "@/components/collections/ReplyComposer";
 
 export const Route = createFileRoute("/email")({
   head: () => ({
@@ -284,7 +285,11 @@ function EmailInbox() {
   );
 
   const activeItem = threads.find((t) => t.thread_id === active) ?? null;
-  const { data: detail, isLoading: detailLoading } = useThreadDetail(activeItem?.thread_id ?? null);
+  const {
+    data: detail,
+    isLoading: detailLoading,
+    refetch: refetchThread,
+  } = useThreadDetail(activeItem?.thread_id ?? null);
   const messages = detail?.messages ?? [];
   // One timeline: thread messages plus the AI agents' "notified AR team" events, by time.
   const timeline: (
@@ -693,6 +698,21 @@ function EmailInbox() {
                 <li className="px-5 py-6 text-sm text-muted-foreground">Nothing to show.</li>
               ) : null}
             </ol>
+
+            <div className="px-5 pb-5 pt-3">
+              <ReplyComposer
+                channel="email"
+                clientName={activeClient?.client_name ?? activeClient?.parent_name ?? activeItem.client_name ?? "Client"}
+                email={activeClient?.email ?? activeItem.client_id ?? undefined}
+                subject={detail?.subject ?? "(no subject)"}
+                threadId={activeItem.thread_id ?? undefined}
+                onSent={() => {
+                  refetch();
+                  refetchSidebar();
+                  refetchThread();
+                }}
+              />
+            </div>
           </aside>
         </>
       ) : null}

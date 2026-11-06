@@ -20,6 +20,7 @@ import {
   useLogFilters,
   type FilterableRow,
 } from "@/components/collections/LogFilters";
+import { ReplyComposer } from "@/components/collections/ReplyComposer";
 
 export const Route = createFileRoute("/sms")({
   head: () => ({
@@ -579,6 +580,15 @@ function SmsInbox() {
                     )}
                 </ol>
               )}
+            </div>
+
+            <div className="px-5 pb-5">
+              <ReplyComposer
+                channel="sms"
+                clientName={activeClient?.client_name || activeClient?.parent_name || activeItem.client_name}
+                phone={activeItem.client_id}
+                onSent={() => refetch()}
+              />
             </div>
           </aside>
         </>

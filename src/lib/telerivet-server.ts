@@ -41,6 +41,40 @@ export interface TelerivetMessage {
  * Paginates up to `maxPages` to bound the request — this is a "recent
  * activity" view, not a full historical export.
  */
+export async function sendTelerivetMessage(opts: {
+  toNumber: string;
+  content: string;
+  phoneId: string;
+  projectId?: string;
+}): Promise<{ id?: string; status?: string }> {
+  const projectId = opts.projectId || (await getEnv("TELERIVET_PROJECT_ID")) || "";
+  if (!projectId) throw new Error("TELERIVET_PROJECT_ID is not configured");
+  if (!opts.phoneId) throw new Error("TELERIVET phone ID is required to send a message");
+
+  const params = new URLSearchParams({
+    to_number: opts.toNumber,
+    content: opts.content,
+    phone_id: opts.phoneId,
+  });
+
+  const res = await fetch(`${TELERIVET_API}/projects/${projectId}/messages/send`, {
+    method: "POST",
+    headers: {
+      ...(await authHeader()),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Telerivet send failed (${res.status}): ${body}`);
+  }
+
+  const data = (await res.json()) as { id?: string; status?: string };
+  return data;
+}
+
 export async function fetchRecentMessages(opts: {
   phoneId?: string;
   /** Telerivet project to read (default: TELERIVET_PROJECT_ID). Viber lives in the Main Sales project. */

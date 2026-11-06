@@ -33,6 +33,41 @@ export interface TwilioMessage {
  * next_page_uri. Bounded to maxPages so this stays a "recent activity"
  * view, not a full historical export.
  */
+export async function sendTwilioWhatsAppMessage(opts: {
+  to: string;
+  body: string;
+  from?: string;
+}): Promise<{ sid?: string; status?: string }> {
+  const sid = (await getEnv("TWILIO_ACCOUNT_SID")) || "";
+  if (!sid) throw new Error("TWILIO_ACCOUNT_SID is not configured");
+
+  const from = opts.from || (await getEnv("TWILIO_WHATSAPP_NUMBER")) || "";
+  if (!from) throw new Error("TWILIO_WHATSAPP_NUMBER is not configured");
+
+  const params = new URLSearchParams({
+    From: from,
+    To: opts.to.startsWith("whatsapp:") ? opts.to : `whatsapp:${opts.to}`,
+    Body: opts.body,
+  });
+
+  const res = await fetch(`${TWILIO_API}/Accounts/${sid}/Messages.json`, {
+    method: "POST",
+    headers: {
+      ...(await authHeader()),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Twilio send failed (${res.status}): ${body.slice(0, 300)}`);
+  }
+
+  const data = (await res.json()) as { sid?: string; status?: string };
+  return data;
+}
+
 export async function fetchRecentWhatsAppMessages(opts: {
   pageSize?: number;
   maxPages?: number;

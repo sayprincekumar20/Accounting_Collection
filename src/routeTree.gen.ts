@@ -34,17 +34,21 @@ import { Route as ApiDailyRunLogsRouteImport } from './routes/api/daily-run-logs
 import { Route as ApiDvReviewsRouteImport } from './routes/api/dv-reviews'
 import { Route as ApiEscalationsRouteImport } from './routes/api/escalations'
 import { Route as ApiGmailAttachmentRouteImport } from './routes/api/gmail-attachment'
+import { Route as ApiGmailSendRouteImport } from './routes/api/gmail-send'
 import { Route as ApiGmailThreadDetailRouteImport } from './routes/api/gmail-thread-detail'
 import { Route as ApiGmailThreadsListRouteImport } from './routes/api/gmail-threads-list'
 import { Route as ApiPromiseHistoryRouteImport } from './routes/api/promise-history'
 import { Route as ApiPromisesBoardRouteImport } from './routes/api/promises-board'
 import { Route as ApiReminderQueueListRouteImport } from './routes/api/reminder-queue-list'
 import { Route as ApiSmsConversationsRouteImport } from './routes/api/sms-conversations'
+import { Route as ApiSmsSendRouteImport } from './routes/api/sms-send'
 import { Route as ApiVapiCallAudioRouteImport } from './routes/api/vapi-call-audio'
 import { Route as ApiVapiCallDetailRouteImport } from './routes/api/vapi-call-detail'
 import { Route as ApiVapiCallsListRouteImport } from './routes/api/vapi-calls-list'
 import { Route as ApiViberConversationsRouteImport } from './routes/api/viber-conversations'
+import { Route as ApiViberSendRouteImport } from './routes/api/viber-send'
 import { Route as ApiWhatsappConversationsRouteImport } from './routes/api/whatsapp-conversations'
+import { Route as ApiWhatsappSendRouteImport } from './routes/api/whatsapp-send'
 import { Route as ApiWorklistRouteImport } from './routes/api/worklist'
 import { Route as ClientsIndexRouteImport } from './routes/clients.index'
 import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
@@ -181,6 +185,11 @@ const ApiGmailAttachmentRoute = ApiGmailAttachmentRouteImport.update({
   path: '/api/gmail-attachment',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGmailSendRoute = ApiGmailSendRouteImport.update({
+  id: '/api/gmail-send',
+  path: '/api/gmail-send',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGmailThreadDetailRoute = ApiGmailThreadDetailRouteImport.update({
   id: '/api/gmail-thread-detail',
   path: '/api/gmail-thread-detail',
@@ -211,6 +220,11 @@ const ApiSmsConversationsRoute = ApiSmsConversationsRouteImport.update({
   path: '/api/sms-conversations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSmsSendRoute = ApiSmsSendRouteImport.update({
+  id: '/api/sms-send',
+  path: '/api/sms-send',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiVapiCallAudioRoute = ApiVapiCallAudioRouteImport.update({
   id: '/api/vapi-call-audio',
   path: '/api/vapi-call-audio',
@@ -231,12 +245,22 @@ const ApiViberConversationsRoute = ApiViberConversationsRouteImport.update({
   path: '/api/viber-conversations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiViberSendRoute = ApiViberSendRouteImport.update({
+  id: '/api/viber-send',
+  path: '/api/viber-send',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWhatsappConversationsRoute =
   ApiWhatsappConversationsRouteImport.update({
     id: '/api/whatsapp-conversations',
     path: '/api/whatsapp-conversations',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiWhatsappSendRoute = ApiWhatsappSendRouteImport.update({
+  id: '/api/whatsapp-send',
+  path: '/api/whatsapp-send',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWorklistRoute = ApiWorklistRouteImport.update({
   id: '/api/worklist',
   path: '/api/worklist',
@@ -317,17 +341,21 @@ export interface FileRoutesByFullPath {
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
+  '/api/gmail-send': typeof ApiGmailSendRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
   '/api/sms-conversations': typeof ApiSmsConversationsRoute
+  '/api/sms-send': typeof ApiSmsSendRoute
   '/api/vapi-call-audio': typeof ApiVapiCallAudioRoute
   '/api/vapi-call-detail': typeof ApiVapiCallDetailRoute
   '/api/vapi-calls-list': typeof ApiVapiCallsListRoute
   '/api/viber-conversations': typeof ApiViberConversationsRoute
+  '/api/viber-send': typeof ApiViberSendRoute
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
+  '/api/whatsapp-send': typeof ApiWhatsappSendRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
@@ -365,17 +393,21 @@ export interface FileRoutesByTo {
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
+  '/api/gmail-send': typeof ApiGmailSendRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
   '/api/sms-conversations': typeof ApiSmsConversationsRoute
+  '/api/sms-send': typeof ApiSmsSendRoute
   '/api/vapi-call-audio': typeof ApiVapiCallAudioRoute
   '/api/vapi-call-detail': typeof ApiVapiCallDetailRoute
   '/api/vapi-calls-list': typeof ApiVapiCallsListRoute
   '/api/viber-conversations': typeof ApiViberConversationsRoute
+  '/api/viber-send': typeof ApiViberSendRoute
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
+  '/api/whatsapp-send': typeof ApiWhatsappSendRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
@@ -414,17 +446,21 @@ export interface FileRoutesById {
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
+  '/api/gmail-send': typeof ApiGmailSendRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
   '/api/sms-conversations': typeof ApiSmsConversationsRoute
+  '/api/sms-send': typeof ApiSmsSendRoute
   '/api/vapi-call-audio': typeof ApiVapiCallAudioRoute
   '/api/vapi-call-detail': typeof ApiVapiCallDetailRoute
   '/api/vapi-calls-list': typeof ApiVapiCallsListRoute
   '/api/viber-conversations': typeof ApiViberConversationsRoute
+  '/api/viber-send': typeof ApiViberSendRoute
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
+  '/api/whatsapp-send': typeof ApiWhatsappSendRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
@@ -464,17 +500,21 @@ export interface FileRouteTypes {
     | '/api/dv-reviews'
     | '/api/escalations'
     | '/api/gmail-attachment'
+    | '/api/gmail-send'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
     | '/api/promise-history'
     | '/api/promises-board'
     | '/api/reminder-queue-list'
     | '/api/sms-conversations'
+    | '/api/sms-send'
     | '/api/vapi-call-audio'
     | '/api/vapi-call-detail'
     | '/api/vapi-calls-list'
     | '/api/viber-conversations'
+    | '/api/viber-send'
     | '/api/whatsapp-conversations'
+    | '/api/whatsapp-send'
     | '/api/worklist'
     | '/clients/$clientId'
     | '/verification/$reviewId'
@@ -512,17 +552,21 @@ export interface FileRouteTypes {
     | '/api/dv-reviews'
     | '/api/escalations'
     | '/api/gmail-attachment'
+    | '/api/gmail-send'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
     | '/api/promise-history'
     | '/api/promises-board'
     | '/api/reminder-queue-list'
     | '/api/sms-conversations'
+    | '/api/sms-send'
     | '/api/vapi-call-audio'
     | '/api/vapi-call-detail'
     | '/api/vapi-calls-list'
     | '/api/viber-conversations'
+    | '/api/viber-send'
     | '/api/whatsapp-conversations'
+    | '/api/whatsapp-send'
     | '/api/worklist'
     | '/clients/$clientId'
     | '/verification/$reviewId'
@@ -560,17 +604,21 @@ export interface FileRouteTypes {
     | '/api/dv-reviews'
     | '/api/escalations'
     | '/api/gmail-attachment'
+    | '/api/gmail-send'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
     | '/api/promise-history'
     | '/api/promises-board'
     | '/api/reminder-queue-list'
     | '/api/sms-conversations'
+    | '/api/sms-send'
     | '/api/vapi-call-audio'
     | '/api/vapi-call-detail'
     | '/api/vapi-calls-list'
     | '/api/viber-conversations'
+    | '/api/viber-send'
     | '/api/whatsapp-conversations'
+    | '/api/whatsapp-send'
     | '/api/worklist'
     | '/clients/$clientId'
     | '/verification/$reviewId'
@@ -609,17 +657,21 @@ export interface RootRouteChildren {
   ApiDvReviewsRoute: typeof ApiDvReviewsRouteWithChildren
   ApiEscalationsRoute: typeof ApiEscalationsRoute
   ApiGmailAttachmentRoute: typeof ApiGmailAttachmentRoute
+  ApiGmailSendRoute: typeof ApiGmailSendRoute
   ApiGmailThreadDetailRoute: typeof ApiGmailThreadDetailRoute
   ApiGmailThreadsListRoute: typeof ApiGmailThreadsListRoute
   ApiPromiseHistoryRoute: typeof ApiPromiseHistoryRoute
   ApiPromisesBoardRoute: typeof ApiPromisesBoardRoute
   ApiReminderQueueListRoute: typeof ApiReminderQueueListRoute
   ApiSmsConversationsRoute: typeof ApiSmsConversationsRoute
+  ApiSmsSendRoute: typeof ApiSmsSendRoute
   ApiVapiCallAudioRoute: typeof ApiVapiCallAudioRoute
   ApiVapiCallDetailRoute: typeof ApiVapiCallDetailRoute
   ApiVapiCallsListRoute: typeof ApiVapiCallsListRoute
   ApiViberConversationsRoute: typeof ApiViberConversationsRoute
+  ApiViberSendRoute: typeof ApiViberSendRoute
   ApiWhatsappConversationsRoute: typeof ApiWhatsappConversationsRoute
+  ApiWhatsappSendRoute: typeof ApiWhatsappSendRoute
   ApiWorklistRoute: typeof ApiWorklistRoute
   ClientsClientIdRoute: typeof ClientsClientIdRoute
   VerificationReviewIdRoute: typeof VerificationReviewIdRoute
@@ -805,6 +857,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGmailAttachmentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/gmail-send': {
+      id: '/api/gmail-send'
+      path: '/api/gmail-send'
+      fullPath: '/api/gmail-send'
+      preLoaderRoute: typeof ApiGmailSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/gmail-thread-detail': {
       id: '/api/gmail-thread-detail'
       path: '/api/gmail-thread-detail'
@@ -847,6 +906,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSmsConversationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/sms-send': {
+      id: '/api/sms-send'
+      path: '/api/sms-send'
+      fullPath: '/api/sms-send'
+      preLoaderRoute: typeof ApiSmsSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/vapi-call-audio': {
       id: '/api/vapi-call-audio'
       path: '/api/vapi-call-audio'
@@ -875,11 +941,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiViberConversationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/viber-send': {
+      id: '/api/viber-send'
+      path: '/api/viber-send'
+      fullPath: '/api/viber-send'
+      preLoaderRoute: typeof ApiViberSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/whatsapp-conversations': {
       id: '/api/whatsapp-conversations'
       path: '/api/whatsapp-conversations'
       fullPath: '/api/whatsapp-conversations'
       preLoaderRoute: typeof ApiWhatsappConversationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/whatsapp-send': {
+      id: '/api/whatsapp-send'
+      path: '/api/whatsapp-send'
+      fullPath: '/api/whatsapp-send'
+      preLoaderRoute: typeof ApiWhatsappSendRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/worklist': {
@@ -1008,17 +1088,21 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDvReviewsRoute: ApiDvReviewsRouteWithChildren,
   ApiEscalationsRoute: ApiEscalationsRoute,
   ApiGmailAttachmentRoute: ApiGmailAttachmentRoute,
+  ApiGmailSendRoute: ApiGmailSendRoute,
   ApiGmailThreadDetailRoute: ApiGmailThreadDetailRoute,
   ApiGmailThreadsListRoute: ApiGmailThreadsListRoute,
   ApiPromiseHistoryRoute: ApiPromiseHistoryRoute,
   ApiPromisesBoardRoute: ApiPromisesBoardRoute,
   ApiReminderQueueListRoute: ApiReminderQueueListRoute,
   ApiSmsConversationsRoute: ApiSmsConversationsRoute,
+  ApiSmsSendRoute: ApiSmsSendRoute,
   ApiVapiCallAudioRoute: ApiVapiCallAudioRoute,
   ApiVapiCallDetailRoute: ApiVapiCallDetailRoute,
   ApiVapiCallsListRoute: ApiVapiCallsListRoute,
   ApiViberConversationsRoute: ApiViberConversationsRoute,
+  ApiViberSendRoute: ApiViberSendRoute,
   ApiWhatsappConversationsRoute: ApiWhatsappConversationsRoute,
+  ApiWhatsappSendRoute: ApiWhatsappSendRoute,
   ApiWorklistRoute: ApiWorklistRoute,
   ClientsClientIdRoute: ClientsClientIdRoute,
   VerificationReviewIdRoute: VerificationReviewIdRoute,

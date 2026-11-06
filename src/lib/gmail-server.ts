@@ -72,6 +72,62 @@ export async function gmailFetch<T = any>(
   return res.json() as Promise<T>;
 }
 
+export async function sendGmailReply({
+  to,
+  subject,
+  body,
+  threadId,
+}: {
+  to: string;
+  subject: string;
+  body: string;
+  threadId?: string;
+}): Promise<{ id: string; threadId?: string }> {
+  const accessToken = await getAccessToken();
+  const from = (await getGmailBusinessEmail()).trim();
+  if (!from) throw new Error("GMAIL_BUSINESS_EMAIL is not configured");
+
+  const message = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: ${subject || "(no subject)"}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    ...(threadId ? [`Thread-Id: ${threadId}`] : []),
+    "",
+    body,
+  ].join("\r\n");
+
+  const encoded = Buffer.from(message, "utf-8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  const res = await fetch(`${GMAIL_API}/users/me/messages/send`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      raw: encoded,
+      ...(threadId ? { threadId } : {}),
+    }),
+  });
+
+  if (!res.ok) {
+    const bodyText = await res.text();
+    throw new Error(`Gmail send failed (${res.status}): ${bodyText}`);
+  }
+
+  const json = (await res.json()) as { id?: string; threadId?: string };
+  const resolvedThreadId = json.threadId || threadId;
+  return {
+    id: json.id || "",
+    ...(resolvedThreadId ? { threadId: resolvedThreadId } : {}),
+  };
+}
+
 export function getHeader(
   headers: { name: string; value: string }[] | undefined,
   name: string,

@@ -21,6 +21,7 @@ import {
   useLogFilters,
   type FilterableRow,
 } from "@/components/collections/LogFilters";
+import { ReplyComposer } from "@/components/collections/ReplyComposer";
 
 export const Route = createFileRoute("/whatsapp")({
   head: () => ({
@@ -613,6 +614,15 @@ function WhatsAppInbox() {
                   <ReadTicks status="read" /> Seen
                 </span>
               </p>
+            </div>
+
+            <div className="px-5 pb-5">
+              <ReplyComposer
+                channel="whatsapp"
+                clientName={activeClient?.client_name || activeClient?.parent_name || activeItem.client_name}
+                phone={activeItem.client_id}
+                onSent={() => refetch()}
+              />
             </div>
           </aside>
         </>
