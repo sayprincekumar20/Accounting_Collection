@@ -141,15 +141,22 @@ function ReportsPage() {
   const [filters, setFilters, clearFilters] = useLogFilters();
   const all = data ?? [];
   const runs = all.filter((r) => inRange(r.run_date, filters.range));
-  // AR report built by the weekly run (25, source WEEKLY_RUN) on the run's date: newest one that day.
-  const weeklyReportFor = (runDate: string) =>
-    (callReports ?? [])
-      .filter(
-        (rep) =>
-          String(rep.source || "").toUpperCase() === "WEEKLY_RUN" &&
-          String(rep.as_of || "").slice(0, 10) === String(runDate).slice(0, 10),
-      )
-      .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0];
+  // Weekly AR report (25, source WEEKLY_RUN) of a run: the first one built on or after that run's date and
+  // before the next run (reports store 'as of' as "November 06, 2026", so match on the creation time).
+  const manilaDay = (iso: string) =>
+    iso ? new Date(new Date(iso).getTime() + 8 * 3600000).toISOString().slice(0, 10) : "";
+  const runDates = [...new Set(all.map((r) => String(r.run_date).slice(0, 10)))].sort();
+  const weeklyReports = (callReports ?? [])
+    .filter((rep) => String(rep.source || "").toUpperCase() === "WEEKLY_RUN")
+    .sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
+  const weeklyReportFor = (runDate: string) => {
+    const d = String(runDate).slice(0, 10);
+    const next = runDates.find((x) => x > d);
+    return weeklyReports.find((rep) => {
+      const c = manilaDay(String(rep.created_at || ""));
+      return c >= d && (!next || c < next);
+    });
+  };
   const [selected, setSelected] = useState<string | null>(null);
   const current = runs.find((r) => r.run_date === selected) || runs[0];
   const q = filters.q.trim().toLowerCase();
