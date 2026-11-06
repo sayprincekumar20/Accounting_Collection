@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 import { downloadCsv } from "@/lib/csv";
+import { ownerName } from "@/lib/owner";
 
 export const Route = createFileRoute("/approvals")({
   head: () => ({ meta: [{ title: "Contact Approvals | Rare Global Food Collections" }] }),
@@ -328,8 +329,7 @@ function ApprovalsPage() {
                 "Current",
                 "Total",
                 "Invoices",
-                "Sales person",
-                "AR owner",
+                "Account owner",
                 "Approved",
                 "Approved by",
                 "Approved at",
@@ -345,8 +345,7 @@ function ApprovalsPage() {
                 i.current,
                 i.total,
                 i.invoices.map((v) => v.number).join(" "),
-                i.sales_person,
-                i.ar_owner,
+                ownerName(i.ar_owner),
                 i.approved ? "Yes" : "No",
                 i.approved_by,
                 i.approved_at,
@@ -412,8 +411,7 @@ function ApprovalsPage() {
                           {[
                             i.parent_name !== i.client_name ? i.parent_name : "",
                             i.segment,
-                            i.sales_person && `Sales: ${i.sales_person}`,
-                            i.ar_owner && `AR: ${i.ar_owner}`,
+                            i.ar_owner && `Account Owner: ${ownerName(i.ar_owner)}`,
                           ]
                             .filter(Boolean)
                             .join(" · ")}
@@ -624,10 +622,7 @@ function ApprovalsPage() {
                     <td className="px-3 py-3">
                       <p className="font-semibold">{i.client_name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {[
-                          i.sales_person && `Sales: ${i.sales_person}`,
-                          i.ar_owner && `AR: ${i.ar_owner}`,
-                        ]
+                        {[i.ar_owner && `Account Owner: ${ownerName(i.ar_owner)}`]
                           .filter(Boolean)
                           .join(" · ")}
                       </p>

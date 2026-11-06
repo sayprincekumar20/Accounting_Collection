@@ -23,3 +23,12 @@ describe("deliveryState (all channels)", () => {
     expect(isFailed("delivered")).toBe(false);
   });
 });
+
+describe("ownerName (CRM Account Owner display)", async () => {
+  const { ownerName } = await import("../src/lib/owner");
+  it("shows the full name in normal capitalisation", () => {
+    expect(ownerName("VANESSA LHEE CORTEJOS")).toBe("Vanessa Lhee Cortejos");
+    expect(ownerName("DAN WILSON JARDIN")).toBe("Dan Wilson Jardin");
+    expect(ownerName("")).toBe("");
+  });
+});

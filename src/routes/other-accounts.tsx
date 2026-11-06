@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 import { downloadCsv } from "@/lib/csv";
+import { ownerName } from "@/lib/owner";
 
 export const Route = createFileRoute("/other-accounts")({
   head: () => ({ meta: [{ title: "Other Accounts | Rare Global Food Collections" }] }),
@@ -88,7 +89,6 @@ function OtherAccountsPage() {
                 "Client",
                 "Parent",
                 "Account owner",
-                "Sales person",
                 "Contact",
                 "Phone",
                 "Email",
@@ -100,8 +100,7 @@ function OtherAccountsPage() {
               visible.map((i) => [
                 i.client_name,
                 i.parent_name,
-                i.ar_owner,
-                i.sales_person,
+                ownerName(i.ar_owner),
                 i.contact_person,
                 i.phone,
                 i.email,
@@ -143,11 +142,8 @@ function OtherAccountsPage() {
                   <tr key={i.client_id}>
                     <td className="px-3 py-3">
                       <p className="font-semibold">{i.client_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {i.sales_person ? `Sales: ${i.sales_person}` : ""}
-                      </p>
                     </td>
-                    <td className="px-3 py-3">{i.ar_owner || "–"}</td>
+                    <td className="px-3 py-3">{ownerName(i.ar_owner) || "–"}</td>
                     <td className="px-3 py-3 text-xs">
                       <p className="font-semibold">{i.contact_person || "No contact person"}</p>
                       <p>{i.phone || "No phone"}</p>
