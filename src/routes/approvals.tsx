@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 import { downloadCsv } from "@/lib/csv";
 import { ownerName } from "@/lib/owner";
+import { InvoiceTable, InvoiceToggle } from "@/components/collections/InvoiceTable";
 
 export const Route = createFileRoute("/approvals")({
   head: () => ({ meta: [{ title: "Contact Approvals | Rare Global Food Collections" }] }),
@@ -139,6 +140,7 @@ function ApprovalsPage() {
 
   // 5+ branch accounts: approve (5+ branches allowed) and start the contact right away (same as /call).
   const [selectedMulti, setSelectedMulti] = useState<Set<string>>(new Set());
+  const [openMulti, setOpenMulti] = useState<string | null>(null);
   async function approveAndContact(list: Item[]) {
     setMsg("");
     if (!list.length) return;
@@ -513,42 +515,7 @@ function ApprovalsPage() {
                       <tr>
                         <td />
                         <td colSpan={6} className="px-3 pb-4">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="text-left text-muted-foreground">
-                                <th className="py-1 pr-3">Invoice</th>
-                                <th className="py-1 pr-3">Branch</th>
-                                <th className="py-1 pr-3">Date</th>
-                                <th className="py-1 pr-3">Due date</th>
-                                <th className="py-1 pr-3 text-right">Amount</th>
-                                <th className="py-1 pr-3 text-right">Balance</th>
-                                <th className="py-1 pr-3">Status</th>
-                                <th className="py-1">PO</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {i.invoices.map((v, k) => (
-                                <tr key={k} className="border-t border-border">
-                                  <td className="py-1 pr-3 font-semibold">{v.number}</td>
-                                  <td className="py-1 pr-3">{v.branch}</td>
-                                  <td className="py-1 pr-3">{day(v.date)}</td>
-                                  <td className="py-1 pr-3">{day(v.due)}</td>
-                                  <td className="py-1 pr-3 text-right tabular-nums">
-                                    {peso(v.amount)}
-                                  </td>
-                                  <td className="py-1 pr-3 text-right tabular-nums">
-                                    {peso(v.balance)}
-                                  </td>
-                                  <td
-                                    className={`py-1 pr-3 font-semibold ${v.status === "OVERDUE" ? "text-destructive" : ""}`}
-                                  >
-                                    {v.status || "–"}
-                                  </td>
-                                  <td className="py-1">{v.po || "–"}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                          <InvoiceTable invoices={i.invoices} />
                         </td>
                       </tr>
                     ) : null}
@@ -603,63 +570,85 @@ function ApprovalsPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {multibranch.map((i) => (
-                  <tr key={i.client_id}>
-                    <td className="px-3 py-3 align-top">
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${i.client_name}`}
-                        checked={selectedMulti.has(i.client_id)}
-                        onChange={() =>
-                          setSelectedMulti((prev) => {
-                            const n = new Set(prev);
-                            if (n.has(i.client_id)) n.delete(i.client_id);
-                            else n.add(i.client_id);
-                            return n;
-                          })
-                        }
-                      />
-                    </td>
-                    <td className="px-3 py-3">
-                      <p className="font-semibold">{i.client_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {[i.ar_owner && `Account Owner: ${ownerName(i.ar_owner)}`]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </p>
-                    </td>
-                    <td className="px-3 py-3 text-xs">
-                      <p className="font-semibold">{i.contact_person || "No contact person"}</p>
-                      <p>{i.phone || "No phone"}</p>
-                      <p className="truncate">{i.email || "No email"}</p>
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">{i.branch_count}</td>
-                    <td className="px-3 py-3 text-right font-semibold tabular-nums text-destructive">
-                      {i.overdue ? peso(i.overdue) : "–"}
-                    </td>
-                    <td className="px-3 py-3 text-right font-semibold tabular-nums">
-                      {peso(i.total)}
-                    </td>
-                    <td className="px-3 py-3">
-                      {i.approved && i.allow_multibranch ? (
-                        <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
-                          Approved for contact
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-semibold">
-                          Not called: AR handles manually
-                        </span>
-                      )}
-                      <CycleStatus i={i} />
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => approveAndContact([i])}
-                        className="mt-1 block rounded-md border border-border px-2 py-0.5 text-xs font-semibold hover:bg-muted disabled:opacity-50"
-                      >
-                        Approve &amp; contact now
-                      </button>
-                    </td>
-                  </tr>
+                  <Fragment key={i.client_id}>
+                    <tr>
+                      <td className="px-3 py-3 align-top">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${i.client_name}`}
+                          checked={selectedMulti.has(i.client_id)}
+                          onChange={() =>
+                            setSelectedMulti((prev) => {
+                              const n = new Set(prev);
+                              if (n.has(i.client_id)) n.delete(i.client_id);
+                              else n.add(i.client_id);
+                              return n;
+                            })
+                          }
+                        />
+                      </td>
+                      <td className="px-3 py-3">
+                        <p className="font-semibold">{i.client_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {[i.ar_owner && `Account Owner: ${ownerName(i.ar_owner)}`]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                        <div className="mt-1">
+                          <InvoiceToggle
+                            count={i.invoices.length}
+                            open={openMulti === i.client_id}
+                            onToggle={() =>
+                              setOpenMulti(openMulti === i.client_id ? null : i.client_id)
+                            }
+                          />
+                        </div>
+                        <p className="mt-1 text-[10px] text-muted-foreground">
+                          Data from Zoho: {when(i.refreshed_at)}
+                        </p>
+                      </td>
+                      <td className="px-3 py-3 text-xs">
+                        <p className="font-semibold">{i.contact_person || "No contact person"}</p>
+                        <p>{i.phone || "No phone"}</p>
+                        <p className="truncate">{i.email || "No email"}</p>
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums">{i.branch_count}</td>
+                      <td className="px-3 py-3 text-right font-semibold tabular-nums text-destructive">
+                        {i.overdue ? peso(i.overdue) : "–"}
+                      </td>
+                      <td className="px-3 py-3 text-right font-semibold tabular-nums">
+                        {peso(i.total)}
+                      </td>
+                      <td className="px-3 py-3">
+                        {i.approved && i.allow_multibranch ? (
+                          <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
+                            Approved for contact
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-semibold">
+                            Not called: AR handles manually
+                          </span>
+                        )}
+                        <CycleStatus i={i} />
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => approveAndContact([i])}
+                          className="mt-1 block rounded-md border border-border px-2 py-0.5 text-xs font-semibold hover:bg-muted disabled:opacity-50"
+                        >
+                          Approve &amp; contact now
+                        </button>
+                      </td>
+                    </tr>
+                    {openMulti === i.client_id ? (
+                      <tr>
+                        <td />
+                        <td colSpan={6} className="px-3 pb-4">
+                          <InvoiceTable invoices={i.invoices} />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 ))}
                 {multibranch.length === 0 ? (
                   <tr>

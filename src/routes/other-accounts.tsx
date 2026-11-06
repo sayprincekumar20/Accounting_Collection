@@ -1,10 +1,15 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 import { downloadCsv } from "@/lib/csv";
 import { ownerName } from "@/lib/owner";
+import {
+  InvoiceTable,
+  InvoiceToggle,
+  type InvoiceRow,
+} from "@/components/collections/InvoiceTable";
 
 export const Route = createFileRoute("/other-accounts")({
   head: () => ({ meta: [{ title: "Other Accounts | Rare Global Food Collections" }] }),
@@ -24,7 +29,7 @@ interface Item {
   current: number;
   total: number;
   branch_count: number;
-  invoices: unknown[];
+  invoices: InvoiceRow[];
   refreshed_at: string;
   sales_team: boolean | null;
 }
@@ -46,6 +51,7 @@ function OtherAccountsPage() {
   });
   const items = useMemo(() => (data ?? []).filter((i) => i.sales_team === false), [data]);
   const [q, setQ] = useState("");
+  const [open, setOpen] = useState<string | null>(null);
   const visible = items.filter(
     (i) =>
       !q ||
@@ -139,24 +145,51 @@ function OtherAccountsPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {visible.map((i) => (
-                  <tr key={i.client_id}>
-                    <td className="px-3 py-3">
-                      <p className="font-semibold">{i.client_name}</p>
-                    </td>
-                    <td className="px-3 py-3">{ownerName(i.ar_owner) || "–"}</td>
-                    <td className="px-3 py-3 text-xs">
-                      <p className="font-semibold">{i.contact_person || "No contact person"}</p>
-                      <p>{i.phone || "No phone"}</p>
-                      <p className="truncate">{i.email || "No email"}</p>
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">{i.branch_count}</td>
-                    <td className="px-3 py-3 text-right font-semibold tabular-nums text-destructive">
-                      {i.overdue ? peso(i.overdue) : "–"}
-                    </td>
-                    <td className="px-3 py-3 text-right font-semibold tabular-nums">
-                      {peso(i.total)}
-                    </td>
-                  </tr>
+                  <Fragment key={i.client_id}>
+                    <tr>
+                      <td className="px-3 py-3">
+                        <p className="font-semibold">{i.client_name}</p>
+                        <div className="mt-1">
+                          <InvoiceToggle
+                            count={i.invoices.length}
+                            open={open === i.client_id}
+                            onToggle={() => setOpen(open === i.client_id ? null : i.client_id)}
+                          />
+                        </div>
+                        <p className="mt-1 text-[10px] text-muted-foreground">
+                          Data from Zoho:{" "}
+                          {i.refreshed_at
+                            ? new Date(i.refreshed_at).toLocaleString("en-PH", {
+                                month: "short",
+                                day: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })
+                            : "–"}
+                        </p>
+                      </td>
+                      <td className="px-3 py-3">{ownerName(i.ar_owner) || "–"}</td>
+                      <td className="px-3 py-3 text-xs">
+                        <p className="font-semibold">{i.contact_person || "No contact person"}</p>
+                        <p>{i.phone || "No phone"}</p>
+                        <p className="truncate">{i.email || "No email"}</p>
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums">{i.branch_count}</td>
+                      <td className="px-3 py-3 text-right font-semibold tabular-nums text-destructive">
+                        {i.overdue ? peso(i.overdue) : "–"}
+                      </td>
+                      <td className="px-3 py-3 text-right font-semibold tabular-nums">
+                        {peso(i.total)}
+                      </td>
+                    </tr>
+                    {open === i.client_id ? (
+                      <tr>
+                        <td colSpan={6} className="px-3 pb-4">
+                          <InvoiceTable invoices={i.invoices} />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 ))}
                 {!isLoading && visible.length === 0 ? (
                   <tr>
