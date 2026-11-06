@@ -87,13 +87,32 @@ export async function sendGmailReply({
   const from = (await getGmailBusinessEmail()).trim();
   if (!from) throw new Error("GMAIL_BUSINESS_EMAIL is not configured");
 
+  let replyHeaders: string[] = [];
+  if (threadId) {
+    const thread = await gmailFetch<{
+      messages?: { payload?: { headers?: { name: string; value: string }[] } }[];
+    }>(
+      `/threads/${encodeURIComponent(threadId)}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References`,
+      accessToken,
+    );
+    const latestHeaders = thread.messages?.[thread.messages.length - 1]?.payload?.headers;
+    const messageId = getHeader(latestHeaders, "Message-ID");
+    const references = getHeader(latestHeaders, "References");
+    if (messageId) {
+      replyHeaders = [
+        `In-Reply-To: ${messageId}`,
+        `References: ${[references, messageId].filter(Boolean).join(" ")}`,
+      ];
+    }
+  }
+
   const message = [
     `From: ${from}`,
     `To: ${to}`,
     `Subject: ${subject || "(no subject)"}`,
     "MIME-Version: 1.0",
     "Content-Type: text/plain; charset=UTF-8",
-    ...(threadId ? [`Thread-Id: ${threadId}`] : []),
+    ...replyHeaders,
     "",
     body,
   ].join("\r\n");

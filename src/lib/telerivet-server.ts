@@ -14,7 +14,8 @@ import { getEnv } from "@/lib/env";
 const TELERIVET_API = "https://api.telerivet.com/v1";
 
 async function authHeader() {
-  const key = (await getEnv("TELERIVET_API_KEY")) || "";
+  const key = ((await getEnv("TELERIVET_API_KEY")) || "").trim();
+  if (!key) throw new Error("TELERIVET_API_KEY is not configured");
   // Telerivet uses HTTP Basic auth: API key as username, empty password.
   return { Authorization: `Basic ${Buffer.from(`${key}:`).toString("base64")}` };
 }
@@ -47,14 +48,18 @@ export async function sendTelerivetMessage(opts: {
   phoneId: string;
   projectId?: string;
 }): Promise<{ id?: string; status?: string }> {
-  const projectId = opts.projectId || (await getEnv("TELERIVET_PROJECT_ID")) || "";
+  const projectId = (opts.projectId || (await getEnv("TELERIVET_PROJECT_ID")) || "").trim();
   if (!projectId) throw new Error("TELERIVET_PROJECT_ID is not configured");
-  if (!opts.phoneId) throw new Error("TELERIVET phone ID is required to send a message");
+  const phoneId = opts.phoneId.trim();
+  if (!phoneId) throw new Error("Telerivet phone ID is required to send a message");
+  const toNumber = opts.toNumber.trim();
+  const content = opts.content.trim();
+  if (!toNumber || !content) throw new Error("A destination phone number and message are required");
 
   const params = new URLSearchParams({
-    to_number: opts.toNumber,
-    content: opts.content,
-    phone_id: opts.phoneId,
+    to_number: toNumber,
+    content,
+    phone_id: phoneId,
   });
 
   const res = await fetch(`${TELERIVET_API}/projects/${projectId}/messages/send`, {
@@ -82,7 +87,7 @@ export async function fetchRecentMessages(opts: {
   pageSize?: number;
   maxPages?: number;
 }): Promise<TelerivetMessage[]> {
-  const projectId = opts.projectId || (await getEnv("TELERIVET_PROJECT_ID")) || "";
+  const projectId = (opts.projectId || (await getEnv("TELERIVET_PROJECT_ID")) || "").trim();
   const pageSize = opts.pageSize ?? 200;
   // Reduced from 5: this is a "recent activity" view, not a full export, and each
   // extra page is another sequential Telerivet call inside a route that already
@@ -106,7 +111,7 @@ export async function fetchRecentMessages(opts: {
       sort: "default",
       sort_dir: "desc",
     });
-    if (opts.phoneId) params.set("phone_id", opts.phoneId);
+    if (opts.phoneId) params.set("phone_id", opts.phoneId.trim());
     if (cursor) params.set("cursor", cursor);
 
     const res = await fetch(

@@ -174,7 +174,8 @@ function useThreadsList() {
       const d = await r.json();
       return { threads: (d.threads ?? []) as ThreadListItem[], truncated: !!d.truncated };
     },
-    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 }
 function useThreadDetail(threadId: string | null) {
@@ -182,10 +183,15 @@ function useThreadDetail(threadId: string | null) {
     queryKey: ["gmail-thread-detail", threadId],
     queryFn: async () => {
       const r = await fetch(`/api/gmail-thread-detail?threadId=${encodeURIComponent(threadId!)}`);
-      if (!r.ok) throw new Error("Thread detail fetch failed");
+      if (!r.ok) {
+        const body = (await r.json().catch(() => ({}))) as { error?: string; detail?: string };
+        throw new Error(body.detail || body.error || "Thread detail fetch failed");
+      }
       return (await r.json()) as ThreadDetail;
     },
     enabled: !!threadId,
+    refetchInterval: threadId ? 15000 : false,
+    refetchIntervalInBackground: false,
   });
 }
 function useEmailSidebar() {
@@ -211,7 +217,8 @@ function useEmailSidebar() {
         }[],
       };
     },
-    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -309,11 +316,15 @@ function EmailInbox() {
     const matchingId = clients.find((cl) => cl.client_id === clientId);
     if (matchingId) return matchingId;
 
-    const normalizedName = String(clientName ?? "").trim().toLowerCase();
+    const normalizedName = String(clientName ?? "")
+      .trim()
+      .toLowerCase();
     if (!normalizedName) return undefined;
 
     return clients.find((cl) => {
-      const candidateName = String(cl.client_name ?? "").trim().toLowerCase();
+      const candidateName = String(cl.client_name ?? "")
+        .trim()
+        .toLowerCase();
       return (
         candidateName &&
         (candidateName.includes(normalizedName) || normalizedName.includes(candidateName))
@@ -702,8 +713,13 @@ function EmailInbox() {
             <div className="px-5 pb-5 pt-3">
               <ReplyComposer
                 channel="email"
-                clientName={activeClient?.client_name ?? activeClient?.parent_name ?? activeItem.client_name ?? "Client"}
-                email={activeClient?.email ?? activeItem.client_id ?? undefined}
+                clientName={
+                  activeClient?.client_name ??
+                  activeClient?.parent_name ??
+                  activeItem.client_name ??
+                  "Client"
+                }
+                email={activeClient?.email ?? ""}
                 subject={detail?.subject ?? "(no subject)"}
                 threadId={activeItem.thread_id ?? undefined}
                 onSent={() => {

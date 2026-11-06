@@ -180,7 +180,8 @@ function useSmsConversations() {
         }[],
       };
     },
-    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
+    refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -611,7 +612,9 @@ function SmsInbox() {
             <div className="px-5 pb-5">
               <ReplyComposer
                 channel="viber"
-                clientName={activeClient?.client_name || activeClient?.parent_name || activeItem.client_name}
+                clientName={
+                  activeClient?.client_name || activeClient?.parent_name || activeItem.client_name
+                }
                 phone={activeItem.client_id}
                 onSent={() => refetch()}
               />

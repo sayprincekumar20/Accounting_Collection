@@ -159,7 +159,13 @@ function useSmsConversations() {
     queryKey: ["sms-conversations"],
     queryFn: async () => {
       const [smsRes, clientsRes, pRes, eRes, qRes] = await Promise.all([
-        fetch("/api/sms-conversations").then((r) => r.json()),
+        fetch("/api/sms-conversations").then(async (r) => {
+          const body = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            throw new Error(body.detail || body.error || "Failed to fetch SMS conversations");
+          }
+          return body;
+        }),
         fetch("/api/clients-list").then((r) => r.json()),
         fetch("/api/promise-history").then((r) => r.json()),
         fetch("/api/escalations").then((r) => r.json()),
@@ -179,7 +185,8 @@ function useSmsConversations() {
         }[],
       };
     },
-    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
+    refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -421,7 +428,7 @@ function SmsInbox() {
               {error ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-sm text-destructive">
-                    Could not load SMS conversations.
+                    {error instanceof Error ? error.message : "Could not load SMS conversations."}
                   </td>
                 </tr>
               ) : null}
@@ -585,8 +592,10 @@ function SmsInbox() {
             <div className="px-5 pb-5">
               <ReplyComposer
                 channel="sms"
-                clientName={activeClient?.client_name || activeClient?.parent_name || activeItem.client_name}
-                phone={activeItem.client_id}
+                clientName={
+                  activeClient?.client_name || activeClient?.parent_name || activeItem.client_name
+                }
+                phone={activeClient?.phone || activeItem.client_id}
                 onSent={() => refetch()}
               />
             </div>

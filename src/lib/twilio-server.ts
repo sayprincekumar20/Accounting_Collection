@@ -12,8 +12,10 @@ import { getEnv } from "@/lib/env";
 const TWILIO_API = "https://api.twilio.com/2010-04-01";
 
 async function authHeader() {
-  const sid = (await getEnv("TWILIO_ACCOUNT_SID")) || "";
-  const token = (await getEnv("TWILIO_AUTH_TOKEN")) || "";
+  const sid = ((await getEnv("TWILIO_ACCOUNT_SID")) || "").trim();
+  const token = ((await getEnv("TWILIO_AUTH_TOKEN")) || "").trim();
+  if (!sid || !token)
+    throw new Error("TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN must be configured");
   return { Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}` };
 }
 
@@ -38,15 +40,22 @@ export async function sendTwilioWhatsAppMessage(opts: {
   body: string;
   from?: string;
 }): Promise<{ sid?: string; status?: string }> {
-  const sid = (await getEnv("TWILIO_ACCOUNT_SID")) || "";
+  const sid = ((await getEnv("TWILIO_ACCOUNT_SID")) || "").trim();
   if (!sid) throw new Error("TWILIO_ACCOUNT_SID is not configured");
 
-  const from = opts.from || (await getEnv("TWILIO_WHATSAPP_NUMBER")) || "";
-  if (!from) throw new Error("TWILIO_WHATSAPP_NUMBER is not configured");
+  const configuredFrom = (opts.from || (await getEnv("TWILIO_WHATSAPP_NUMBER")) || "").trim();
+  if (!configuredFrom) throw new Error("TWILIO_WHATSAPP_NUMBER is not configured");
+  const fromNumber = configuredFrom.replace(/^whatsapp:/i, "").replace(/[^\d+]/g, "");
+  const from = `whatsapp:${fromNumber.startsWith("+") ? fromNumber : `+${fromNumber}`}`;
 
+  const toNumber = opts.to
+    .trim()
+    .replace(/^whatsapp:/i, "")
+    .replace(/[^\d+]/g, "");
+  if (!toNumber) throw new Error("A valid WhatsApp destination number is required");
   const params = new URLSearchParams({
     From: from,
-    To: opts.to.startsWith("whatsapp:") ? opts.to : `whatsapp:${opts.to}`,
+    To: `whatsapp:${toNumber.startsWith("+") ? toNumber : `+${toNumber}`}`,
     Body: opts.body,
   });
 
@@ -74,7 +83,7 @@ export async function fetchRecentWhatsAppMessages(opts: {
   from?: string; // e.g. "whatsapp:+639453450025" -- Twilio-side filter
   to?: string;
 }): Promise<TwilioMessage[]> {
-  const sid = (await getEnv("TWILIO_ACCOUNT_SID")) || "";
+  const sid = ((await getEnv("TWILIO_ACCOUNT_SID")) || "").trim();
   if (!sid) throw new Error("TWILIO_ACCOUNT_SID is not configured");
   const pageSize = opts.pageSize ?? 200;
   const maxPages = opts.maxPages ?? 5;

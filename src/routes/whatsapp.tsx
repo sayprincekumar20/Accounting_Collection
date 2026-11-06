@@ -158,7 +158,13 @@ function useWaConversations() {
     queryKey: ["whatsapp-conversations"],
     queryFn: async () => {
       const [waRes, clientsRes, pRes, eRes, qRes] = await Promise.all([
-        fetch("/api/whatsapp-conversations").then((r) => r.json()),
+        fetch("/api/whatsapp-conversations").then(async (r) => {
+          const body = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            throw new Error(body.detail || body.error || "Failed to fetch WhatsApp conversations");
+          }
+          return body;
+        }),
         fetch("/api/clients-list").then((r) => r.json()),
         fetch("/api/promise-history").then((r) => r.json()),
         fetch("/api/escalations").then((r) => r.json()),
@@ -178,7 +184,8 @@ function useWaConversations() {
         }[],
       };
     },
-    refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -432,7 +439,9 @@ function WhatsAppInbox() {
               {error ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-sm text-destructive">
-                    Could not load WhatsApp conversations.
+                    {error instanceof Error
+                      ? error.message
+                      : "Could not load WhatsApp conversations."}
                   </td>
                 </tr>
               ) : null}
@@ -619,8 +628,10 @@ function WhatsAppInbox() {
             <div className="px-5 pb-5">
               <ReplyComposer
                 channel="whatsapp"
-                clientName={activeClient?.client_name || activeClient?.parent_name || activeItem.client_name}
-                phone={activeItem.client_id}
+                clientName={
+                  activeClient?.client_name || activeClient?.parent_name || activeItem.client_name
+                }
+                phone={activeClient?.phone || activeItem.client_id}
                 onSent={() => refetch()}
               />
             </div>

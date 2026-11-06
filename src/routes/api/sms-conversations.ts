@@ -68,7 +68,7 @@ export const Route = createFileRoute("/api/sms-conversations")({
     handlers: {
       GET: async () => {
         try {
-          const phoneId = await getEnv("TELERIVET_SMS_PHONE_ID"); // optional but recommended
+          const phoneId = ((await getEnv("TELERIVET_SMS_PHONE_ID")) || "").trim(); // optional but recommended
 
           // Use allSettled, not all: this endpoint combines 4 independent sources
           // (Telerivet + 3 n8n Data Table reads). A promise/escalation/client
@@ -87,8 +87,12 @@ export const Route = createFileRoute("/api/sms-conversations")({
 
           if (results[0].status === "rejected") {
             console.error("[sms-conversations] Telerivet fetch failed:", results[0].reason);
+            const detail =
+              results[0].reason instanceof Error
+                ? results[0].reason.message.slice(0, 300)
+                : String(results[0].reason);
             return new Response(
-              JSON.stringify({ error: "Failed to fetch SMS conversations from Telerivet" }),
+              JSON.stringify({ error: "Failed to fetch SMS conversations from Telerivet", detail }),
               {
                 status: 502,
                 headers: { "Content-Type": "application/json" },
@@ -225,10 +229,11 @@ export const Route = createFileRoute("/api/sms-conversations")({
           });
         } catch (err) {
           console.error("[sms-conversations] fetch error:", err);
-          return new Response(JSON.stringify({ error: "Failed to fetch SMS conversations" }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          });
+          const detail = err instanceof Error ? err.message.slice(0, 300) : String(err);
+          return new Response(
+            JSON.stringify({ error: "Failed to fetch SMS conversations", detail }),
+            { status: 500, headers: { "Content-Type": "application/json" } },
+          );
         }
       },
     },
