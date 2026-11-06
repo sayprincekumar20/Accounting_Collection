@@ -580,7 +580,7 @@ function EmailInbox() {
           <aside
             role="dialog"
             aria-label="Thread detail"
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col overflow-y-auto border-l border-border bg-card shadow-2xl animate-in slide-in-from-right duration-200"
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col overflow-hidden border-l border-border bg-card shadow-2xl animate-in slide-in-from-right duration-200"
           >
             <header className="sticky top-0 z-10 flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card px-5 py-4">
               <div>
@@ -635,7 +635,7 @@ function EmailInbox() {
               </button>
             </header>
 
-            <ol className="divide-y divide-border">
+            <ol className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
               {timeline.map((item, idx) => {
                 if (item.kind === "esc") {
                   return (
@@ -710,7 +710,7 @@ function EmailInbox() {
               ) : null}
             </ol>
 
-            <div className="px-5 pb-5 pt-3">
+            <div className="shrink-0 border-t border-border bg-card/95 px-4 py-3 backdrop-blur sm:px-5">
               <ReplyComposer
                 channel="email"
                 clientName={

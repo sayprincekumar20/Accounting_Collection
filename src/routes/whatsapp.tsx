@@ -466,7 +466,7 @@ function WhatsAppInbox() {
           <aside
             role="dialog"
             aria-label="Conversation detail"
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col overflow-y-auto border-l border-border bg-card shadow-2xl animate-in slide-in-from-right duration-200"
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col overflow-hidden border-l border-border bg-card shadow-2xl animate-in slide-in-from-right duration-200"
           >
             <header className="sticky top-0 z-10 flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card px-5 py-4">
               <div>
@@ -516,7 +516,7 @@ function WhatsAppInbox() {
               </button>
             </header>
 
-            <div className="p-4">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
               <div className="rounded-xl bg-[#efeae2] px-3 py-4 sm:px-5">
                 {activeItem.messages.length === 0 ? (
                   <p className="py-8 text-center text-sm text-[#667781]">No messages yet.</p>
@@ -625,7 +625,7 @@ function WhatsAppInbox() {
               </p>
             </div>
 
-            <div className="px-5 pb-5">
+            <div className="shrink-0 border-t border-border bg-card/95 px-4 py-3 backdrop-blur sm:px-5">
               <ReplyComposer
                 channel="whatsapp"
                 clientName={
