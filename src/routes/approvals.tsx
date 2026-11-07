@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 import { downloadCsv } from "@/lib/csv";
 import { ownerName } from "@/lib/owner";
+import { ScheduleLine } from "@/components/collections/ScheduleBadge";
 import { InvoiceTable, InvoiceToggle } from "@/components/collections/InvoiceTable";
 
 export const Route = createFileRoute("/approvals")({
@@ -23,6 +24,7 @@ interface Invoice {
   po: string;
 }
 interface Item {
+  collection_schedule?: string;
   client_id: string;
   client_name: string;
   parent_name: string;
@@ -418,6 +420,7 @@ function ApprovalsPage() {
                             .filter(Boolean)
                             .join(" · ")}
                         </p>
+                        <ScheduleLine value={i.collection_schedule} />
                         <div className="mt-1 flex flex-wrap gap-1">
                           {future(i.promise_until) ? (
                             <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
@@ -594,6 +597,8 @@ function ApprovalsPage() {
                             .filter(Boolean)
                             .join(" · ")}
                         </p>
+                        <ScheduleLine value={i.collection_schedule} />
+
                         <div className="mt-1">
                           <InvoiceToggle
                             count={i.invoices.length}

@@ -534,3 +534,18 @@ describe("authorship: SMS fallback after a failed Viber is an automated reminder
     ).toBe("reminder");
   });
 });
+
+describe("Contact Approvals: collection schedule from CRM", () => {
+  it("returns the client's collection schedule", async () => {
+    tables["rJpqXxmxhqJnlLrJ"] = [
+      client("Sched Co___s@x.co", { collection_schedule: "Monday, Friday" }),
+      client("Open Co___o@x.co"),
+    ];
+    const items = (await (await call("contact-approvals", "GET")).json()).items as {
+      client_name: string;
+      collection_schedule: string;
+    }[];
+    const by = Object.fromEntries(items.map((i) => [i.client_name, i.collection_schedule]));
+    expect(by).toEqual({ "Sched Co": "Monday, Friday", "Open Co": "" });
+  });
+});

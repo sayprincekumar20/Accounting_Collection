@@ -108,6 +108,7 @@ export function ChannelBadge({ channel }: { channel: string }) {
 
 const statusTone: Record<string, string> = {
   waiting_approval: "bg-warning/15 text-warning",
+  waiting_schedule: "bg-secondary text-secondary-foreground",
   delivered: "bg-success/12 text-success",
   read: "bg-success/12 text-success",
   sent: "bg-secondary text-secondary-foreground",

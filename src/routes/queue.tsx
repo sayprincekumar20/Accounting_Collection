@@ -53,6 +53,7 @@ interface QueueRow {
 const QUEUE_STATUSES = [
   { value: "all", label: "All statuses" },
   { value: "q_WAITING_APPROVAL", label: "Waiting for approval" },
+  { value: "q_WAITING_SCHEDULE", label: "Waiting for collection day" },
   { value: "q_PENDING", label: "Pending" },
   { value: "q_WAITING_QUOTA", label: "Waiting on quota" },
   { value: "q_SENT", label: "Sent" },

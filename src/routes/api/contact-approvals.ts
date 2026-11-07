@@ -134,6 +134,7 @@ export const Route = createFileRoute("/api/contact-approvals")({
                     : c["sales_team"] === true || s(c["sales_team"]) === "true"
                       ? true
                       : null,
+                collection_schedule: s(c["collection_schedule"]),
                 branch_count: branchesByParent.get(parentKey(c))?.size ?? 0,
                 multibranch: (branchesByParent.get(parentKey(c))?.size ?? 0) >= MIN_BRANCHES,
               };
