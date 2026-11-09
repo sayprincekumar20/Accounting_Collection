@@ -466,7 +466,7 @@ function WhatsAppInbox() {
           <aside
             role="dialog"
             aria-label="Conversation detail"
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col overflow-hidden border-l border-border bg-card shadow-2xl animate-in slide-in-from-right duration-200"
+            className="fixed inset-y-0 right-0 z-[60] flex w-full max-w-xl flex-col overflow-hidden border-l border-border bg-card shadow-2xl animate-in slide-in-from-right duration-200"
           >
             <header className="sticky top-0 z-10 flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card px-5 py-4">
               <div>
@@ -625,13 +625,19 @@ function WhatsAppInbox() {
               </p>
             </div>
 
-            <div className="shrink-0 border-t border-border bg-card/95 px-4 py-3 backdrop-blur sm:px-5">
+            <div className="shrink-0 border-t border-border bg-card px-3 py-2 sm:px-4">
               <ReplyComposer
+                key={activeItem.client_id}
                 channel="whatsapp"
+                draftKey={activeItem.client_id}
                 clientName={
                   activeClient?.client_name || activeClient?.parent_name || activeItem.client_name
                 }
                 phone={activeClient?.phone || activeItem.client_id}
+                conversationContext={activeItem.messages.map((message) => ({
+                  role: message.role === "ai" ? "assistant" : "user",
+                  content: message.content,
+                }))}
                 onSent={() => refetch()}
               />
             </div>

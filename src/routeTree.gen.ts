@@ -38,10 +38,13 @@ import { Route as ApiGmailAttachmentRouteImport } from './routes/api/gmail-attac
 import { Route as ApiGmailSendRouteImport } from './routes/api/gmail-send'
 import { Route as ApiGmailThreadDetailRouteImport } from './routes/api/gmail-thread-detail'
 import { Route as ApiGmailThreadsListRouteImport } from './routes/api/gmail-threads-list'
+import { Route as ApiGooglePickerConfigRouteImport } from './routes/api/google-picker-config'
 import { Route as ApiNotificationsRouteImport } from './routes/api/notifications'
 import { Route as ApiPromiseHistoryRouteImport } from './routes/api/promise-history'
 import { Route as ApiPromisesBoardRouteImport } from './routes/api/promises-board'
 import { Route as ApiReminderQueueListRouteImport } from './routes/api/reminder-queue-list'
+import { Route as ApiReplyDraftRouteImport } from './routes/api/reply-draft'
+import { Route as ApiReplyMediaRouteImport } from './routes/api/reply-media'
 import { Route as ApiSmsConversationsRouteImport } from './routes/api/sms-conversations'
 import { Route as ApiSmsSendRouteImport } from './routes/api/sms-send'
 import { Route as ApiVapiCallAudioRouteImport } from './routes/api/vapi-call-audio'
@@ -58,6 +61,7 @@ import { Route as VerificationIndexRouteImport } from './routes/verification.ind
 import { Route as VerificationReviewIdRouteImport } from './routes/verification.$reviewId'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant.chat'
 import { Route as ApiDvReviewsReviewIdRouteImport } from './routes/api/dv-reviews.$reviewId'
+import { Route as ApiOutboundMediaTokenRouteImport } from './routes/api/outbound-media.$token'
 import { Route as ApiDvReviewsReviewIdActionRouteImport } from './routes/api/dv-reviews.$reviewId.$action'
 import { Route as ApiDvReviewsReviewIdPagesNRouteImport } from './routes/api/dv-reviews.$reviewId.pages.$n'
 import { Route as ApiDvReviewsReviewIdRowsRowIdRouteImport } from './routes/api/dv-reviews.$reviewId.rows.$rowId'
@@ -207,6 +211,11 @@ const ApiGmailThreadsListRoute = ApiGmailThreadsListRouteImport.update({
   path: '/api/gmail-threads-list',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGooglePickerConfigRoute = ApiGooglePickerConfigRouteImport.update({
+  id: '/api/google-picker-config',
+  path: '/api/google-picker-config',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiNotificationsRoute = ApiNotificationsRouteImport.update({
   id: '/api/notifications',
   path: '/api/notifications',
@@ -225,6 +234,16 @@ const ApiPromisesBoardRoute = ApiPromisesBoardRouteImport.update({
 const ApiReminderQueueListRoute = ApiReminderQueueListRouteImport.update({
   id: '/api/reminder-queue-list',
   path: '/api/reminder-queue-list',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiReplyDraftRoute = ApiReplyDraftRouteImport.update({
+  id: '/api/reply-draft',
+  path: '/api/reply-draft',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiReplyMediaRoute = ApiReplyMediaRouteImport.update({
+  id: '/api/reply-media',
+  path: '/api/reply-media',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSmsConversationsRoute = ApiSmsConversationsRouteImport.update({
@@ -308,6 +327,11 @@ const ApiDvReviewsReviewIdRoute = ApiDvReviewsReviewIdRouteImport.update({
   path: '/$reviewId',
   getParentRoute: () => ApiDvReviewsRoute,
 } as any)
+const ApiOutboundMediaTokenRoute = ApiOutboundMediaTokenRouteImport.update({
+  id: '/api/outbound-media/$token',
+  path: '/api/outbound-media/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDvReviewsReviewIdActionRoute =
   ApiDvReviewsReviewIdActionRouteImport.update({
     id: '/$action',
@@ -357,10 +381,13 @@ export interface FileRoutesByFullPath {
   '/api/gmail-send': typeof ApiGmailSendRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
+  '/api/google-picker-config': typeof ApiGooglePickerConfigRoute
   '/api/notifications': typeof ApiNotificationsRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
+  '/api/reply-draft': typeof ApiReplyDraftRoute
+  '/api/reply-media': typeof ApiReplyMediaRoute
   '/api/sms-conversations': typeof ApiSmsConversationsRoute
   '/api/sms-send': typeof ApiSmsSendRoute
   '/api/vapi-call-audio': typeof ApiVapiCallAudioRoute
@@ -377,6 +404,7 @@ export interface FileRoutesByFullPath {
   '/verification/': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
+  '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
   '/api/dv-reviews/$reviewId/rows/$rowId': typeof ApiDvReviewsReviewIdRowsRowIdRoute
@@ -411,10 +439,13 @@ export interface FileRoutesByTo {
   '/api/gmail-send': typeof ApiGmailSendRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
+  '/api/google-picker-config': typeof ApiGooglePickerConfigRoute
   '/api/notifications': typeof ApiNotificationsRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
+  '/api/reply-draft': typeof ApiReplyDraftRoute
+  '/api/reply-media': typeof ApiReplyMediaRoute
   '/api/sms-conversations': typeof ApiSmsConversationsRoute
   '/api/sms-send': typeof ApiSmsSendRoute
   '/api/vapi-call-audio': typeof ApiVapiCallAudioRoute
@@ -431,6 +462,7 @@ export interface FileRoutesByTo {
   '/verification': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
+  '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
   '/api/dv-reviews/$reviewId/rows/$rowId': typeof ApiDvReviewsReviewIdRowsRowIdRoute
@@ -466,10 +498,13 @@ export interface FileRoutesById {
   '/api/gmail-send': typeof ApiGmailSendRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
+  '/api/google-picker-config': typeof ApiGooglePickerConfigRoute
   '/api/notifications': typeof ApiNotificationsRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
+  '/api/reply-draft': typeof ApiReplyDraftRoute
+  '/api/reply-media': typeof ApiReplyMediaRoute
   '/api/sms-conversations': typeof ApiSmsConversationsRoute
   '/api/sms-send': typeof ApiSmsSendRoute
   '/api/vapi-call-audio': typeof ApiVapiCallAudioRoute
@@ -486,6 +521,7 @@ export interface FileRoutesById {
   '/verification/': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
+  '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
   '/api/dv-reviews/$reviewId/rows/$rowId': typeof ApiDvReviewsReviewIdRowsRowIdRoute
@@ -522,10 +558,13 @@ export interface FileRouteTypes {
     | '/api/gmail-send'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
+    | '/api/google-picker-config'
     | '/api/notifications'
     | '/api/promise-history'
     | '/api/promises-board'
     | '/api/reminder-queue-list'
+    | '/api/reply-draft'
+    | '/api/reply-media'
     | '/api/sms-conversations'
     | '/api/sms-send'
     | '/api/vapi-call-audio'
@@ -542,6 +581,7 @@ export interface FileRouteTypes {
     | '/verification/'
     | '/api/assistant/chat'
     | '/api/dv-reviews/$reviewId'
+    | '/api/outbound-media/$token'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/dv-reviews/$reviewId/pages/$n'
     | '/api/dv-reviews/$reviewId/rows/$rowId'
@@ -576,10 +616,13 @@ export interface FileRouteTypes {
     | '/api/gmail-send'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
+    | '/api/google-picker-config'
     | '/api/notifications'
     | '/api/promise-history'
     | '/api/promises-board'
     | '/api/reminder-queue-list'
+    | '/api/reply-draft'
+    | '/api/reply-media'
     | '/api/sms-conversations'
     | '/api/sms-send'
     | '/api/vapi-call-audio'
@@ -596,6 +639,7 @@ export interface FileRouteTypes {
     | '/verification'
     | '/api/assistant/chat'
     | '/api/dv-reviews/$reviewId'
+    | '/api/outbound-media/$token'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/dv-reviews/$reviewId/pages/$n'
     | '/api/dv-reviews/$reviewId/rows/$rowId'
@@ -630,10 +674,13 @@ export interface FileRouteTypes {
     | '/api/gmail-send'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
+    | '/api/google-picker-config'
     | '/api/notifications'
     | '/api/promise-history'
     | '/api/promises-board'
     | '/api/reminder-queue-list'
+    | '/api/reply-draft'
+    | '/api/reply-media'
     | '/api/sms-conversations'
     | '/api/sms-send'
     | '/api/vapi-call-audio'
@@ -650,6 +697,7 @@ export interface FileRouteTypes {
     | '/verification/'
     | '/api/assistant/chat'
     | '/api/dv-reviews/$reviewId'
+    | '/api/outbound-media/$token'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/dv-reviews/$reviewId/pages/$n'
     | '/api/dv-reviews/$reviewId/rows/$rowId'
@@ -685,10 +733,13 @@ export interface RootRouteChildren {
   ApiGmailSendRoute: typeof ApiGmailSendRoute
   ApiGmailThreadDetailRoute: typeof ApiGmailThreadDetailRoute
   ApiGmailThreadsListRoute: typeof ApiGmailThreadsListRoute
+  ApiGooglePickerConfigRoute: typeof ApiGooglePickerConfigRoute
   ApiNotificationsRoute: typeof ApiNotificationsRoute
   ApiPromiseHistoryRoute: typeof ApiPromiseHistoryRoute
   ApiPromisesBoardRoute: typeof ApiPromisesBoardRoute
   ApiReminderQueueListRoute: typeof ApiReminderQueueListRoute
+  ApiReplyDraftRoute: typeof ApiReplyDraftRoute
+  ApiReplyMediaRoute: typeof ApiReplyMediaRoute
   ApiSmsConversationsRoute: typeof ApiSmsConversationsRoute
   ApiSmsSendRoute: typeof ApiSmsSendRoute
   ApiVapiCallAudioRoute: typeof ApiVapiCallAudioRoute
@@ -704,6 +755,7 @@ export interface RootRouteChildren {
   ClientsIndexRoute: typeof ClientsIndexRoute
   VerificationIndexRoute: typeof VerificationIndexRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
+  ApiOutboundMediaTokenRoute: typeof ApiOutboundMediaTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -911,6 +963,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGmailThreadsListRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/google-picker-config': {
+      id: '/api/google-picker-config'
+      path: '/api/google-picker-config'
+      fullPath: '/api/google-picker-config'
+      preLoaderRoute: typeof ApiGooglePickerConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/notifications': {
       id: '/api/notifications'
       path: '/api/notifications'
@@ -937,6 +996,20 @@ declare module '@tanstack/react-router' {
       path: '/api/reminder-queue-list'
       fullPath: '/api/reminder-queue-list'
       preLoaderRoute: typeof ApiReminderQueueListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/reply-draft': {
+      id: '/api/reply-draft'
+      path: '/api/reply-draft'
+      fullPath: '/api/reply-draft'
+      preLoaderRoute: typeof ApiReplyDraftRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/reply-media': {
+      id: '/api/reply-media'
+      path: '/api/reply-media'
+      fullPath: '/api/reply-media'
+      preLoaderRoute: typeof ApiReplyMediaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sms-conversations': {
@@ -1051,6 +1124,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDvReviewsReviewIdRouteImport
       parentRoute: typeof ApiDvReviewsRoute
     }
+    '/api/outbound-media/$token': {
+      id: '/api/outbound-media/$token'
+      path: '/api/outbound-media/$token'
+      fullPath: '/api/outbound-media/$token'
+      preLoaderRoute: typeof ApiOutboundMediaTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dv-reviews/$reviewId/$action': {
       id: '/api/dv-reviews/$reviewId/$action'
       path: '/$action'
@@ -1132,10 +1212,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGmailSendRoute: ApiGmailSendRoute,
   ApiGmailThreadDetailRoute: ApiGmailThreadDetailRoute,
   ApiGmailThreadsListRoute: ApiGmailThreadsListRoute,
+  ApiGooglePickerConfigRoute: ApiGooglePickerConfigRoute,
   ApiNotificationsRoute: ApiNotificationsRoute,
   ApiPromiseHistoryRoute: ApiPromiseHistoryRoute,
   ApiPromisesBoardRoute: ApiPromisesBoardRoute,
   ApiReminderQueueListRoute: ApiReminderQueueListRoute,
+  ApiReplyDraftRoute: ApiReplyDraftRoute,
+  ApiReplyMediaRoute: ApiReplyMediaRoute,
   ApiSmsConversationsRoute: ApiSmsConversationsRoute,
   ApiSmsSendRoute: ApiSmsSendRoute,
   ApiVapiCallAudioRoute: ApiVapiCallAudioRoute,
@@ -1151,6 +1234,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClientsIndexRoute: ClientsIndexRoute,
   VerificationIndexRoute: VerificationIndexRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
+  ApiOutboundMediaTokenRoute: ApiOutboundMediaTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

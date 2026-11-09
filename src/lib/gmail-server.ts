@@ -9,6 +9,9 @@
 //   GMAIL_BUSINESS_EMAIL   e.g. "prince@rareglobalfood.com"
 
 import { getEnv } from "@/lib/env";
+import { getStoredReplyMedia, isReplyMediaId, MAX_REPLY_TOTAL_SIZE } from "@/lib/reply-media";
+import { replyHtmlToText, sanitizeReplyHtml } from "@/lib/reply-format";
+import { getReplyAllCcRecipients, parseEmailRecipients } from "@/lib/email-recipients";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1";
@@ -74,50 +77,185 @@ export async function gmailFetch<T = any>(
 
 export async function sendGmailReply({
   to,
+  cc = [],
+  bcc = [],
   subject,
   body,
   threadId,
+  mode = "reply",
+  htmlBody,
+  attachmentIds = [],
 }: {
-  to: string;
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
   subject: string;
   body: string;
   threadId?: string;
+  mode?: "reply" | "replyAll" | "forward";
+  htmlBody?: string;
+  attachmentIds?: string[];
 }): Promise<{ id: string; threadId?: string }> {
+  if (attachmentIds.some((id) => !isReplyMediaId(id))) {
+    throw new Error("Invalid attachment reference");
+  }
+  if (attachmentIds.length > 10) throw new Error("You can attach up to 10 files at once.");
+
   const accessToken = await getAccessToken();
   const from = (await getGmailBusinessEmail()).trim();
   if (!from) throw new Error("GMAIL_BUSINESS_EMAIL is not configured");
 
+  const toRecipients = parseEmailRecipients(to.join(", "));
+  const ccRecipients = parseEmailRecipients(cc.join(", "));
+  const bccRecipients = parseEmailRecipients(bcc.join(", "));
+  if (!toRecipients.length) throw new Error("At least one To recipient is required.");
+
+  const cleanHeader = (value: string) => value.replace(/[\r\n]+/g, " ").trim();
+  const escapeHtml = (value: string) =>
+    value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   let replyHeaders: string[] = [];
+  let forwardText = "";
+  let forwardHtml = "";
+  let resolvedCc = ccRecipients;
   if (threadId) {
     const thread = await gmailFetch<{
-      messages?: { payload?: { headers?: { name: string; value: string }[] } }[];
-    }>(
-      `/threads/${encodeURIComponent(threadId)}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References`,
-      accessToken,
-    );
-    const latestHeaders = thread.messages?.[thread.messages.length - 1]?.payload?.headers;
+      messages?: {
+        payload?: {
+          headers?: { name: string; value: string }[];
+          mimeType?: string;
+          body?: { data?: string };
+          parts?: unknown[];
+        };
+      }[];
+    }>(`/threads/${encodeURIComponent(threadId)}?format=full`, accessToken);
+    const messages = thread.messages ?? [];
+    const latestMessage = messages[messages.length - 1];
+    const latestHeaders = latestMessage?.payload?.headers;
     const messageId = getHeader(latestHeaders, "Message-ID");
     const references = getHeader(latestHeaders, "References");
-    if (messageId) {
+    if (mode !== "forward" && messageId) {
       replyHeaders = [
         `In-Reply-To: ${messageId}`,
         `References: ${[references, messageId].filter(Boolean).join(" ")}`,
       ];
     }
+
+    if (mode === "replyAll") {
+      const businessAddress = from.toLowerCase();
+      const replySource = [...messages].reverse().find((message) => {
+        const senders = parseEmailRecipients(getHeader(message.payload?.headers, "From"));
+        return (
+          senders.length > 0 &&
+          senders.every((address) => address.toLowerCase() !== businessAddress)
+        );
+      });
+      const headers = replySource?.payload?.headers;
+      const replyAllCc = getReplyAllCcRecipients({
+        toRecipients,
+        headerTo: getHeader(headers, "To"),
+        headerCc: getHeader(headers, "Cc"),
+        businessEmail: businessAddress,
+      });
+      resolvedCc = parseEmailRecipients([...ccRecipients, ...replyAllCc].join(", "));
+    }
+
+    if (mode === "forward" && latestMessage?.payload) {
+      const headers = latestHeaders;
+      const original = extractBody(latestMessage.payload);
+      const originalHtml = [original.body, original.quotedBody].filter(Boolean).join("<br>");
+      const originalText = replyHtmlToText(originalHtml);
+      const forwardHeaders = [
+        `From: ${getHeader(headers, "From")}`,
+        `Date: ${getHeader(headers, "Date")}`,
+        `Subject: ${getHeader(headers, "Subject")}`,
+        `To: ${getHeader(headers, "To")}`,
+        getHeader(headers, "Cc") ? `Cc: ${getHeader(headers, "Cc")}` : "",
+      ].filter(Boolean);
+      forwardText = `\n\n---------- Forwarded message ----------\n${forwardHeaders.join("\n")}\n\n${originalText}`;
+      const escapedHeaders = forwardHeaders
+        .map((header) => `<div>${escapeHtml(header)}</div>`)
+        .join("");
+      forwardHtml = `<br><hr><div><strong>Forwarded message</strong></div>${escapedHeaders}<br>${originalHtml}`;
+    }
+  }
+
+  const encodeHeader = (value: string) => {
+    const clean = cleanHeader(value);
+    return /^[\x20-\x7e]*$/.test(clean)
+      ? clean
+      : `=?UTF-8?B?${Buffer.from(clean, "utf-8").toString("base64")}?=`;
+  };
+  const authoredText = body.trim() || replyHtmlToText(htmlBody || "");
+  const textBody = authoredText + forwardText;
+  const escapedText = authoredText
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+  const safeHtml = sanitizeReplyHtml((htmlBody || `<div>${escapedText}</div>`) + forwardHtml);
+  const mixedBoundary = `reply_mixed_${crypto.randomUUID().replace(/-/g, "")}`;
+  const alternativeBoundary = `reply_alt_${crypto.randomUUID().replace(/-/g, "")}`;
+  const attachments = [];
+  let attachmentSize = 0;
+  for (const id of attachmentIds) {
+    const attachment = await getStoredReplyMedia(id);
+    if (!attachment)
+      throw new Error("An attachment has expired or is no longer available. Please add it again.");
+    attachmentSize += attachment.size;
+    attachments.push(attachment);
+  }
+  if (attachmentSize > MAX_REPLY_TOTAL_SIZE) {
+    throw new Error(
+      `The combined attachment size must be ${MAX_REPLY_TOTAL_SIZE / 1024 / 1024} MB or smaller.`,
+    );
   }
 
   const message = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${subject || "(no subject)"}`,
+    `From: ${cleanHeader(from)}`,
+    `To: ${toRecipients.map(cleanHeader).join(", ")}`,
+    ...(resolvedCc.length ? [`Cc: ${resolvedCc.map(cleanHeader).join(", ")}`] : []),
+    ...(bccRecipients.length ? [`Bcc: ${bccRecipients.map(cleanHeader).join(", ")}`] : []),
+    `Subject: ${encodeHeader(subject || "(no subject)")}`,
     "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
+    `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`,
     ...replyHeaders,
     "",
-    body,
+    `--${mixedBoundary}`,
+    `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
+    "",
+    `--${alternativeBoundary}`,
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    textBody,
+    `--${alternativeBoundary}`,
+    "Content-Type: text/html; charset=UTF-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    safeHtml,
+    `--${alternativeBoundary}--`,
   ].join("\r\n");
 
-  const encoded = Buffer.from(message, "utf-8")
+  let mimeParts = message;
+  for (const attachment of attachments) {
+    const base64 = Buffer.from(await attachment.arrayBuffer())
+      .toString("base64")
+      .replace(/.{1,76}/g, "$&\r\n")
+      .trim();
+    const filename = encodeURIComponent(attachment.filename).replace(/'/g, "%27");
+    mimeParts += [
+      "",
+      `--${mixedBoundary}`,
+      `Content-Type: ${attachment.contentType}`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; filename*=UTF-8''${filename}`,
+      "",
+      base64,
+    ].join("\r\n");
+  }
+  mimeParts += `\r\n--${mixedBoundary}--`;
+
+  const encoded = Buffer.from(mimeParts, "utf-8")
     .toString("base64")
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
@@ -130,7 +268,7 @@ export async function sendGmailReply({
     },
     body: JSON.stringify({
       raw: encoded,
-      ...(threadId ? { threadId } : {}),
+      ...(threadId && mode !== "forward" ? { threadId } : {}),
     }),
   });
 
@@ -140,7 +278,7 @@ export async function sendGmailReply({
   }
 
   const json = (await res.json()) as { id?: string; threadId?: string };
-  const resolvedThreadId = json.threadId || threadId;
+  const resolvedThreadId = mode === "forward" ? undefined : json.threadId || threadId;
   return {
     id: json.id || "",
     ...(resolvedThreadId ? { threadId: resolvedThreadId } : {}),

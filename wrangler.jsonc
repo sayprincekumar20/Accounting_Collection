@@ -8,9 +8,16 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./.output/public",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+  },
+  "vars": {
+    "SUPABASE_URL": "https://zetjnskkhgjszldijkkv.supabase.co",
+    "SUPABASE_STORAGE_BUCKET": "reply-media",
+  },
+  "triggers": {
+    "crons": ["0 */6 * * *"],
   },
   "observability": {
-    "enabled": true
-  }
+    "enabled": true,
+  },
 }

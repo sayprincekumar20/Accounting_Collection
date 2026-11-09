@@ -15,7 +15,10 @@ export default defineConfig({
     tanstackStart(),
     // Redirect the generated server entry to our own src/server.ts, which wraps
     // TanStack Start's handler with SSR error handling (see that file for why).
-    nitro({ preset: "cloudflare-module" }),
+    nitro({
+      preset: "cloudflare-module",
+      plugins: ["./plugins/reply-media-cleanup.ts"],
+    }),
     viteReact(),
   ],
   environments: {

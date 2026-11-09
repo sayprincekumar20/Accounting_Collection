@@ -20,6 +20,13 @@ export const isStaticAsset = (path: string) =>
   !path.startsWith("/api/") &&
   /\.(js|css|map|png|jpe?g|svg|ico|webp|gif|woff2?|ttf|txt|json)$/i.test(path);
 
+function isProviderMediaFetch(request: Request, path: string) {
+  return (
+    (request.method === "GET" || request.method === "HEAD") &&
+    /^\/api\/outbound-media\/[a-f0-9]{64}$/.test(path)
+  );
+}
+
 export async function handleAuth(request: Request): Promise<Response | null> {
   // Read the login settings the same way as every other secret (cloudflare:workers env binding):
   // the framework runtime does not pass Cloudflare's env to this fetch handler.
@@ -30,6 +37,7 @@ export async function handleAuth(request: Request): Promise<Response | null> {
   });
   const url = new URL(request.url);
   const path = url.pathname;
+  if (cfg && isProviderMediaFetch(request, path)) return null;
   if (!cfg) {
     // Fail closed: without DASHBOARD_USER / DASHBOARD_PASSWORD / DASHBOARD_SESSION_SECRET nobody can sign in,
     // so nothing but static files is served (previously the dashboard stayed open without a login).

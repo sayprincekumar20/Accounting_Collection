@@ -39,6 +39,7 @@ export async function sendTwilioWhatsAppMessage(opts: {
   to: string;
   body: string;
   from?: string;
+  mediaUrls?: string[];
 }): Promise<{ sid?: string; status?: string }> {
   const sid = ((await getEnv("TWILIO_ACCOUNT_SID")) || "").trim();
   if (!sid) throw new Error("TWILIO_ACCOUNT_SID is not configured");
@@ -53,11 +54,13 @@ export async function sendTwilioWhatsAppMessage(opts: {
     .replace(/^whatsapp:/i, "")
     .replace(/[^\d+]/g, "");
   if (!toNumber) throw new Error("A valid WhatsApp destination number is required");
-  const params = new URLSearchParams({
-    From: from,
-    To: `whatsapp:${toNumber.startsWith("+") ? toNumber : `+${toNumber}`}`,
-    Body: opts.body,
-  });
+  const params = new URLSearchParams();
+  params.set("From", from);
+  params.set("To", `whatsapp:${toNumber.startsWith("+") ? toNumber : `+${toNumber}`}`);
+  if (opts.body) params.set("Body", opts.body);
+  for (const mediaUrl of opts.mediaUrls || []) params.append("MediaUrl", mediaUrl);
+  if (!opts.body && !opts.mediaUrls?.length)
+    throw new Error("Message text or an attachment is required");
 
   const res = await fetch(`${TWILIO_API}/Accounts/${sid}/Messages.json`, {
     method: "POST",

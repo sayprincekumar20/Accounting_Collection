@@ -39,3 +39,9 @@ export async function getEnv(key: string): Promise<string | undefined> {
   if (cfEnv && typeof cfEnv[key] === "string") return cfEnv[key];
   return process.env[key];
 }
+
+export async function getCloudflareBinding(key: string): Promise<unknown> {
+  const cfEnv = await getCloudflareEnv();
+  if (!cfEnv || typeof cfEnv !== "object") return undefined;
+  return cfEnv[key];
+}

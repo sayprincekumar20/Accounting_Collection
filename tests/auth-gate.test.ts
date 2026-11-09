@@ -40,6 +40,16 @@ describe("login configured", () => {
     const r = await handleAuth(req("/api/clients-list"));
     expect(r?.status).toBe(401);
   });
+  it("only bypasses login for a random-token outbound media GET", async () => {
+    expect(await handleAuth(req(`/api/outbound-media/${"a".repeat(64)}`))).toBeNull();
+    expect(
+      (await handleAuth(req(`/api/outbound-media/${"a".repeat(64)}`, { method: "POST" })))?.status,
+    ).toBe(401);
+    expect(
+      await handleAuth(req(`/api/outbound-media/${"a".repeat(64)}`, { method: "HEAD" })),
+    ).toBeNull();
+    expect((await handleAuth(req(`/api/outbound-media/${"z".repeat(64)}`)))?.status).toBe(401);
+  });
   it("REGRESSION: an API path ending in .json/.txt/.png does NOT skip the login", async () => {
     for (const p of [
       "/api/dv-reviews/abc.json",

@@ -47,6 +47,7 @@ export async function sendTelerivetMessage(opts: {
   content: string;
   phoneId: string;
   projectId?: string;
+  mediaUrls?: string[];
 }): Promise<{ id?: string; status?: string }> {
   const projectId = (opts.projectId || (await getEnv("TELERIVET_PROJECT_ID")) || "").trim();
   if (!projectId) throw new Error("TELERIVET_PROJECT_ID is not configured");
@@ -54,13 +55,18 @@ export async function sendTelerivetMessage(opts: {
   if (!phoneId) throw new Error("Telerivet phone ID is required to send a message");
   const toNumber = opts.toNumber.trim();
   const content = opts.content.trim();
-  if (!toNumber || !content) throw new Error("A destination phone number and message are required");
+  if (!toNumber || (!content && !opts.mediaUrls?.length)) {
+    throw new Error("A destination phone number and message or attachment are required");
+  }
 
   const params = new URLSearchParams({
     to_number: toNumber,
     content,
     phone_id: phoneId,
   });
+  for (const [index, mediaUrl] of (opts.mediaUrls || []).entries()) {
+    params.set(`media_urls[${index}]`, mediaUrl);
+  }
 
   const res = await fetch(`${TELERIVET_API}/projects/${projectId}/messages/send`, {
     method: "POST",
