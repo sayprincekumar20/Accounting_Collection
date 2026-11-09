@@ -1,3 +1,4 @@
+import type React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -21,6 +22,8 @@ import {
   type FilterableRow,
 } from "@/components/collections/LogFilters";
 import { ReplyComposer } from "@/components/collections/ReplyComposer";
+import { EscalationBadge, PromiseBadge } from "@/components/collections/ClientDetailDialogs";
+import { LatestButton, useChatScroll } from "@/components/collections/ChatScroll";
 
 export const Route = createFileRoute("/sms")({
   head: () => ({
@@ -213,6 +216,8 @@ function SmsInbox() {
   );
 
   const activeItem = conversations.find((c) => c.client_id === active) ?? null;
+  // WhatsApp-style: open at the latest message, follow new ones, 'Latest' button when scrolled up.
+  const chat = useChatScroll(active, activeItem ? activeItem.messages.length : 0);
   const activeClient = activeItem
     ? clients.find((cl) => digits(cl.phone) === digits(activeItem.client_id))
     : undefined;
@@ -479,18 +484,18 @@ function SmsInbox() {
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <ChannelBadge channel="sms" />
                   {activePromise ? (
-                    <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
-                      Promised {shortDate(activePromise.promise_date)} ·{" "}
-                      {reasonLabel(activePromise.reason)}
-                    </span>
+                    <PromiseBadge
+                      clientId={activeItem.client_id ?? ""}
+                      clientName={activeItem.client_name ?? ""}
+                      label={`Promised ${shortDate(activePromise.promise_date)} · ${reasonLabel(activePromise.reason)}`}
+                    />
                   ) : null}
                   {activeEscalation ? (
-                    <span
-                      title={activeEscalation.reason}
-                      className="max-w-[220px] truncate rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive"
-                    >
-                      Escalated: {activeEscalation.reason}
-                    </span>
+                    <EscalationBadge
+                      clientId={activeItem.client_id ?? ""}
+                      clientName={activeItem.client_name ?? ""}
+                      label={`Escalated: ${activeEscalation.reason}`}
+                    />
                   ) : null}
                 </div>
               </div>
@@ -503,93 +508,99 @@ function SmsInbox() {
               </button>
             </header>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
-              <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                Full conversation
-              </h3>
-              {activeItem.messages.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No messages yet.</p>
-              ) : (
-                <ol className="space-y-4">
-                  {[
-                    ...activeItem.messages.map((m) => ({
-                      kind: "msg" as const,
-                      at: new Date(m.ts).getTime() || 0,
-                      m,
-                    })),
-                    ...(activeItem.escalations ?? []).map((e) => ({
-                      kind: "esc" as const,
-                      at: new Date(e.recorded_at).getTime() || 0,
-                      reason: e.reason,
-                      ref: e.ref || "",
-                    })),
-                  ]
-                    .sort((a, b) => a.at - b.at)
-                    .map((it, i) =>
-                      it.kind === "esc" ? (
-                        <li
-                          key={`esc-${i}`}
-                          className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2"
-                        >
-                          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-destructive">
-                            AI agent notified the AR team ·{" "}
-                            {formatTs(new Date(it.at).toISOString())}
-                          </p>
-                          <p className="mt-0.5 text-sm">{it.reason}</p>
-                          <RefTag refId={it.ref} className="mt-1" />
-                        </li>
-                      ) : (
-                        ((m: SmsMessage) => (
+            <div className="relative flex min-h-0 flex-1 flex-col">
+              <div
+                ref={chat.ref as React.RefObject<HTMLDivElement>}
+                className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5"
+              >
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                  Full conversation
+                </h3>
+                {activeItem.messages.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No messages yet.</p>
+                ) : (
+                  <ol className="space-y-4">
+                    {[
+                      ...activeItem.messages.map((m) => ({
+                        kind: "msg" as const,
+                        at: new Date(m.ts).getTime() || 0,
+                        m,
+                      })),
+                      ...(activeItem.escalations ?? []).map((e) => ({
+                        kind: "esc" as const,
+                        at: new Date(e.recorded_at).getTime() || 0,
+                        reason: e.reason,
+                        ref: e.ref || "",
+                      })),
+                    ]
+                      .sort((a, b) => a.at - b.at)
+                      .map((it, i) =>
+                        it.kind === "esc" ? (
                           <li
-                            key={i}
-                            className={`flex flex-col gap-1 ${m.role === "ai" ? "items-end" : "items-start"}`}
+                            key={`esc-${i}`}
+                            className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2"
                           >
-                            <div className="text-[11px] text-muted-foreground">
-                              {m.role === "ai"
-                                ? m.author === "ar_team"
-                                  ? "AR team"
-                                  : m.author === "reminder"
-                                    ? "Automated reminder"
-                                    : "AI agent"
-                                : activeClient?.contact_person || activeItem.client_name}
-                              {" · "}
-                              {formatTs(m.ts)}
-                            </div>
-                            <div
-                              className={`max-w-[80%] rounded-xl border px-3.5 py-2.5 text-sm ${m.role === "ai" && isFailed(m.status) ? "ring-2 ring-destructive " : ""}${
-                                m.role === "ai" && m.author === "ar_team"
-                                  ? "border-transparent bg-success text-white"
-                                  : m.role === "ai"
-                                    ? "border-transparent bg-primary text-primary-foreground"
-                                    : "border-border bg-muted"
-                              }`}
-                            >
-                              <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {m.role === "ai" ? (
-                                <DeliveryBadge status={m.status} error={m.error} />
-                              ) : null}
-                              {m.promise_recorded ? (
-                                <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
-                                  Promise to Pay
-                                </span>
-                              ) : null}
-                              {m.notified_ar ? (
-                                <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-[10px] font-semibold text-destructive">
-                                  AR Notified
-                                </span>
-                              ) : null}
-                            </div>
+                            <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-destructive">
+                              AI agent notified the AR team ·{" "}
+                              {formatTs(new Date(it.at).toISOString())}
+                            </p>
+                            <p className="mt-0.5 text-sm">{it.reason}</p>
+                            <RefTag refId={it.ref} className="mt-1" />
                           </li>
-                        ))(it.m)
-                      ),
-                    )}
-                </ol>
-              )}
-            </div>
+                        ) : (
+                          ((m: SmsMessage) => (
+                            <li
+                              key={i}
+                              className={`flex flex-col gap-1 ${m.role === "ai" ? "items-end" : "items-start"}`}
+                            >
+                              <div className="text-[11px] text-muted-foreground">
+                                {m.role === "ai"
+                                  ? m.author === "ar_team"
+                                    ? "AR team"
+                                    : m.author === "reminder"
+                                      ? "Automated reminder"
+                                      : "AI agent"
+                                  : activeClient?.contact_person || activeItem.client_name}
+                                {" · "}
+                                {formatTs(m.ts)}
+                              </div>
+                              <div
+                                className={`max-w-[80%] rounded-xl border px-3.5 py-2.5 text-sm ${m.role === "ai" && isFailed(m.status) ? "ring-2 ring-destructive " : ""}${
+                                  m.role === "ai" && m.author === "ar_team"
+                                    ? "border-transparent bg-success text-white"
+                                    : m.role === "ai"
+                                      ? "border-transparent bg-primary text-primary-foreground"
+                                      : "border-border bg-muted"
+                                }`}
+                              >
+                                <span style={{ whiteSpace: "pre-wrap" }}>{m.content}</span>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {m.role === "ai" ? (
+                                  <DeliveryBadge status={m.status} error={m.error} />
+                                ) : null}
+                                {m.promise_recorded ? (
+                                  <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
+                                    Promise to Pay
+                                  </span>
+                                ) : null}
+                                {m.notified_ar ? (
+                                  <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-[10px] font-semibold text-destructive">
+                                    AR Notified
+                                  </span>
+                                ) : null}
+                              </div>
+                            </li>
+                          ))(it.m)
+                        ),
+                      )}
+                  </ol>
+                )}
+              </div>
 
-            <div className="shrink-0 border-t border-border bg-card px-3 py-2 sm:px-4">
+              <LatestButton visible={!chat.atBottom} onClick={() => chat.toBottom(true)} />
+            </div>
+            <div className="max-h-[55%] overflow-y-auto shrink-0 border-t border-border bg-card px-3 py-2 sm:px-4">
               <ReplyComposer
                 key={activeItem.client_id}
                 channel="sms"

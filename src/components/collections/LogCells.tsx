@@ -1,3 +1,4 @@
+import { EscalationBadge } from "@/components/collections/ClientDetailDialogs";
 // Shared table cells for the channel log pages (Email, SMS, WhatsApp, Voice), so every
 // channel shows status, summary, promise date and escalation the same way.
 
@@ -152,16 +153,32 @@ export function PromiseCell({
 export function EscalatedCell({
   escalation,
 }: {
-  escalation?: { reason: string; recorded_at: string; ref?: string | undefined } | undefined;
+  escalation?:
+    | {
+        reason: string;
+        recorded_at: string;
+        ref?: string | undefined;
+        client_id?: string | undefined;
+        client_name?: string | undefined;
+      }
+    | undefined;
 }) {
   if (!escalation) return <span className="text-xs text-muted-foreground">—</span>;
   const reason = cleanText(escalation.reason);
   const when = dayTime(escalation.recorded_at);
   return (
     <span className="inline-flex max-w-[200px] flex-col items-start gap-0.5" title={reason}>
-      <span className="rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive">
-        Escalated
-      </span>
+      {escalation.client_id ? (
+        <EscalationBadge
+          clientId={escalation.client_id}
+          clientName={escalation.client_name ?? ""}
+          label="Escalated · details"
+        />
+      ) : (
+        <span className="rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive">
+          Escalated
+        </span>
+      )}
       {when ? (
         <span className="whitespace-nowrap text-[10px] text-muted-foreground">{when}</span>
       ) : null}

@@ -1,3 +1,4 @@
+import type React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -22,6 +23,8 @@ import {
   type FilterableRow,
 } from "@/components/collections/LogFilters";
 import { ReplyComposer } from "@/components/collections/ReplyComposer";
+import { EscalationBadge, PromiseBadge } from "@/components/collections/ClientDetailDialogs";
+import { LatestButton, useChatScroll } from "@/components/collections/ChatScroll";
 
 export const Route = createFileRoute("/whatsapp")({
   head: () => ({
@@ -212,6 +215,8 @@ function WhatsAppInbox() {
   );
 
   const activeItem = conversations.find((c) => c.client_id === active) ?? null;
+  // WhatsApp-style: open at the latest message, follow new ones, 'Latest' button when scrolled up.
+  const chat = useChatScroll(active, activeItem ? activeItem.messages.length : 0);
   const activeClient = activeItem
     ? clients.find((cl) => digits(cl.phone) === digits(activeItem.client_id))
     : undefined;
@@ -492,18 +497,18 @@ function WhatsAppInbox() {
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <ChannelBadge channel="whatsapp" />
                   {activePromise ? (
-                    <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
-                      Promised {shortDate(activePromise.promise_date)} ·{" "}
-                      {reasonLabel(activePromise.reason)}
-                    </span>
+                    <PromiseBadge
+                      clientId={activeItem.client_id ?? ""}
+                      clientName={activeItem.client_name ?? ""}
+                      label={`Promised ${shortDate(activePromise.promise_date)} · ${reasonLabel(activePromise.reason)}`}
+                    />
                   ) : null}
                   {activeEscalation ? (
-                    <span
-                      title={activeEscalation.reason}
-                      className="max-w-[220px] truncate rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive"
-                    >
-                      Escalated: {activeEscalation.reason}
-                    </span>
+                    <EscalationBadge
+                      clientId={activeItem.client_id ?? ""}
+                      clientName={activeItem.client_name ?? ""}
+                      label={`Escalated: ${activeEscalation.reason}`}
+                    />
                   ) : null}
                 </div>
               </div>
@@ -516,116 +521,122 @@ function WhatsAppInbox() {
               </button>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              <div className="rounded-xl bg-[#efeae2] px-3 py-4 sm:px-5">
-                {activeItem.messages.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-[#667781]">No messages yet.</p>
-                ) : (
-                  <ol className="space-y-1.5">
-                    {activeItem.messages.map((m, i) => {
-                      const ours = m.role === "ai";
-                      const prev = activeItem.messages[i - 1];
-                      const day = waDay(m.ts);
-                      const showDay = !prev || waDay(prev.ts) !== day;
-                      const firstOfRun = !prev || prev.role !== m.role || showDay;
-                      return (
-                        <li key={i}>
-                          {showDay ? (
-                            <div className="my-3 flex justify-center">
-                              <span className="rounded-md bg-white/90 px-3 py-1 text-[11px] font-medium text-[#54656f] shadow-sm">
-                                {day}
-                              </span>
-                            </div>
-                          ) : null}
-                          <div
-                            className={`flex ${ours ? "justify-end" : "justify-start"} ${firstOfRun ? "mt-2" : ""}`}
-                          >
+            <div className="relative flex min-h-0 flex-1 flex-col">
+              <div
+                ref={chat.ref as React.RefObject<HTMLDivElement>}
+                className="min-h-0 flex-1 overflow-y-auto p-4"
+              >
+                <div className="rounded-xl bg-[#efeae2] px-3 py-4 sm:px-5">
+                  {activeItem.messages.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-[#667781]">No messages yet.</p>
+                  ) : (
+                    <ol className="space-y-1.5">
+                      {activeItem.messages.map((m, i) => {
+                        const ours = m.role === "ai";
+                        const prev = activeItem.messages[i - 1];
+                        const day = waDay(m.ts);
+                        const showDay = !prev || waDay(prev.ts) !== day;
+                        const firstOfRun = !prev || prev.role !== m.role || showDay;
+                        return (
+                          <li key={i}>
+                            {showDay ? (
+                              <div className="my-3 flex justify-center">
+                                <span className="rounded-md bg-white/90 px-3 py-1 text-[11px] font-medium text-[#54656f] shadow-sm">
+                                  {day}
+                                </span>
+                              </div>
+                            ) : null}
                             <div
-                              className={`relative max-w-[82%] rounded-lg px-2.5 pb-1.5 pt-1.5 text-[14px] leading-[19px] text-[#111b21] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] ${
-                                ours ? "bg-[#d9fdd3]" : "bg-white"
-                              } ${firstOfRun ? (ours ? "rounded-tr-none" : "rounded-tl-none") : ""}`}
+                              className={`flex ${ours ? "justify-end" : "justify-start"} ${firstOfRun ? "mt-2" : ""}`}
                             >
-                              {ours && (firstOfRun || m.author !== prev?.author) ? (
-                                <span
-                                  className={`mb-0.5 block text-[11px] font-semibold ${m.author === "ar_team" ? "text-[#1f7a3a]" : "text-[#667781]"}`}
-                                >
-                                  {m.author === "ar_team"
-                                    ? "AR team"
-                                    : m.author === "reminder"
-                                      ? "Automated reminder"
-                                      : "AI agent"}
+                              <div
+                                className={`relative max-w-[82%] rounded-lg px-2.5 pb-1.5 pt-1.5 text-[14px] leading-[19px] text-[#111b21] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] ${
+                                  ours ? "bg-[#d9fdd3]" : "bg-white"
+                                } ${firstOfRun ? (ours ? "rounded-tr-none" : "rounded-tl-none") : ""}`}
+                              >
+                                {ours && (firstOfRun || m.author !== prev?.author) ? (
+                                  <span
+                                    className={`mb-0.5 block text-[11px] font-semibold ${m.author === "ar_team" ? "text-[#1f7a3a]" : "text-[#667781]"}`}
+                                  >
+                                    {m.author === "ar_team"
+                                      ? "AR team"
+                                      : m.author === "reminder"
+                                        ? "Automated reminder"
+                                        : "AI agent"}
+                                  </span>
+                                ) : null}
+                                {firstOfRun && !ours ? (
+                                  <span className="mb-0.5 block text-[12px] font-semibold text-[#027eb5]">
+                                    {activeClient?.contact_person ||
+                                      activeItem.client_name ||
+                                      "Client"}
+                                  </span>
+                                ) : null}
+                                <span className="whitespace-pre-wrap break-words">{m.content}</span>
+                                <span className="float-right ml-3 mt-1 flex translate-y-1 items-center gap-1 text-[11px] text-[#667781]">
+                                  {waTime(m.ts)}
+                                  {ours ? <ReadTicks status={m.status} /> : null}
                                 </span>
-                              ) : null}
-                              {firstOfRun && !ours ? (
-                                <span className="mb-0.5 block text-[12px] font-semibold text-[#027eb5]">
-                                  {activeClient?.contact_person ||
-                                    activeItem.client_name ||
-                                    "Client"}
-                                </span>
-                              ) : null}
-                              <span className="whitespace-pre-wrap break-words">{m.content}</span>
-                              <span className="float-right ml-3 mt-1 flex translate-y-1 items-center gap-1 text-[11px] text-[#667781]">
-                                {waTime(m.ts)}
-                                {ours ? <ReadTicks status={m.status} /> : null}
-                              </span>
+                              </div>
                             </div>
-                          </div>
-                          {m.promise_recorded || m.notified_ar ? (
-                            <div
-                              className={`mt-1 flex gap-1.5 ${ours ? "justify-end" : "justify-start"}`}
-                            >
-                              {ours && isFailed(m.status) ? (
-                                <DeliveryBadge status={m.status} />
-                              ) : null}
-                              {m.promise_recorded ? (
-                                <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
-                                  Promise to pay
-                                </span>
-                              ) : null}
-                              {m.notified_ar ? (
-                                <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-[10px] font-semibold text-destructive">
-                                  AR notified
-                                </span>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </li>
-                      );
-                    })}
-                  </ol>
-                )}
-              </div>
-              {(activeItem.escalations ?? []).length ? (
-                <div className="mt-3 space-y-2">
-                  {(activeItem.escalations ?? []).map((e, i) => (
-                    <div
-                      key={i}
-                      className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2"
-                    >
-                      <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-destructive">
-                        AI agent notified the AR team · {waDay(e.recorded_at)}{" "}
-                        {waTime(e.recorded_at)}
-                      </p>
-                      <p className="mt-0.5 text-sm">{e.reason}</p>
-                      <RefTag refId={e.ref} className="mt-1" />
-                    </div>
-                  ))}
+                            {m.promise_recorded || m.notified_ar ? (
+                              <div
+                                className={`mt-1 flex gap-1.5 ${ours ? "justify-end" : "justify-start"}`}
+                              >
+                                {ours && isFailed(m.status) ? (
+                                  <DeliveryBadge status={m.status} />
+                                ) : null}
+                                {m.promise_recorded ? (
+                                  <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
+                                    Promise to pay
+                                  </span>
+                                ) : null}
+                                {m.notified_ar ? (
+                                  <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-[10px] font-semibold text-destructive">
+                                    AR notified
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  )}
                 </div>
-              ) : null}
-              <p className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <ReadTicks status="sent" /> Sent
-                </span>
-                <span className="flex items-center gap-1">
-                  <ReadTicks status="delivered" /> Delivered
-                </span>
-                <span className="flex items-center gap-1">
-                  <ReadTicks status="read" /> Seen
-                </span>
-              </p>
-            </div>
+                {(activeItem.escalations ?? []).length ? (
+                  <div className="mt-3 space-y-2">
+                    {(activeItem.escalations ?? []).map((e, i) => (
+                      <div
+                        key={i}
+                        className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2"
+                      >
+                        <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-destructive">
+                          AI agent notified the AR team · {waDay(e.recorded_at)}{" "}
+                          {waTime(e.recorded_at)}
+                        </p>
+                        <p className="mt-0.5 text-sm">{e.reason}</p>
+                        <RefTag refId={e.ref} className="mt-1" />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <p className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <ReadTicks status="sent" /> Sent
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <ReadTicks status="delivered" /> Delivered
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <ReadTicks status="read" /> Seen
+                  </span>
+                </p>
+              </div>
 
-            <div className="shrink-0 border-t border-border bg-card px-3 py-2 sm:px-4">
+              <LatestButton visible={!chat.atBottom} onClick={() => chat.toBottom(true)} />
+            </div>
+            <div className="max-h-[55%] overflow-y-auto shrink-0 border-t border-border bg-card px-3 py-2 sm:px-4">
               <ReplyComposer
                 key={activeItem.client_id}
                 channel="whatsapp"

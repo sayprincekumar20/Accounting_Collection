@@ -66,8 +66,11 @@ function WorklistPage() {
     refetchInterval: 300000,
   });
   const items = data ?? [];
-  const [status, setStatus] = useState<"ALL" | Item["status"]>("OPEN");
-  const [q, setQ] = useState("");
+  // Opened from an 'Escalated' badge: /worklist?q=<Ref> pre-fills the search and shows every status.
+  const linkQ =
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("q") || "" : "";
+  const [status, setStatus] = useState<"ALL" | Item["status"]>(linkQ ? "ALL" : "OPEN");
+  const [q, setQ] = useState(linkQ);
   const [channel, setChannel] = useState("ALL");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);

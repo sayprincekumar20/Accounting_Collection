@@ -1,3 +1,4 @@
+import type React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -20,6 +21,8 @@ import {
   type FilterableRow,
 } from "@/components/collections/LogFilters";
 import { ReplyComposer } from "@/components/collections/ReplyComposer";
+import { EscalationBadge, PromiseBadge } from "@/components/collections/ClientDetailDialogs";
+import { LatestButton, useChatScroll } from "@/components/collections/ChatScroll";
 
 export const Route = createFileRoute("/email")({
   head: () => ({
@@ -311,6 +314,8 @@ function EmailInbox() {
       ref: e.ref || "",
     })),
   ].sort((a, b) => a.at - b.at);
+  // WhatsApp-style: open at the latest message, follow new ones, 'Latest' button when scrolled up.
+  const chat = useChatScroll(activeItem?.thread_id ?? null, timeline.length);
 
   function findClient(clientId: string, clientName: string | null | undefined) {
     const matchingId = clients.find((cl) => cl.client_id === clientId);
@@ -611,18 +616,18 @@ function EmailInbox() {
                     {messages.length} message{messages.length === 1 ? "" : "s"}
                   </span>
                   {activePromise ? (
-                    <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
-                      Promised {shortDate(activePromise.promise_date)} ·{" "}
-                      {reasonLabel(activePromise.reason)}
-                    </span>
+                    <PromiseBadge
+                      clientId={activeItem.client_id ?? ""}
+                      clientName={activeItem.client_name ?? ""}
+                      label={`Promised ${shortDate(activePromise.promise_date)} · ${reasonLabel(activePromise.reason)}`}
+                    />
                   ) : null}
                   {activeEscalation ? (
-                    <span
-                      title={activeEscalation.reason}
-                      className="max-w-[220px] truncate rounded-full bg-destructive/12 px-2.5 py-0.5 text-[11px] font-semibold text-destructive"
-                    >
-                      Escalated: {activeEscalation.reason}
-                    </span>
+                    <EscalationBadge
+                      clientId={activeItem.client_id ?? ""}
+                      clientName={activeItem.client_name ?? ""}
+                      label={`Escalated: ${activeEscalation.reason}`}
+                    />
                   ) : null}
                 </div>
               </div>
@@ -635,82 +640,89 @@ function EmailInbox() {
               </button>
             </header>
 
-            <ol className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
-              {timeline.map((item, idx) => {
-                if (item.kind === "esc") {
+            <div className="relative flex min-h-0 flex-1 flex-col">
+              <ol
+                ref={chat.ref as React.RefObject<HTMLOListElement>}
+                className="min-h-0 flex-1 divide-y divide-border overflow-y-auto"
+              >
+                {timeline.map((item, idx) => {
+                  if (item.kind === "esc") {
+                    return (
+                      <li key={`esc-${idx}`} className="bg-destructive/5 px-5 py-3">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-destructive">
+                          AI agent notified the AR team ·{" "}
+                          {formatTs(new Date(item.at).toISOString())}
+                        </p>
+                        <p className="mt-1 text-sm">{item.reason}</p>
+                        <RefTag refId={item.ref} className="mt-1" />
+                      </li>
+                    );
+                  }
+                  const m = item.m;
+                  const outbound = m.direction === "outbound";
+                  const name = (m.from.split("<")[0] || m.from).replace(/"/g, "").trim() || m.from;
+                  const initial = name.charAt(0).toUpperCase();
                   return (
-                    <li key={`esc-${idx}`} className="bg-destructive/5 px-5 py-3">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-destructive">
-                        AI agent notified the AR team · {formatTs(new Date(item.at).toISOString())}
-                      </p>
-                      <p className="mt-1 text-sm">{item.reason}</p>
-                      <RefTag refId={item.ref} className="mt-1" />
+                    <li key={m.messageId} className="px-5 py-4">
+                      <div className="flex items-start gap-3">
+                        <span
+                          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                          style={{
+                            color: outbound ? "var(--primary-foreground)" : "var(--foreground)",
+                            backgroundColor: outbound
+                              ? "var(--primary)"
+                              : "color-mix(in oklab, var(--foreground) 10%, transparent)",
+                          }}
+                        >
+                          {initial}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-baseline gap-x-2">
+                            <span className="truncate text-sm font-semibold">{name}</span>
+                            <AuthorBadge author={m.author} />
+                            <span className="truncate text-xs text-muted-foreground">{m.from}</span>
+                            <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                              {formatTs(m.date)}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-xs text-muted-foreground">to {m.to}</p>
+                          <div className="mt-3 text-sm leading-relaxed">
+                            <MessageBody body={m.body} />
+                            {m.quotedBody ? <QuotedText quotedBody={m.quotedBody} /> : null}
+                          </div>
+                          {m.attachments?.length ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {m.attachments.map((a) => (
+                                <a
+                                  key={a.attachmentId}
+                                  href={`/api/gmail-attachment?messageId=${encodeURIComponent(a.messageId)}&attachmentId=${encodeURIComponent(a.attachmentId)}&filename=${encodeURIComponent(a.filename)}&mimeType=${encodeURIComponent(a.mimeType)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="rounded-lg border border-border bg-muted px-2.5 py-1 text-xs hover:bg-accent hover:underline"
+                                >
+                                  📎 {a.filename}
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
                     </li>
                   );
-                }
-                const m = item.m;
-                const outbound = m.direction === "outbound";
-                const name = (m.from.split("<")[0] || m.from).replace(/"/g, "").trim() || m.from;
-                const initial = name.charAt(0).toUpperCase();
-                return (
-                  <li key={m.messageId} className="px-5 py-4">
-                    <div className="flex items-start gap-3">
-                      <span
-                        className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
-                        style={{
-                          color: outbound ? "var(--primary-foreground)" : "var(--foreground)",
-                          backgroundColor: outbound
-                            ? "var(--primary)"
-                            : "color-mix(in oklab, var(--foreground) 10%, transparent)",
-                        }}
-                      >
-                        {initial}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-x-2">
-                          <span className="truncate text-sm font-semibold">{name}</span>
-                          <AuthorBadge author={m.author} />
-                          <span className="truncate text-xs text-muted-foreground">{m.from}</span>
-                          <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                            {formatTs(m.date)}
-                          </span>
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">to {m.to}</p>
-                        <div className="mt-3 text-sm leading-relaxed">
-                          <MessageBody body={m.body} />
-                          {m.quotedBody ? <QuotedText quotedBody={m.quotedBody} /> : null}
-                        </div>
-                        {m.attachments?.length ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {m.attachments.map((a) => (
-                              <a
-                                key={a.attachmentId}
-                                href={`/api/gmail-attachment?messageId=${encodeURIComponent(a.messageId)}&attachmentId=${encodeURIComponent(a.attachmentId)}&filename=${encodeURIComponent(a.filename)}&mimeType=${encodeURIComponent(a.mimeType)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="rounded-lg border border-border bg-muted px-2.5 py-1 text-xs hover:bg-accent hover:underline"
-                              >
-                                📎 {a.filename}
-                              </a>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
+                })}
+                {detailLoading ? (
+                  <li className="px-5 py-6 text-sm text-muted-foreground">
+                    Loading thread from Gmail…
                   </li>
-                );
-              })}
-              {detailLoading ? (
-                <li className="px-5 py-6 text-sm text-muted-foreground">
-                  Loading thread from Gmail…
-                </li>
-              ) : null}
-              {!detailLoading && messages.length === 0 ? (
-                <li className="px-5 py-6 text-sm text-muted-foreground">Nothing to show.</li>
-              ) : null}
-            </ol>
+                ) : null}
+                {!detailLoading && messages.length === 0 ? (
+                  <li className="px-5 py-6 text-sm text-muted-foreground">Nothing to show.</li>
+                ) : null}
+              </ol>
+              <LatestButton visible={!chat.atBottom} onClick={() => chat.toBottom(true)} />
+            </div>
 
-            <div className="shrink-0 border-t border-border bg-card px-3 py-2 sm:px-4">
+            <div className="max-h-[55%] shrink-0 overflow-y-auto border-t border-border bg-card px-3 py-2 sm:px-4">
               <ReplyComposer
                 key={activeItem.thread_id ?? ""}
                 channel="email"
