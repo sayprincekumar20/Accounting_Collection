@@ -374,8 +374,7 @@ export function ReplyComposer({
   }, [formattedHtml, message]);
 
   const recipientMissing = channel === "email" ? !emailTo.trim() : !phone?.trim();
-  // File uploads are switched off in the reply box (all channels): text replies only.
-  const canAttach = false as boolean;
+  const canAttach = channel === "email" || channel === "whatsapp" || channel === "viber";
   const maxChannelFiles = channel === "whatsapp" ? 1 : MAX_REPLY_FILES;
   const formattedChannel = channel === "email" || channel === "whatsapp";
   const disabled =
