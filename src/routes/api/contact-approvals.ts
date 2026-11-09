@@ -69,6 +69,7 @@ export const Route = createFileRoute("/api/contact-approvals")({
                 balance: number;
                 status: string;
                 po: string;
+                counter: string;
               }[] = [];
               try {
                 for (const b of JSON.parse(s(c["branches_data"]) || "[]")) {
@@ -88,6 +89,7 @@ export const Route = createFileRoute("/api/contact-approvals")({
                       balance: Number(i["balance"] || 0),
                       status: s(i["status"]).toUpperCase(),
                       po: s(i["po_number"]),
+                      counter: s(i["counter_date"]).slice(0, 10),
                     });
                   }
                 }

@@ -16,6 +16,7 @@ import {
   UserX,
   FileCheck2,
   ShieldCheck,
+  Bell,
 } from "lucide-react";
 
 const nav = [
@@ -25,6 +26,7 @@ const nav = [
   { to: "/approvals", label: "Contact Approvals", icon: ShieldCheck },
   { to: "/other-accounts", label: "Other Accounts", icon: UserX },
   { to: "/worklist", label: "AR Worklist", icon: ClipboardCheck },
+  { to: "/notifications", label: "Notifications", icon: Bell },
   { to: "/promises", label: "Promises", icon: CalendarClock },
   { to: "/contacts", label: "Contacts to Fix", icon: UserX },
   { to: "/reports", label: "Reports", icon: FileBarChart },

@@ -549,3 +549,52 @@ describe("Contact Approvals: collection schedule from CRM", () => {
     expect(by).toEqual({ "Sched Co": "Monday, Friday", "Open Co": "" });
   });
 });
+
+describe("GET /api/notifications (system messages formerly posted to Cliq)", () => {
+  it("returns SYSTEM / callback rows with their full message, newest first, and not client escalations", async () => {
+    tables["ANfkZZDIrDuC4RjK"] = [
+      {
+        entry_id: "a",
+        client_id: "SYSTEM___manual-run",
+        client_name: "Manual run",
+        channel: "SYSTEM",
+        reason: "Manual run by X",
+        message: "MANUAL RUN FINISHED ...",
+        timestamp: "2026-11-09T01:00:00Z",
+      },
+      {
+        entry_id: "b",
+        client_id: "SYSTEM___cycle-close-out",
+        client_name: "Weekly cycle close-out",
+        channel: "SYSTEM",
+        reason: "Weekly cycle complete",
+        message: "WEEKLY CYCLE ...",
+        timestamp: "2026-11-09T02:00:00Z",
+      },
+      {
+        entry_id: "c",
+        client_id: "ABC CO___x",
+        client_name: "ABC",
+        channel: "VOICE_CALLBACK",
+        reason: "Customer called back",
+        timestamp: "2026-11-09T03:00:00Z",
+      },
+      {
+        entry_id: "d",
+        client_id: "ABC CO___x",
+        client_name: "ABC",
+        channel: "SMS",
+        reason: "Claims paid",
+        timestamp: "2026-11-09T04:00:00Z",
+      },
+    ];
+    const items = (await (await call("notifications", "GET")).json()).items as {
+      id: string;
+      kind: string;
+      message: string;
+    }[];
+    expect(items.map((i) => i.id)).toEqual(["c", "b", "a"]);
+    expect(items.map((i) => i.kind)).toEqual(["Callback", "Cycle close-out", "/call result"]);
+    expect(items[2]!.message).toContain("MANUAL RUN FINISHED");
+  });
+});

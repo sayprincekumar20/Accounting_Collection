@@ -14,6 +14,7 @@ import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as ContactsRouteImport } from './routes/contacts'
 import { Route as EmailRouteImport } from './routes/email'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as OtherAccountsRouteImport } from './routes/other-accounts'
 import { Route as PromisesRouteImport } from './routes/promises'
 import { Route as QueueRouteImport } from './routes/queue'
@@ -37,6 +38,7 @@ import { Route as ApiGmailAttachmentRouteImport } from './routes/api/gmail-attac
 import { Route as ApiGmailSendRouteImport } from './routes/api/gmail-send'
 import { Route as ApiGmailThreadDetailRouteImport } from './routes/api/gmail-thread-detail'
 import { Route as ApiGmailThreadsListRouteImport } from './routes/api/gmail-threads-list'
+import { Route as ApiNotificationsRouteImport } from './routes/api/notifications'
 import { Route as ApiPromiseHistoryRouteImport } from './routes/api/promise-history'
 import { Route as ApiPromisesBoardRouteImport } from './routes/api/promises-board'
 import { Route as ApiReminderQueueListRouteImport } from './routes/api/reminder-queue-list'
@@ -83,6 +85,11 @@ const EmailRoute = EmailRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OtherAccountsRoute = OtherAccountsRouteImport.update({
@@ -198,6 +205,11 @@ const ApiGmailThreadDetailRoute = ApiGmailThreadDetailRouteImport.update({
 const ApiGmailThreadsListRoute = ApiGmailThreadsListRouteImport.update({
   id: '/api/gmail-threads-list',
   path: '/api/gmail-threads-list',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNotificationsRoute = ApiNotificationsRouteImport.update({
+  id: '/api/notifications',
+  path: '/api/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPromiseHistoryRoute = ApiPromiseHistoryRouteImport.update({
@@ -321,6 +333,7 @@ export interface FileRoutesByFullPath {
   '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
   '/login': typeof LoginRoute
+  '/notifications': typeof NotificationsRoute
   '/other-accounts': typeof OtherAccountsRoute
   '/promises': typeof PromisesRoute
   '/queue': typeof QueueRoute
@@ -344,6 +357,7 @@ export interface FileRoutesByFullPath {
   '/api/gmail-send': typeof ApiGmailSendRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
+  '/api/notifications': typeof ApiNotificationsRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
@@ -373,6 +387,7 @@ export interface FileRoutesByTo {
   '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
   '/login': typeof LoginRoute
+  '/notifications': typeof NotificationsRoute
   '/other-accounts': typeof OtherAccountsRoute
   '/promises': typeof PromisesRoute
   '/queue': typeof QueueRoute
@@ -396,6 +411,7 @@ export interface FileRoutesByTo {
   '/api/gmail-send': typeof ApiGmailSendRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
+  '/api/notifications': typeof ApiNotificationsRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
@@ -426,6 +442,7 @@ export interface FileRoutesById {
   '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
   '/login': typeof LoginRoute
+  '/notifications': typeof NotificationsRoute
   '/other-accounts': typeof OtherAccountsRoute
   '/promises': typeof PromisesRoute
   '/queue': typeof QueueRoute
@@ -449,6 +466,7 @@ export interface FileRoutesById {
   '/api/gmail-send': typeof ApiGmailSendRoute
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
+  '/api/notifications': typeof ApiNotificationsRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
@@ -480,6 +498,7 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/email'
     | '/login'
+    | '/notifications'
     | '/other-accounts'
     | '/promises'
     | '/queue'
@@ -503,6 +522,7 @@ export interface FileRouteTypes {
     | '/api/gmail-send'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
+    | '/api/notifications'
     | '/api/promise-history'
     | '/api/promises-board'
     | '/api/reminder-queue-list'
@@ -532,6 +552,7 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/email'
     | '/login'
+    | '/notifications'
     | '/other-accounts'
     | '/promises'
     | '/queue'
@@ -555,6 +576,7 @@ export interface FileRouteTypes {
     | '/api/gmail-send'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
+    | '/api/notifications'
     | '/api/promise-history'
     | '/api/promises-board'
     | '/api/reminder-queue-list'
@@ -584,6 +606,7 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/email'
     | '/login'
+    | '/notifications'
     | '/other-accounts'
     | '/promises'
     | '/queue'
@@ -607,6 +630,7 @@ export interface FileRouteTypes {
     | '/api/gmail-send'
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
+    | '/api/notifications'
     | '/api/promise-history'
     | '/api/promises-board'
     | '/api/reminder-queue-list'
@@ -637,6 +661,7 @@ export interface RootRouteChildren {
   ContactsRoute: typeof ContactsRoute
   EmailRoute: typeof EmailRoute
   LoginRoute: typeof LoginRoute
+  NotificationsRoute: typeof NotificationsRoute
   OtherAccountsRoute: typeof OtherAccountsRoute
   PromisesRoute: typeof PromisesRoute
   QueueRoute: typeof QueueRoute
@@ -660,6 +685,7 @@ export interface RootRouteChildren {
   ApiGmailSendRoute: typeof ApiGmailSendRoute
   ApiGmailThreadDetailRoute: typeof ApiGmailThreadDetailRoute
   ApiGmailThreadsListRoute: typeof ApiGmailThreadsListRoute
+  ApiNotificationsRoute: typeof ApiNotificationsRoute
   ApiPromiseHistoryRoute: typeof ApiPromiseHistoryRoute
   ApiPromisesBoardRoute: typeof ApiPromisesBoardRoute
   ApiReminderQueueListRoute: typeof ApiReminderQueueListRoute
@@ -715,6 +741,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/other-accounts': {
@@ -876,6 +909,13 @@ declare module '@tanstack/react-router' {
       path: '/api/gmail-threads-list'
       fullPath: '/api/gmail-threads-list'
       preLoaderRoute: typeof ApiGmailThreadsListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/notifications': {
+      id: '/api/notifications'
+      path: '/api/notifications'
+      fullPath: '/api/notifications'
+      preLoaderRoute: typeof ApiNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/promise-history': {
@@ -1068,6 +1108,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactsRoute: ContactsRoute,
   EmailRoute: EmailRoute,
   LoginRoute: LoginRoute,
+  NotificationsRoute: NotificationsRoute,
   OtherAccountsRoute: OtherAccountsRoute,
   PromisesRoute: PromisesRoute,
   QueueRoute: QueueRoute,
@@ -1091,6 +1132,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGmailSendRoute: ApiGmailSendRoute,
   ApiGmailThreadDetailRoute: ApiGmailThreadDetailRoute,
   ApiGmailThreadsListRoute: ApiGmailThreadsListRoute,
+  ApiNotificationsRoute: ApiNotificationsRoute,
   ApiPromiseHistoryRoute: ApiPromiseHistoryRoute,
   ApiPromisesBoardRoute: ApiPromisesBoardRoute,
   ApiReminderQueueListRoute: ApiReminderQueueListRoute,

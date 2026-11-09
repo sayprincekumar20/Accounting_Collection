@@ -8,6 +8,8 @@ export interface InvoiceRow {
   balance: number;
   status: string;
   po: string;
+  /** Zoho Inventory "Date Counter" (payment terms often run from it); empty = not yet countered / not refreshed. */
+  counter?: string;
 }
 
 const peso = (v: number) =>
@@ -51,6 +53,7 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceRow[] }) {
             <th className="py-1 pr-3">Branch</th>
             <th className="py-1 pr-3">Date</th>
             <th className="py-1 pr-3">Due date</th>
+            <th className="py-1 pr-3">Counter date</th>
             <th className="py-1 pr-3 text-right">Amount</th>
             <th className="py-1 pr-3 text-right">Balance</th>
             <th className="py-1 pr-3">Status</th>
@@ -64,6 +67,7 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceRow[] }) {
               <td className="py-1 pr-3">{v.branch}</td>
               <td className="py-1 pr-3">{day(v.date)}</td>
               <td className="py-1 pr-3">{day(v.due)}</td>
+              <td className="py-1 pr-3">{v.counter ? day(v.counter) : "–"}</td>
               <td className="py-1 pr-3 text-right tabular-nums">{peso(v.amount)}</td>
               <td className="py-1 pr-3 text-right tabular-nums">{peso(v.balance)}</td>
               <td
