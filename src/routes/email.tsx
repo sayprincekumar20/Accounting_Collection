@@ -22,7 +22,12 @@ import {
 } from "@/components/collections/LogFilters";
 import { ReplyComposer } from "@/components/collections/ReplyComposer";
 import { EscalationBadge, PromiseBadge } from "@/components/collections/ClientDetailDialogs";
-import { LatestButton, useChatScroll } from "@/components/collections/ChatScroll";
+import {
+  DaySeparator,
+  LatestButton,
+  useChatScroll,
+  withDaySeparators,
+} from "@/components/collections/ChatScroll";
 
 export const Route = createFileRoute("/email")({
   head: () => ({
@@ -238,15 +243,20 @@ function MessageBody({ body }: { body: string }) {
       title="email-body"
       // Inline images ("cid:" references) cannot load here and showed as broken icons; the same
       // images are listed as attachments below the message.
-      srcDoc={body.replace(/<img\b[^>]*\bsrc=["']cid:[^"']*["'][^>]*>/gi, "")}
-      sandbox=""
+      srcDoc={
+        "<style>html,body{margin:0;padding:0;font:14px/1.55 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1f2937;overflow-wrap:anywhere}img{max-width:100%;height:auto}pre{white-space:pre-wrap;font:inherit;margin:0}p{margin:0 0 .6em}</style>" +
+        body.replace(/<img\b[^>]*\bsrc=["']cid:[^"']*["'][^>]*>/gi, "")
+      }
+      // allow-same-origin (NO allow-scripts): scripts in emails still cannot run, but the dashboard can
+      // measure the email's height, so each message is as tall as its content (no empty gaps).
+      sandbox="allow-same-origin"
       className="w-full border-0"
-      style={{ minHeight: "40px" }}
+      style={{ height: "24px" }}
       onLoad={(e) => {
         const el = e.currentTarget;
         try {
           const h = el.contentWindow?.document.body.scrollHeight;
-          if (h) el.style.height = h + 20 + "px";
+          if (h) el.style.height = h + 4 + "px";
         } catch {
           /* ignore */
         }
@@ -645,7 +655,14 @@ function EmailInbox() {
                 ref={chat.ref as React.RefObject<HTMLOListElement>}
                 className="min-h-0 flex-1 divide-y divide-border overflow-y-auto"
               >
-                {timeline.map((item, idx) => {
+                {withDaySeparators(timeline).map((item, idx) => {
+                  if (item.kind === "day") {
+                    return (
+                      <li key={`day-${idx}`} className="border-0 bg-transparent px-5 py-1">
+                        <DaySeparator at={item.at} />
+                      </li>
+                    );
+                  }
                   if (item.kind === "esc") {
                     return (
                       <li key={`esc-${idx}`} className="bg-destructive/5 px-5 py-3">

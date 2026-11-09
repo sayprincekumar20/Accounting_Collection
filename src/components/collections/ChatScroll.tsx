@@ -57,3 +57,47 @@ export function LatestButton({ visible, onClick }: { visible: boolean; onClick: 
 }
 
 export type ChatScrollRef = RefObject<HTMLElement | null>;
+
+/** Day label like WhatsApp: 'Today', 'Yesterday' or 'Mon, Nov 9, 2026' (Manila time). */
+export function dayLabel(at: number): string {
+  if (!at) return "";
+  const manila = (t: number) => new Date(t + 8 * 3600000).toISOString().slice(0, 10);
+  const d = manila(at);
+  const today = manila(Date.now());
+  const yesterday = manila(Date.now() - 86400000);
+  if (d === today) return "Today";
+  if (d === yesterday) return "Yesterday";
+  return new Date(at).toLocaleDateString("en-PH", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "Asia/Manila",
+  });
+}
+
+/** Inserts { kind: 'day' } markers wherever the day changes in a time-sorted list. */
+export function withDaySeparators<T extends { at: number }>(
+  items: T[],
+): (T | { kind: "day"; at: number })[] {
+  const out: (T | { kind: "day"; at: number })[] = [];
+  let last = "";
+  for (const it of items) {
+    const label = dayLabel(it.at);
+    if (label && label !== last) out.push({ kind: "day", at: it.at });
+    last = label;
+    out.push(it);
+  }
+  return out;
+}
+
+/** Centred day separator between messages. */
+export function DaySeparator({ at }: { at: number }) {
+  return (
+    <div className="my-2 flex items-center justify-center" role="separator">
+      <span className="rounded-full bg-muted px-3 py-0.5 text-[11px] font-semibold text-muted-foreground shadow-sm">
+        {dayLabel(at)}
+      </span>
+    </div>
+  );
+}
