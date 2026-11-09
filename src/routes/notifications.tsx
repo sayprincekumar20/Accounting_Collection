@@ -114,7 +114,7 @@ function NotificationsPage() {
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tone[i.kind] ?? tone.System}`}
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tone[i.kind] ?? tone["System"]}`}
                     >
                       {i.kind}
                     </span>
