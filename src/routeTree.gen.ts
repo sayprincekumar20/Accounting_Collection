@@ -43,7 +43,6 @@ import { Route as ApiNotificationsRouteImport } from './routes/api/notifications
 import { Route as ApiPromiseHistoryRouteImport } from './routes/api/promise-history'
 import { Route as ApiPromisesBoardRouteImport } from './routes/api/promises-board'
 import { Route as ApiReminderQueueListRouteImport } from './routes/api/reminder-queue-list'
-import { Route as ApiReplyDraftRouteImport } from './routes/api/reply-draft'
 import { Route as ApiReplyMediaRouteImport } from './routes/api/reply-media'
 import { Route as ApiSmsConversationsRouteImport } from './routes/api/sms-conversations'
 import { Route as ApiSmsSendRouteImport } from './routes/api/sms-send'
@@ -236,11 +235,6 @@ const ApiReminderQueueListRoute = ApiReminderQueueListRouteImport.update({
   path: '/api/reminder-queue-list',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiReplyDraftRoute = ApiReplyDraftRouteImport.update({
-  id: '/api/reply-draft',
-  path: '/api/reply-draft',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiReplyMediaRoute = ApiReplyMediaRouteImport.update({
   id: '/api/reply-media',
   path: '/api/reply-media',
@@ -386,7 +380,6 @@ export interface FileRoutesByFullPath {
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
-  '/api/reply-draft': typeof ApiReplyDraftRoute
   '/api/reply-media': typeof ApiReplyMediaRoute
   '/api/sms-conversations': typeof ApiSmsConversationsRoute
   '/api/sms-send': typeof ApiSmsSendRoute
@@ -444,7 +437,6 @@ export interface FileRoutesByTo {
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
-  '/api/reply-draft': typeof ApiReplyDraftRoute
   '/api/reply-media': typeof ApiReplyMediaRoute
   '/api/sms-conversations': typeof ApiSmsConversationsRoute
   '/api/sms-send': typeof ApiSmsSendRoute
@@ -503,7 +495,6 @@ export interface FileRoutesById {
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
   '/api/reminder-queue-list': typeof ApiReminderQueueListRoute
-  '/api/reply-draft': typeof ApiReplyDraftRoute
   '/api/reply-media': typeof ApiReplyMediaRoute
   '/api/sms-conversations': typeof ApiSmsConversationsRoute
   '/api/sms-send': typeof ApiSmsSendRoute
@@ -563,7 +554,6 @@ export interface FileRouteTypes {
     | '/api/promise-history'
     | '/api/promises-board'
     | '/api/reminder-queue-list'
-    | '/api/reply-draft'
     | '/api/reply-media'
     | '/api/sms-conversations'
     | '/api/sms-send'
@@ -621,7 +611,6 @@ export interface FileRouteTypes {
     | '/api/promise-history'
     | '/api/promises-board'
     | '/api/reminder-queue-list'
-    | '/api/reply-draft'
     | '/api/reply-media'
     | '/api/sms-conversations'
     | '/api/sms-send'
@@ -679,7 +668,6 @@ export interface FileRouteTypes {
     | '/api/promise-history'
     | '/api/promises-board'
     | '/api/reminder-queue-list'
-    | '/api/reply-draft'
     | '/api/reply-media'
     | '/api/sms-conversations'
     | '/api/sms-send'
@@ -738,7 +726,6 @@ export interface RootRouteChildren {
   ApiPromiseHistoryRoute: typeof ApiPromiseHistoryRoute
   ApiPromisesBoardRoute: typeof ApiPromisesBoardRoute
   ApiReminderQueueListRoute: typeof ApiReminderQueueListRoute
-  ApiReplyDraftRoute: typeof ApiReplyDraftRoute
   ApiReplyMediaRoute: typeof ApiReplyMediaRoute
   ApiSmsConversationsRoute: typeof ApiSmsConversationsRoute
   ApiSmsSendRoute: typeof ApiSmsSendRoute
@@ -998,13 +985,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiReminderQueueListRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/reply-draft': {
-      id: '/api/reply-draft'
-      path: '/api/reply-draft'
-      fullPath: '/api/reply-draft'
-      preLoaderRoute: typeof ApiReplyDraftRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/reply-media': {
       id: '/api/reply-media'
       path: '/api/reply-media'
@@ -1217,7 +1197,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPromiseHistoryRoute: ApiPromiseHistoryRoute,
   ApiPromisesBoardRoute: ApiPromisesBoardRoute,
   ApiReminderQueueListRoute: ApiReminderQueueListRoute,
-  ApiReplyDraftRoute: ApiReplyDraftRoute,
   ApiReplyMediaRoute: ApiReplyMediaRoute,
   ApiSmsConversationsRoute: ApiSmsConversationsRoute,
   ApiSmsSendRoute: ApiSmsSendRoute,

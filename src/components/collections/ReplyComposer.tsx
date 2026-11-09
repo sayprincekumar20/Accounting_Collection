@@ -1,16 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Bold,
-  Bot,
   CheckCircle2,
-  ChevronDown,
   HardDrive,
   Highlighter,
   Italic,
   Loader2,
   Paperclip,
   Send,
-  Sparkles,
   Strikethrough,
   Underline,
   X,
@@ -274,14 +271,6 @@ type CachedReplyDraft = {
   showBcc: boolean;
 };
 
-export type MessageDraftAction =
-  | "generate"
-  | "professional"
-  | "translate-to-english"
-  | "translate-to-filipino"
-  | "shorten"
-  | "grammar";
-
 const cachedReplyDrafts = new Map<string, CachedReplyDraft>();
 
 export function ReplyComposer({
@@ -323,9 +312,7 @@ export function ReplyComposer({
   const [showCc, setShowCc] = useState(cachedDraft?.showCc ?? false);
   const [showBcc, setShowBcc] = useState(cachedDraft?.showBcc ?? false);
   const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false);
-  const [isAiMenuOpen, setIsAiMenuOpen] = useState(false);
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
-  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const defaultRecipient = useRef(!cachedDraft);
   const defaultSubject = useRef(!cachedDraft);
@@ -420,47 +407,6 @@ export function ReplyComposer({
     textarea.style.height = "auto";
     textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
   }, [message, channel]);
-
-  async function createAiDraft(action: MessageDraftAction) {
-    if (isGeneratingAi) return;
-    setIsGeneratingAi(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/reply-draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          channel,
-          message,
-          conversation: conversationContext?.slice(-20),
-        }),
-      });
-      const result = (await response.json().catch(() => ({}))) as {
-        draft?: string;
-        error?: string;
-      };
-      if (!response.ok || !result.draft) {
-        throw new Error(result.error || "Could not prepare an AI draft");
-      }
-      setMessage(result.draft);
-      setFormattedHtml("");
-      if (editorRef.current && (channel === "email" || channel === "whatsapp")) {
-        editorRef.current.innerText = result.draft;
-        editorRef.current.style.height = "auto";
-        editorRef.current.style.height = `${Math.min(editorRef.current.scrollHeight, 120)}px`;
-      }
-      setIsAiMenuOpen(false);
-      requestAnimationFrame(() => {
-        if (channel === "email" || channel === "whatsapp") editorRef.current?.focus();
-        else viberMessageRef.current?.focus();
-      });
-    } catch (draftError) {
-      setError(getErrorMessage(draftError, channel));
-    } finally {
-      setIsGeneratingAi(false);
-    }
-  }
 
   async function uploadFiles(files: File[]) {
     if (!files.length) return;
@@ -656,15 +602,6 @@ export function ReplyComposer({
           : "Reply on Viber";
 
   if (channel === "viber" || channel === "email" || channel === "whatsapp" || channel === "sms") {
-    const aiActions: { action: MessageDraftAction; label: string }[] = [
-      { action: "generate", label: "Draft from conversation" },
-      { action: "professional", label: "Improve professional tone" },
-      { action: "translate-to-english", label: "Translate Filipino to English" },
-      { action: "translate-to-filipino", label: "Translate English to Filipino" },
-      { action: "shorten", label: "Shorten message" },
-      { action: "grammar", label: "Correct grammar" },
-    ];
-
     return (
       <form onSubmit={handleSubmit} className="space-y-2">
         {canAttach ? (
@@ -913,7 +850,6 @@ export function ReplyComposer({
                 aria-expanded={isAttachmentMenuOpen}
                 onClick={() => {
                   setIsAttachmentMenuOpen((open) => !open);
-                  setIsAiMenuOpen(false);
                 }}
                 className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground"
               >
@@ -1001,53 +937,6 @@ export function ReplyComposer({
               className="max-h-[120px] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-1 py-2 text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground focus:ring-0 disabled:opacity-60"
             />
           )}
-
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              disabled={isGeneratingAi}
-              aria-expanded={isAiMenuOpen}
-              onClick={() => {
-                setIsAiMenuOpen((open) => !open);
-                setIsAttachmentMenuOpen(false);
-              }}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-border px-2.5 text-xs font-semibold text-foreground transition hover:bg-muted disabled:opacity-60 sm:px-3"
-            >
-              {isGeneratingAi ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4 text-primary" />
-              )}
-              <span className="hidden sm:inline">AI Assistant</span>
-              <ChevronDown className="hidden h-3.5 w-3.5 sm:block" />
-            </button>
-            {isAiMenuOpen ? (
-              <div className="absolute bottom-12 right-0 z-30 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-1.5 shadow-xl">
-                <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  AI drafts · review before sending
-                </p>
-                {aiActions.map(({ action, label }) => (
-                  <button
-                    key={action}
-                    type="button"
-                    disabled={
-                      isGeneratingAi ||
-                      (action === "generate" ? !conversationContext?.length : !message.trim())
-                    }
-                    onClick={() => void createAiDraft(action)}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    {action === "generate" ? (
-                      <Bot className="h-4 w-4 shrink-0 text-primary" />
-                    ) : (
-                      <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    )}
-                    {label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
 
           <button
             type="submit"
