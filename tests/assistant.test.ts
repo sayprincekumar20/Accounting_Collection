@@ -174,3 +174,67 @@ describe("navigate (UI action)", () => {
     expect((await runAction("navigate", { page: "not-a-page" }, ctx())).ok).toBe(false);
   });
 });
+
+describe("Phase 2 write actions (confirmation required, real backend calls mocked)", () => {
+  it("approve_clients: needs confirmation; then approves Sales Team clients only", async () => {
+    tables["rJpqXxmxhqJnlLrJ"] = [
+      client("Team Co___a@x.co", 1000, 0, { sales_team: true }),
+      client("Other Co___b@x.co", 1000, 0, { sales_team: false }),
+    ];
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ ok: true, saved: 1 }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const pending = await runAction(
+      "approve_clients",
+      { clients: ["Team Co", "Other Co"], approve: true },
+      ctx(),
+    );
+    expect(pending.needsConfirmation).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+    const r = await runAction(
+      "approve_clients",
+      { clients: ["Team Co", "Other Co"], approve: true },
+      ctx(),
+      true,
+    );
+    expect(r.ok).toBe(true);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain("/webhook/contact-approval-update");
+    const body = JSON.parse(String(init.body));
+    expect(body.items.map((i: { client_id: string }) => i.client_id)).toEqual(["Team Co___a@x.co"]);
+    expect((r.result?.data as { not_sales_team: string[] }).not_sales_team).toEqual(["Other Co"]);
+    vi.unstubAllGlobals();
+  });
+  it("contact_clients: needs confirmation; then starts the contact process for the working set", async () => {
+    tables["rJpqXxmxhqJnlLrJ"] = [
+      client("Team Co___a@x.co", 1000, 0),
+      client("Mid Co___b@x.co", 1000, 0),
+    ];
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ reply: "Running now (2)" }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    expect(
+      (
+        await runAction(
+          "contact_clients",
+          { use_working_set: true },
+          ctx(["Team Co___a@x.co", "Mid Co___b@x.co"]),
+        )
+      ).needsConfirmation,
+    ).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+    const r = await runAction(
+      "contact_clients",
+      { use_working_set: true },
+      ctx(["Team Co___a@x.co", "Mid Co___b@x.co"]),
+      true,
+    );
+    expect((r.result?.data as { plan: string }).plan).toBe("Running now (2)");
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain("/webhook/cliq-call-command");
+    expect(String(JSON.parse(String(init.body)).text).split("\n")).toEqual(["Team Co", "Mid Co"]);
+    vi.unstubAllGlobals();
+  });
+});

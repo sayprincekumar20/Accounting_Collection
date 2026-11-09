@@ -6,6 +6,7 @@ import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 import { downloadCsv } from "@/lib/csv";
 import { ownerName } from "@/lib/owner";
 import { ScheduleLine } from "@/components/collections/ScheduleBadge";
+import { CreditLine } from "@/components/collections/CreditLine";
 import {
   InvoiceTable,
   InvoiceToggle,
@@ -18,6 +19,8 @@ export const Route = createFileRoute("/other-accounts")({
 });
 
 interface Item {
+  credit_terms?: string;
+  credit_limit?: number | null;
   collection_schedule?: string;
   client_id: string;
   client_name: string;
@@ -152,6 +155,7 @@ function OtherAccountsPage() {
                       <td className="px-3 py-3">
                         <p className="font-semibold">{i.client_name}</p>
                         <ScheduleLine value={i.collection_schedule} />
+                        <CreditLine terms={i.credit_terms} limit={i.credit_limit} />
 
                         <div className="mt-1">
                           <InvoiceToggle

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { buildActivity, companyKey, cycleStart, loadActivityTables } from "@/lib/client-activity";
 import { registerAction, type ActionContext } from "./registry";
+import { approveClients, contactClients } from "@/lib/n8n-actions";
 
 type Row = Record<string, unknown>;
 const T = {
@@ -730,3 +731,116 @@ registerAction({
 });
 
 export const ASSISTANT_TOOLS_READY = true;
+
+// ------------------------------------------------------------------ write actions (Phase 2: confirmation required)
+
+async function resolveClients(
+  a: { clients?: string[] | undefined; use_working_set?: boolean | undefined },
+  ctx: ActionContext,
+) {
+  const { active } = await loadCore();
+  const out: Row[] = [];
+  const missing: string[] = [];
+  if (a.use_working_set && ctx.workingSet.length) {
+    for (const id of ctx.workingSet) {
+      const c = active.find((x) => s(x["client_id"]) === id);
+      if (c) out.push(c);
+    }
+  }
+  for (const ref of a.clients ?? []) {
+    const c = findClient(active, ref);
+    if (c) out.push(c);
+    else missing.push(ref);
+  }
+  const seen = new Set<string>();
+  return {
+    list: out.filter((c) => !seen.has(s(c["client_id"])) && !!seen.add(s(c["client_id"]))),
+    missing,
+  };
+}
+
+registerAction({
+  id: "approve_clients",
+  description:
+    "Approve (or remove the approval of) clients on Contact Approvals for THIS cycle (Wednesday to Tuesday), by name or the working set. Approval only allows contact; it does not contact anyone. Clients whose account owner is not in the Sales Team cannot be approved.",
+  kind: "write",
+  permission: "ar",
+  needsConfirmation: true,
+  params: z.object({
+    clients: z
+      .array(z.string().min(2).max(200))
+      .max(200)
+      .optional()
+      .describe("client names or ids"),
+    use_working_set: z.boolean().optional(),
+    approve: z.boolean().describe("true = approve, false = remove the approval"),
+    allow_multibranch: z
+      .boolean()
+      .optional()
+      .describe("true = also allow contacting 5+ branch accounts"),
+    note: z.string().max(300).optional(),
+  }),
+  execute: async (a, ctx) => {
+    const { list, missing } = await resolveClients(a, ctx);
+    const eligible = list.filter(
+      (c) => !(c["sales_team"] === false || s(c["sales_team"]) === "false"),
+    );
+    const blocked = list
+      .filter((c) => c["sales_team"] === false || s(c["sales_team"]) === "false")
+      .map((c) => s(c["client_name"]));
+    if (!eligible.length)
+      return {
+        data: { saved: 0, missing, not_sales_team: blocked },
+        summary: "approve_clients: nothing to save",
+      };
+    const r = await approveClients(
+      ctx.userName,
+      eligible.map((c) => ({
+        client_id: s(c["client_id"]),
+        client_name: s(c["client_name"]),
+        approved: a.approve,
+        note: a.note ?? "via AI assistant",
+        allow_multibranch: !!a.allow_multibranch && a.approve,
+      })),
+    );
+    return {
+      data: {
+        saved: r.saved,
+        approve: a.approve,
+        clients: eligible.map((c) => s(c["client_name"])),
+        missing,
+        not_sales_team: blocked,
+      },
+      ui: { op: "refresh" },
+      summary: `approve_clients: ${a.approve ? "approved" : "removed"} ${r.saved}`,
+    };
+  },
+});
+
+registerAction({
+  id: "contact_clients",
+  description:
+    "Contact clients NOW (replaces the former Zoho Cliq /call): Zoho refresh, fresh statement PDF, text (email, or Viber with SMS fallback) and a call from Grace. Max 20 per request. Only clients approved this cycle are contacted; promise, Sales Team, 5+ branches and the 4-day cooldown are checked. Returns the plan (who will be contacted, who is skipped and why). Use force only when the user explicitly asks to repeat a client already reached this week.",
+  kind: "write",
+  permission: "ar",
+  needsConfirmation: true,
+  params: z.object({
+    clients: z.array(z.string().min(2).max(200)).max(20).optional().describe("client names or ids"),
+    use_working_set: z.boolean().optional(),
+    force: z.boolean().optional(),
+  }),
+  execute: async (a, ctx) => {
+    const { list, missing } = await resolveClients(a, ctx);
+    const names = [...list.map((c) => s(c["client_name"])), ...missing].slice(0, 20);
+    if (!names.length)
+      return {
+        data: { started: false, message: "No clients given." },
+        summary: "contact_clients: nothing",
+      };
+    const r = await contactClients(ctx.userName, names, !!a.force);
+    return {
+      data: { started: true, plan: r.reply, clients: names },
+      summary: `contact_clients: ${names.length} requested`,
+    };
+  },
+});

@@ -330,12 +330,12 @@ function Overview() {
           )}
         />
         <StatCard
-          label="Via /call today"
+          label="Contacted manually today"
           value={String(callCmdToday.length)}
           hint={
             callCmdToday.length
-              ? `clients contacted from #Sales · ${peso(callCmdToday.reduce((t, q) => t + Number(q.collection_amount || 0), 0))}`
-              : "No /call from #Sales yet today"
+              ? `clients contacted from the dashboard · ${peso(callCmdToday.reduce((t, q) => t + Number(q.collection_amount || 0), 0))}`
+              : "No manual contact yet today"
           }
         />
       </div>

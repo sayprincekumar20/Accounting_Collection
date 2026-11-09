@@ -137,6 +137,11 @@ export const Route = createFileRoute("/api/contact-approvals")({
                       ? true
                       : null,
                 collection_schedule: s(c["collection_schedule"]),
+                credit_terms: s(c["credit_terms"]),
+                credit_limit:
+                  c["credit_limit"] != null && s(c["credit_limit"]) !== ""
+                    ? Number(c["credit_limit"])
+                    : null,
                 branch_count: branchesByParent.get(parentKey(c))?.size ?? 0,
                 multibranch: (branchesByParent.get(parentKey(c))?.size ?? 0) >= MIN_BRANCHES,
               };

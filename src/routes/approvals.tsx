@@ -6,6 +6,7 @@ import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 import { downloadCsv } from "@/lib/csv";
 import { ownerName } from "@/lib/owner";
 import { ScheduleLine } from "@/components/collections/ScheduleBadge";
+import { CreditLine } from "@/components/collections/CreditLine";
 import { InvoiceTable, InvoiceToggle } from "@/components/collections/InvoiceTable";
 
 export const Route = createFileRoute("/approvals")({
@@ -24,6 +25,8 @@ interface Invoice {
   po: string;
 }
 interface Item {
+  credit_terms?: string;
+  credit_limit?: number | null;
   collection_schedule?: string;
   client_id: string;
   client_name: string;
@@ -143,6 +146,47 @@ function ApprovalsPage() {
   // 5+ branch accounts: approve (5+ branches allowed) and start the contact right away (same as /call).
   const [selectedMulti, setSelectedMulti] = useState<Set<string>>(new Set());
   const [openMulti, setOpenMulti] = useState<string | null>(null);
+  // Contact approved clients now (replaces the Zoho Cliq /call): same process and checks.
+  async function contactNow(list: Item[]) {
+    setMsg("");
+    const ok = list.filter((i) => i.approved);
+    if (!ok.length) {
+      setMsg("Select approved clients first (only clients approved this cycle can be contacted).");
+      return;
+    }
+    const who = askName();
+    if (!who) return;
+    if (
+      !window.confirm(
+        `Contact now ${ok.length} approved client(s)?\n\n${ok.map((i) => "- " + i.client_name).join("\n")}\n\nEach gets a fresh statement (email, or Viber with SMS fallback) and a call from Grace.`,
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/contact-now", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requested_by: who,
+          names: ok.slice(0, 20).map((i) => i.client_name),
+        }),
+      });
+      const out = (await r.json().catch(() => ({}))) as {
+        reply?: string;
+        error?: string;
+        detail?: string;
+      };
+      if (!r.ok) throw new Error(out.detail || out.error || "Starting the contact failed");
+      setMsg("Started. " + (out.reply || "Results will appear on the Notifications page."));
+      await qc.invalidateQueries({ queryKey: ["contact-approvals"] });
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function approveAndContact(list: Item[]) {
     setMsg("");
     if (!list.length) return;
@@ -183,7 +227,7 @@ function ApprovalsPage() {
       };
       if (!r2.ok) throw new Error(out.detail || out.error || "Starting the contact failed");
       setSelectedMulti(new Set());
-      setMsg("Started. " + (out.reply || "Results will be posted in #Sales."));
+      setMsg("Started. " + (out.reply || "Results will appear on the Notifications page."));
       await qc.invalidateQueries({ queryKey: ["contact-approvals"] });
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Failed");
@@ -320,6 +364,14 @@ function ApprovalsPage() {
         </button>
         <button
           type="button"
+          disabled={busy || !selected.size}
+          onClick={() => contactNow(items.filter((i) => selected.has(i.client_id)))}
+          className="h-9 rounded-lg border border-primary px-3 text-sm font-semibold text-primary disabled:opacity-40"
+        >
+          Contact selected now
+        </button>
+        <button
+          type="button"
           onClick={() =>
             downloadCsv(
               "contact-approvals",
@@ -421,6 +473,7 @@ function ApprovalsPage() {
                             .join(" · ")}
                         </p>
                         <ScheduleLine value={i.collection_schedule} />
+                        <CreditLine terms={i.credit_terms} limit={i.credit_limit} />
                         <div className="mt-1 flex flex-wrap gap-1">
                           {future(i.promise_until) ? (
                             <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
@@ -554,8 +607,8 @@ function ApprovalsPage() {
               Approve &amp; contact selected ({selectedMulti.size})
             </button>
             <span className="text-xs text-muted-foreground">
-              One statement and one call per contact, covering all its branches. Results are posted
-              in #Sales.
+              One statement and one call per contact, covering all its branches. Results appear on
+              the Notifications page.
             </span>
           </div>
           <div className="overflow-x-auto">
@@ -598,6 +651,7 @@ function ApprovalsPage() {
                             .join(" · ")}
                         </p>
                         <ScheduleLine value={i.collection_schedule} />
+                        <CreditLine terms={i.credit_terms} limit={i.credit_limit} />
 
                         <div className="mt-1">
                           <InvoiceToggle
