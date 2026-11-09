@@ -263,7 +263,7 @@ export function Assistant() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open the AI assistant"
-        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90"
+        className="fixed bottom-5 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90"
       >
         <Bot className="h-6 w-6" />
       </button>
