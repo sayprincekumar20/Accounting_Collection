@@ -28,6 +28,8 @@ export interface TwilioMessage {
   date_created: string;
   direction: string; // "inbound" | "outbound-api" | "outbound-call" | "outbound-reply"
   status: string;
+  error_code?: number | string | null;
+  error_message?: string | null;
 }
 
 /**

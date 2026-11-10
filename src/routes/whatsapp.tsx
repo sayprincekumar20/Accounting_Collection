@@ -46,6 +46,7 @@ interface WaMessage {
   content: string;
   ts: string;
   status?: string;
+  error?: string;
   notified_ar?: boolean;
   promise_recorded?: boolean;
   author?: string;
@@ -577,6 +578,11 @@ function WhatsAppInbox() {
                                   {waTime(m.ts)}
                                   {ours ? <ReadTicks status={m.status} /> : null}
                                 </span>
+                                {ours && m.error ? (
+                                  <span className="mt-1 block clear-both text-[11px] font-semibold text-destructive">
+                                    {m.error}
+                                  </span>
+                                ) : null}
                               </div>
                             </div>
                             {m.promise_recorded || m.notified_ar ? (

@@ -520,6 +520,20 @@ export function ReplyComposer({
   const [sent, setSent] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
+  // WhatsApp 24-hour customer-service window (from the client's last message), re-evaluated every minute.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (channel !== "whatsapp") return;
+    const t = window.setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => window.clearInterval(t);
+  }, [channel]);
+  const waLastAt = lastClientMessageAt ? new Date(lastClientMessageAt).getTime() || 0 : 0;
+  const waMsLeft = waLastAt ? waLastAt + 24 * 3600000 - nowTick : -1;
+  const waClosed = channel === "whatsapp" && waMsLeft <= 0;
+  const waLeftText =
+    waMsLeft > 0
+      ? `${Math.floor(waMsLeft / 3600000)} h ${Math.floor((waMsLeft % 3600000) / 60000)} m`
+      : "";
   // Email: collapsed to 'Reply / Reply all / Forward' until the user starts writing (like Gmail);
   // stays open when a draft exists; closes again after sending.
   const [emailOpen, setEmailOpen] = useState(
@@ -1435,18 +1449,18 @@ export function ReplyComposer({
           </div>
         ) : null}
 
-        {channel === "whatsapp" &&
-        (!lastClientMessageAt ||
-          Date.now() - (new Date(lastClientMessageAt).getTime() || 0) > 24 * 3600000) ? (
-          <p
-            className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground"
-            role="note"
-          >
-            <span className="font-semibold">Outside WhatsApp&apos;s 24-hour window.</span> The
-            client has not written in the last 24 hours, so WhatsApp only delivers approved template
-            messages; a free-form reply will most likely be rejected.
+        {channel === "whatsapp" && waClosed ? (
+          <div className="rounded-2xl border border-warning/40 bg-warning/10 p-3" role="note">
+            <p className="text-sm font-semibold text-foreground">
+              24-hour window closed · only approved templates can be sent
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {lastClientMessageAt
+                ? "The client has not written in the last 24 hours. Free replies unlock automatically when the client writes again."
+                : "The client has never written on WhatsApp. Free replies unlock automatically when the client writes."}
+            </p>
             {templateClientId ? (
-              <span className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   disabled={templateState.busy}
@@ -1457,206 +1471,209 @@ export function ReplyComposer({
                 </button>
                 {templateState.note ? (
                   <span
-                    className={
-                      templateState.ok
-                        ? "font-semibold text-success"
-                        : "font-semibold text-destructive"
-                    }
+                    className={`text-xs font-semibold ${templateState.ok ? "text-success" : "text-destructive"}`}
                   >
                     {templateState.note}
                   </span>
                 ) : null}
-              </span>
-            ) : (
-              " Use Viber, SMS or Email instead."
-            )}
+              </div>
+            ) : null}
+          </div>
+        ) : channel === "whatsapp" && waLeftText ? (
+          <p className="px-1 text-[11px] text-muted-foreground">
+            Free reply window:{" "}
+            <span className="font-semibold text-foreground">{waLeftText} left</span>
           </p>
         ) : null}
-        <div className="rounded-2xl border border-border bg-background shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
-          {channel === "email" || channel === "whatsapp" ? (
-            <div
-              ref={editorRef}
-              contentEditable={!isSending}
-              suppressContentEditableWarning
-              role="textbox"
-              aria-multiline="true"
-              aria-label={`${channelLabel} message`}
-              data-placeholder="Write a message..."
-              onKeyUp={rememberSelection}
-              onMouseUp={rememberSelection}
-              onInput={(event) => setEditorValue(event.currentTarget)}
-              onKeyDown={(event) => {
-                const send =
-                  event.key === "Enter" &&
-                  (event.ctrlKey ||
-                    event.metaKey ||
-                    (channel !== "email" && !event.shiftKey && !event.nativeEvent.isComposing));
-                if (send) {
-                  event.preventDefault();
-                  if (!disabled) event.currentTarget.closest("form")?.requestSubmit();
-                }
-              }}
-              className="max-h-40 min-h-11 w-full overflow-y-auto whitespace-pre-wrap break-words rounded-t-2xl border-0 bg-transparent px-3.5 pt-3 pb-1 text-sm leading-6 text-foreground outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)]"
-            />
-          ) : (
-            <textarea
-              ref={viberMessageRef}
-              value={message}
-              disabled={isSending}
-              onChange={(event) => {
-                setMessage(event.target.value);
-                event.currentTarget.style.height = "auto";
-                event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 160)}px`;
-              }}
-              onKeyDown={(event) => {
-                const send =
-                  event.key === "Enter" &&
-                  (event.ctrlKey ||
-                    event.metaKey ||
-                    (!event.shiftKey && !event.nativeEvent.isComposing));
-                if (send) {
-                  event.preventDefault();
-                  if (!disabled) event.currentTarget.form?.requestSubmit();
-                }
-              }}
-              aria-label={`${channelLabel} message`}
-              placeholder="Write a message..."
-              rows={1}
-              className="block max-h-40 min-h-11 w-full resize-none overflow-y-auto rounded-t-2xl border-0 bg-transparent px-3.5 pt-3 pb-1 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground focus:ring-0 disabled:opacity-60"
-            />
-          )}
+        {waClosed ? null : (
+          <div className="rounded-2xl border border-border bg-background shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
+            {channel === "email" || channel === "whatsapp" ? (
+              <div
+                ref={editorRef}
+                contentEditable={!isSending}
+                suppressContentEditableWarning
+                role="textbox"
+                aria-multiline="true"
+                aria-label={`${channelLabel} message`}
+                data-placeholder="Write a message..."
+                onKeyUp={rememberSelection}
+                onMouseUp={rememberSelection}
+                onInput={(event) => setEditorValue(event.currentTarget)}
+                onKeyDown={(event) => {
+                  const send =
+                    event.key === "Enter" &&
+                    (event.ctrlKey ||
+                      event.metaKey ||
+                      (channel !== "email" && !event.shiftKey && !event.nativeEvent.isComposing));
+                  if (send) {
+                    event.preventDefault();
+                    if (!disabled) event.currentTarget.closest("form")?.requestSubmit();
+                  }
+                }}
+                className="max-h-40 min-h-11 w-full overflow-y-auto whitespace-pre-wrap break-words rounded-t-2xl border-0 bg-transparent px-3.5 pt-3 pb-1 text-sm leading-6 text-foreground outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)]"
+              />
+            ) : (
+              <textarea
+                ref={viberMessageRef}
+                value={message}
+                disabled={isSending}
+                onChange={(event) => {
+                  setMessage(event.target.value);
+                  event.currentTarget.style.height = "auto";
+                  event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 160)}px`;
+                }}
+                onKeyDown={(event) => {
+                  const send =
+                    event.key === "Enter" &&
+                    (event.ctrlKey ||
+                      event.metaKey ||
+                      (!event.shiftKey && !event.nativeEvent.isComposing));
+                  if (send) {
+                    event.preventDefault();
+                    if (!disabled) event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                aria-label={`${channelLabel} message`}
+                placeholder="Write a message..."
+                rows={1}
+                className="block max-h-40 min-h-11 w-full resize-none overflow-y-auto rounded-t-2xl border-0 bg-transparent px-3.5 pt-3 pb-1 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground focus:ring-0 disabled:opacity-60"
+              />
+            )}
 
-          <div className="flex items-center gap-1 px-2 pb-2 pt-1">
-            {canAttach ? (
-              <>
-                <button
-                  ref={attachBtnRef}
-                  type="button"
-                  aria-label="Add attachment"
-                  title="Attach a file"
-                  aria-expanded={isAttachmentMenuOpen}
-                  onClick={() => setIsAttachmentMenuOpen((open) => !open)}
-                  className={toolBtn}
-                >
-                  <Paperclip className="h-5 w-5" />
-                </button>
-                <FloatingPanel
-                  anchorRef={attachBtnRef}
-                  open={isAttachmentMenuOpen}
-                  onClose={() => setIsAttachmentMenuOpen(false)}
-                >
-                  <div className="w-56 p-1.5">
-                    <button
-                      type="button"
-                      disabled={isUploading || attachments.length >= maxChannelFiles}
-                      onClick={() => {
-                        setIsAttachmentMenuOpen(false);
-                        fileInputRef.current?.click();
-                      }}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"
-                    >
-                      <Upload className="h-4 w-4" />
-                      Upload from device
-                    </button>
-                    <button
-                      type="button"
-                      disabled={
-                        isUploading || isPickingDrive || attachments.length >= maxChannelFiles
-                      }
-                      onClick={() => {
-                        setIsAttachmentMenuOpen(false);
-                        void selectDriveFiles();
-                      }}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"
-                    >
-                      {isPickingDrive ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <HardDrive className="h-4 w-4" />
-                      )}
-                      Google Drive
-                    </button>
-                    <p className="px-3 pb-1 pt-1 text-[10px] text-muted-foreground">
-                      {channel === "viber"
-                        ? "Images and documents · 15 MB each · 20 MB total"
-                        : `Up to ${maxChannelFiles} ${maxChannelFiles === 1 ? "file" : "files"} · 15 MB each · 20 MB total`}
-                    </p>
-                  </div>
-                </FloatingPanel>
-                <button
-                  type="button"
-                  aria-label="Add from Google Drive"
-                  title="Google Drive"
-                  disabled={isUploading || isPickingDrive || attachments.length >= maxChannelFiles}
-                  onClick={() => void selectDriveFiles()}
-                  className={toolBtn}
-                >
-                  {isPickingDrive ? <Loader2 className="h-5 w-5 animate-spin" /> : <DriveLogo />}
-                </button>
-                <button
-                  type="button"
-                  aria-label="Add image"
-                  title="Add image"
-                  disabled={isUploading || attachments.length >= maxChannelFiles}
-                  onClick={() => imageInputRef.current?.click()}
-                  className={toolBtn}
-                >
-                  <ImageIcon className="h-5 w-5" />
-                </button>
-              </>
-            ) : null}
-            {channel !== "sms" ? (
-              <>
-                <button
-                  ref={emojiBtnRef}
-                  type="button"
-                  aria-label="Insert emoji"
-                  title="Emoji"
-                  aria-expanded={isEmojiOpen}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => setIsEmojiOpen((open) => !open)}
-                  className={toolBtn}
-                >
-                  <Smile className="h-5 w-5" />
-                </button>
-                <FloatingPanel
-                  anchorRef={emojiBtnRef}
-                  open={isEmojiOpen}
-                  onClose={() => setIsEmojiOpen(false)}
-                >
-                  <div className="grid w-72 grid-cols-8 gap-0.5 p-2">
-                    {EMOJIS.map((e) => (
+            <div className="flex items-center gap-1 px-2 pb-2 pt-1">
+              {canAttach ? (
+                <>
+                  <button
+                    ref={attachBtnRef}
+                    type="button"
+                    aria-label="Add attachment"
+                    title="Attach a file"
+                    aria-expanded={isAttachmentMenuOpen}
+                    onClick={() => setIsAttachmentMenuOpen((open) => !open)}
+                    className={toolBtn}
+                  >
+                    <Paperclip className="h-5 w-5" />
+                  </button>
+                  <FloatingPanel
+                    anchorRef={attachBtnRef}
+                    open={isAttachmentMenuOpen}
+                    onClose={() => setIsAttachmentMenuOpen(false)}
+                  >
+                    <div className="w-56 p-1.5">
                       <button
-                        key={e}
                         type="button"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => insertEmoji(e)}
-                        className="rounded-md p-1 text-lg leading-none hover:bg-muted"
+                        disabled={isUploading || attachments.length >= maxChannelFiles}
+                        onClick={() => {
+                          setIsAttachmentMenuOpen(false);
+                          fileInputRef.current?.click();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"
                       >
-                        {e}
+                        <Upload className="h-4 w-4" />
+                        Upload from device
                       </button>
-                    ))}
-                  </div>
-                </FloatingPanel>
-              </>
-            ) : null}
-            <span className="ml-auto hidden pr-2 text-[11px] text-muted-foreground sm:inline">
-              {channel === "email" ? "Ctrl + Enter to send" : "Shift + Enter for new line"}
-            </span>
-            <button
-              type="submit"
-              disabled={disabled}
-              className={`${channel === "email" ? "" : "ml-auto sm:ml-0 "}inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50`}
-            >
-              {isSending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-              {isSending ? "Sending" : "Send"}
-            </button>
+                      <button
+                        type="button"
+                        disabled={
+                          isUploading || isPickingDrive || attachments.length >= maxChannelFiles
+                        }
+                        onClick={() => {
+                          setIsAttachmentMenuOpen(false);
+                          void selectDriveFiles();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"
+                      >
+                        {isPickingDrive ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <HardDrive className="h-4 w-4" />
+                        )}
+                        Google Drive
+                      </button>
+                      <p className="px-3 pb-1 pt-1 text-[10px] text-muted-foreground">
+                        {channel === "viber"
+                          ? "Images and documents · 15 MB each · 20 MB total"
+                          : `Up to ${maxChannelFiles} ${maxChannelFiles === 1 ? "file" : "files"} · 15 MB each · 20 MB total`}
+                      </p>
+                    </div>
+                  </FloatingPanel>
+                  <button
+                    type="button"
+                    aria-label="Add from Google Drive"
+                    title="Google Drive"
+                    disabled={
+                      isUploading || isPickingDrive || attachments.length >= maxChannelFiles
+                    }
+                    onClick={() => void selectDriveFiles()}
+                    className={toolBtn}
+                  >
+                    {isPickingDrive ? <Loader2 className="h-5 w-5 animate-spin" /> : <DriveLogo />}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Add image"
+                    title="Add image"
+                    disabled={isUploading || attachments.length >= maxChannelFiles}
+                    onClick={() => imageInputRef.current?.click()}
+                    className={toolBtn}
+                  >
+                    <ImageIcon className="h-5 w-5" />
+                  </button>
+                </>
+              ) : null}
+              {channel !== "sms" ? (
+                <>
+                  <button
+                    ref={emojiBtnRef}
+                    type="button"
+                    aria-label="Insert emoji"
+                    title="Emoji"
+                    aria-expanded={isEmojiOpen}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => setIsEmojiOpen((open) => !open)}
+                    className={toolBtn}
+                  >
+                    <Smile className="h-5 w-5" />
+                  </button>
+                  <FloatingPanel
+                    anchorRef={emojiBtnRef}
+                    open={isEmojiOpen}
+                    onClose={() => setIsEmojiOpen(false)}
+                  >
+                    <div className="grid w-72 grid-cols-8 gap-0.5 p-2">
+                      {EMOJIS.map((e) => (
+                        <button
+                          key={e}
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => insertEmoji(e)}
+                          className="rounded-md p-1 text-lg leading-none hover:bg-muted"
+                        >
+                          {e}
+                        </button>
+                      ))}
+                    </div>
+                  </FloatingPanel>
+                </>
+              ) : null}
+              <span className="ml-auto hidden pr-2 text-[11px] text-muted-foreground sm:inline">
+                {channel === "email" ? "Ctrl + Enter to send" : "Shift + Enter for new line"}
+              </span>
+              <button
+                type="submit"
+                disabled={disabled}
+                className={`${channel === "email" ? "" : "ml-auto sm:ml-0 "}inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                {isSending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                {isSending ? "Sending" : "Send"}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {error ? (
           <div

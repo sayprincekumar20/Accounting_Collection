@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { deliveryErrorText } from "@/lib/twilio-errors";
 import { fetchRecentWhatsAppMessages } from "@/lib/twilio-server";
 import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { getEnv } from "@/lib/env";
@@ -46,6 +47,8 @@ interface ConversationOut {
     content: string;
     ts: string;
     status: string;
+    /** Why an outgoing message was not delivered (Twilio error code in plain words). */
+    error?: string;
     author?: string;
   }[];
   escalations?: EscalationNote[];
@@ -155,6 +158,9 @@ export const Route = createFileRoute("/api/whatsapp-conversations")({
               ts,
               // Twilio delivery status for our messages: queued/sent/delivered/read/failed/undelivered.
               status: fromDigits === ourNumber ? m.status || "" : "received",
+              ...(fromDigits === ourNumber && m.error_code
+                ? { error: deliveryErrorText(m.error_code, m.error_message) }
+                : {}),
             });
             convo.lastMessageAt = ts;
             convo.lastMessagePreview = (m.body || "").slice(0, 140);
