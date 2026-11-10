@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { RefTag } from "@/components/collections/LogCells";
 import { downloadCsv } from "@/lib/csv";
 import { AppShell } from "@/components/AppShell";
+import { ClientHeader } from "@/components/collections/ClientHeader";
 import {
   Panel,
   ChannelBadge,
@@ -284,6 +285,7 @@ function ClientDetail() {
         </div>
       }
     >
+      <ClientHeader clientId={client.client_id} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Amount due" value={peso(client.collection_amount)} tone="primary" />
         <StatCard

@@ -153,7 +153,13 @@ function OtherAccountsPage() {
                   <Fragment key={i.client_id}>
                     <tr>
                       <td className="px-3 py-3">
-                        <p className="font-semibold">{i.client_name}</p>
+                        <a
+                          href={`/clients/${encodeURIComponent(i.client_id)}`}
+                          className="font-semibold hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {i.client_name}
+                        </a>
                         <ScheduleLine value={i.collection_schedule} />
                         <CreditLine terms={i.credit_terms} limit={i.credit_limit} />
 

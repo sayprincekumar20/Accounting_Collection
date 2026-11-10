@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { escalationAgeHours, escalationType } from "@/lib/escalation-type";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
@@ -12,6 +13,8 @@ export const Route = createFileRoute("/worklist")({
 });
 
 interface Item {
+  type?: string;
+  message?: string;
   entry_id: string;
   client_id: string;
   client_name: string;
@@ -273,7 +276,37 @@ function WorklistPage() {
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     {i.channel} · {when(i.recorded_at)}
                   </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                    <span className="rounded-full bg-secondary px-2 py-0.5 font-semibold text-secondary-foreground">
+                      {i.type || escalationType(i.reason)}
+                    </span>
+                    {(() => {
+                      const h = escalationAgeHours(i.recorded_at, i.status, i.handled_at);
+                      const late = i.status !== "DONE" && h >= 48;
+                      const txt =
+                        h < 48 ? `${Math.max(1, Math.round(h))} h` : `${Math.round(h / 24)} days`;
+                      return (
+                        <span
+                          className={
+                            late ? "font-semibold text-destructive" : "text-muted-foreground"
+                          }
+                        >
+                          {i.status === "DONE" ? `handled in ${txt}` : `open ${txt}`}
+                        </span>
+                      );
+                    })()}
+                  </div>
                   <p className="mt-0.5 whitespace-pre-line text-sm">{i.reason}</p>
+                  {i.message && i.message !== i.reason ? (
+                    <details className="mt-1">
+                      <summary className="cursor-pointer text-xs font-semibold text-primary">
+                        What the client said / full details
+                      </summary>
+                      <pre className="mt-1 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-muted p-2 text-xs">
+                        {i.message}
+                      </pre>
+                    </details>
+                  ) : null}
                   <RefTag refId={i.ref} className="mt-1" />
                   {i.ar_note ? (
                     <p className="mt-1 text-xs text-muted-foreground">AR note: {i.ar_note}</p>

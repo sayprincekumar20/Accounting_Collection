@@ -462,7 +462,13 @@ function ApprovalsPage() {
                         />
                       </td>
                       <td className="px-3 py-3 align-top">
-                        <p className="font-semibold">{i.client_name}</p>
+                        <a
+                          href={`/clients/${encodeURIComponent(i.client_id)}`}
+                          className="font-semibold hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {i.client_name}
+                        </a>
                         <p className="text-xs text-muted-foreground">
                           {[
                             i.parent_name !== i.client_name ? i.parent_name : "",
@@ -644,7 +650,13 @@ function ApprovalsPage() {
                         />
                       </td>
                       <td className="px-3 py-3">
-                        <p className="font-semibold">{i.client_name}</p>
+                        <a
+                          href={`/clients/${encodeURIComponent(i.client_id)}`}
+                          className="font-semibold hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {i.client_name}
+                        </a>
                         <p className="text-xs text-muted-foreground">
                           {[i.ar_owner && `Account Owner: ${ownerName(i.ar_owner)}`]
                             .filter(Boolean)

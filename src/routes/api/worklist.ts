@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { escalationType } from "@/lib/escalation-type";
 import { clearDataTableCache, fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { isNotReachedAlert } from "@/lib/authorship";
 
@@ -56,6 +57,9 @@ export const Route = createFileRoute("/api/worklist")({
                 handled_by: s(e["handled_by"]),
                 handled_at: s(e["handled_at"]),
                 ar_note: s(e["ar_note"]),
+                // Full text saved with the escalation (what the client said / the call excerpt) and its type.
+                message: s(e["message"]),
+                type: escalationType(e["reason"]),
               };
             })
             .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime());

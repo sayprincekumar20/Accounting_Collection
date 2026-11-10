@@ -6,6 +6,7 @@ import {
   useLogFilters,
 } from "@/components/collections/LogFilters";
 import { AppShell } from "@/components/AppShell";
+import { ArInsights } from "@/components/collections/ArInsights";
 import {
   StatCard,
   Panel,
@@ -339,6 +340,8 @@ function Overview() {
           }
         />
       </div>
+
+      <ArInsights />
 
       <div className="mt-5 grid gap-5 xl:grid-cols-3">
         <div className="xl:col-span-2 space-y-5">

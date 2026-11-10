@@ -26,6 +26,7 @@ import { Route as WhatsappRouteImport } from './routes/whatsapp'
 import { Route as WorklistRouteImport } from './routes/worklist'
 import { Route as ApiCallReportsRouteImport } from './routes/api/call-reports'
 import { Route as ApiChannelCountersRouteImport } from './routes/api/channel-counters'
+import { Route as ApiClientSnapshotRouteImport } from './routes/api/client-snapshot'
 import { Route as ApiClientTimelineRouteImport } from './routes/api/client-timeline'
 import { Route as ApiClientsListRouteImport } from './routes/api/clients-list'
 import { Route as ApiContactApprovalsRouteImport } from './routes/api/contact-approvals'
@@ -39,6 +40,7 @@ import { Route as ApiGmailSendRouteImport } from './routes/api/gmail-send'
 import { Route as ApiGmailThreadDetailRouteImport } from './routes/api/gmail-thread-detail'
 import { Route as ApiGmailThreadsListRouteImport } from './routes/api/gmail-threads-list'
 import { Route as ApiGooglePickerConfigRouteImport } from './routes/api/google-picker-config'
+import { Route as ApiInsightsRouteImport } from './routes/api/insights'
 import { Route as ApiNotificationsRouteImport } from './routes/api/notifications'
 import { Route as ApiPromiseHistoryRouteImport } from './routes/api/promise-history'
 import { Route as ApiPromisesBoardRouteImport } from './routes/api/promises-board'
@@ -150,6 +152,11 @@ const ApiChannelCountersRoute = ApiChannelCountersRouteImport.update({
   path: '/api/channel-counters',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiClientSnapshotRoute = ApiClientSnapshotRouteImport.update({
+  id: '/api/client-snapshot',
+  path: '/api/client-snapshot',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiClientTimelineRoute = ApiClientTimelineRouteImport.update({
   id: '/api/client-timeline',
   path: '/api/client-timeline',
@@ -213,6 +220,11 @@ const ApiGmailThreadsListRoute = ApiGmailThreadsListRouteImport.update({
 const ApiGooglePickerConfigRoute = ApiGooglePickerConfigRouteImport.update({
   id: '/api/google-picker-config',
   path: '/api/google-picker-config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInsightsRoute = ApiInsightsRouteImport.update({
+  id: '/api/insights',
+  path: '/api/insights',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiNotificationsRoute = ApiNotificationsRouteImport.update({
@@ -363,6 +375,7 @@ export interface FileRoutesByFullPath {
   '/worklist': typeof WorklistRoute
   '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
+  '/api/client-snapshot': typeof ApiClientSnapshotRoute
   '/api/client-timeline': typeof ApiClientTimelineRoute
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/contact-approvals': typeof ApiContactApprovalsRoute
@@ -376,6 +389,7 @@ export interface FileRoutesByFullPath {
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/google-picker-config': typeof ApiGooglePickerConfigRoute
+  '/api/insights': typeof ApiInsightsRoute
   '/api/notifications': typeof ApiNotificationsRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
@@ -420,6 +434,7 @@ export interface FileRoutesByTo {
   '/worklist': typeof WorklistRoute
   '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
+  '/api/client-snapshot': typeof ApiClientSnapshotRoute
   '/api/client-timeline': typeof ApiClientTimelineRoute
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/contact-approvals': typeof ApiContactApprovalsRoute
@@ -433,6 +448,7 @@ export interface FileRoutesByTo {
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/google-picker-config': typeof ApiGooglePickerConfigRoute
+  '/api/insights': typeof ApiInsightsRoute
   '/api/notifications': typeof ApiNotificationsRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
@@ -478,6 +494,7 @@ export interface FileRoutesById {
   '/worklist': typeof WorklistRoute
   '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
+  '/api/client-snapshot': typeof ApiClientSnapshotRoute
   '/api/client-timeline': typeof ApiClientTimelineRoute
   '/api/clients-list': typeof ApiClientsListRoute
   '/api/contact-approvals': typeof ApiContactApprovalsRoute
@@ -491,6 +508,7 @@ export interface FileRoutesById {
   '/api/gmail-thread-detail': typeof ApiGmailThreadDetailRoute
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/google-picker-config': typeof ApiGooglePickerConfigRoute
+  '/api/insights': typeof ApiInsightsRoute
   '/api/notifications': typeof ApiNotificationsRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
@@ -537,6 +555,7 @@ export interface FileRouteTypes {
     | '/worklist'
     | '/api/call-reports'
     | '/api/channel-counters'
+    | '/api/client-snapshot'
     | '/api/client-timeline'
     | '/api/clients-list'
     | '/api/contact-approvals'
@@ -550,6 +569,7 @@ export interface FileRouteTypes {
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
     | '/api/google-picker-config'
+    | '/api/insights'
     | '/api/notifications'
     | '/api/promise-history'
     | '/api/promises-board'
@@ -594,6 +614,7 @@ export interface FileRouteTypes {
     | '/worklist'
     | '/api/call-reports'
     | '/api/channel-counters'
+    | '/api/client-snapshot'
     | '/api/client-timeline'
     | '/api/clients-list'
     | '/api/contact-approvals'
@@ -607,6 +628,7 @@ export interface FileRouteTypes {
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
     | '/api/google-picker-config'
+    | '/api/insights'
     | '/api/notifications'
     | '/api/promise-history'
     | '/api/promises-board'
@@ -651,6 +673,7 @@ export interface FileRouteTypes {
     | '/worklist'
     | '/api/call-reports'
     | '/api/channel-counters'
+    | '/api/client-snapshot'
     | '/api/client-timeline'
     | '/api/clients-list'
     | '/api/contact-approvals'
@@ -664,6 +687,7 @@ export interface FileRouteTypes {
     | '/api/gmail-thread-detail'
     | '/api/gmail-threads-list'
     | '/api/google-picker-config'
+    | '/api/insights'
     | '/api/notifications'
     | '/api/promise-history'
     | '/api/promises-board'
@@ -709,6 +733,7 @@ export interface RootRouteChildren {
   WorklistRoute: typeof WorklistRoute
   ApiCallReportsRoute: typeof ApiCallReportsRoute
   ApiChannelCountersRoute: typeof ApiChannelCountersRoute
+  ApiClientSnapshotRoute: typeof ApiClientSnapshotRoute
   ApiClientTimelineRoute: typeof ApiClientTimelineRoute
   ApiClientsListRoute: typeof ApiClientsListRoute
   ApiContactApprovalsRoute: typeof ApiContactApprovalsRoute
@@ -722,6 +747,7 @@ export interface RootRouteChildren {
   ApiGmailThreadDetailRoute: typeof ApiGmailThreadDetailRoute
   ApiGmailThreadsListRoute: typeof ApiGmailThreadsListRoute
   ApiGooglePickerConfigRoute: typeof ApiGooglePickerConfigRoute
+  ApiInsightsRoute: typeof ApiInsightsRoute
   ApiNotificationsRoute: typeof ApiNotificationsRoute
   ApiPromiseHistoryRoute: typeof ApiPromiseHistoryRoute
   ApiPromisesBoardRoute: typeof ApiPromisesBoardRoute
@@ -866,6 +892,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChannelCountersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/client-snapshot': {
+      id: '/api/client-snapshot'
+      path: '/api/client-snapshot'
+      fullPath: '/api/client-snapshot'
+      preLoaderRoute: typeof ApiClientSnapshotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/client-timeline': {
       id: '/api/client-timeline'
       path: '/api/client-timeline'
@@ -955,6 +988,13 @@ declare module '@tanstack/react-router' {
       path: '/api/google-picker-config'
       fullPath: '/api/google-picker-config'
       preLoaderRoute: typeof ApiGooglePickerConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/insights': {
+      id: '/api/insights'
+      path: '/api/insights'
+      fullPath: '/api/insights'
+      preLoaderRoute: typeof ApiInsightsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/notifications': {
@@ -1180,6 +1220,7 @@ const rootRouteChildren: RootRouteChildren = {
   WorklistRoute: WorklistRoute,
   ApiCallReportsRoute: ApiCallReportsRoute,
   ApiChannelCountersRoute: ApiChannelCountersRoute,
+  ApiClientSnapshotRoute: ApiClientSnapshotRoute,
   ApiClientTimelineRoute: ApiClientTimelineRoute,
   ApiClientsListRoute: ApiClientsListRoute,
   ApiContactApprovalsRoute: ApiContactApprovalsRoute,
@@ -1193,6 +1234,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGmailThreadDetailRoute: ApiGmailThreadDetailRoute,
   ApiGmailThreadsListRoute: ApiGmailThreadsListRoute,
   ApiGooglePickerConfigRoute: ApiGooglePickerConfigRoute,
+  ApiInsightsRoute: ApiInsightsRoute,
   ApiNotificationsRoute: ApiNotificationsRoute,
   ApiPromiseHistoryRoute: ApiPromiseHistoryRoute,
   ApiPromisesBoardRoute: ApiPromisesBoardRoute,
