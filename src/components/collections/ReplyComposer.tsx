@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { createPortal } from "react-dom";
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   Baseline,
   Upload,
   Image as ImageIcon,
@@ -1007,16 +1010,18 @@ export function ReplyComposer({
               aria-expanded={showAdvancedControls}
               className="rounded-lg px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted"
             >
-              {showAdvancedControls
-                ? "Hide options"
-                : channel === "email"
-                  ? "Email options"
+              {channel === "email"
+                ? showAdvancedControls
+                  ? "Hide To · Cc · Subject"
+                  : "To · Cc · Subject"
+                : showAdvancedControls
+                  ? "Hide options"
                   : "Format"}
             </button>
           </div>
         ) : null}
 
-        {channel === "email" && showAdvancedControls ? (
+        {channel === "email" ? (
           <div className="space-y-2 rounded-xl border border-border bg-background p-2.5">
             <div className="flex flex-wrap gap-1">
               {(
@@ -1052,61 +1057,65 @@ export function ReplyComposer({
                 </button>
               ))}
             </div>
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="w-12 shrink-0">To</span>
-              <EmailChips
-                value={emailTo}
-                onChange={(v) => {
-                  defaultRecipient.current = false;
-                  setEmailTo(v);
-                }}
-                disabled={isSending}
-              />
-            </label>
-            <div className="flex gap-3 pl-14">
-              <button
-                type="button"
-                onClick={() => setShowCc((visible) => !visible)}
-                className="text-xs text-primary hover:underline"
-              >
-                Cc
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowBcc((visible) => !visible)}
-                className="text-xs text-primary hover:underline"
-              >
-                Bcc
-              </button>
-            </div>
-            {showCc ? (
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="w-12 shrink-0">Cc</span>
-                <EmailChips value={emailCc} onChange={setEmailCc} disabled={isSending} />
-              </label>
+            {showAdvancedControls ? (
+              <>
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="w-12 shrink-0">To</span>
+                  <EmailChips
+                    value={emailTo}
+                    onChange={(v) => {
+                      defaultRecipient.current = false;
+                      setEmailTo(v);
+                    }}
+                    disabled={isSending}
+                  />
+                </label>
+                <div className="flex gap-3 pl-14">
+                  <button
+                    type="button"
+                    onClick={() => setShowCc((visible) => !visible)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Cc
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowBcc((visible) => !visible)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Bcc
+                  </button>
+                </div>
+                {showCc ? (
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="w-12 shrink-0">Cc</span>
+                    <EmailChips value={emailCc} onChange={setEmailCc} disabled={isSending} />
+                  </label>
+                ) : null}
+                {showBcc ? (
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="w-12 shrink-0">Bcc</span>
+                    <EmailChips value={emailBcc} onChange={setEmailBcc} disabled={isSending} />
+                  </label>
+                ) : null}
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="w-12 shrink-0">Subject</span>
+                  <input
+                    value={emailSubject}
+                    onChange={(event) => {
+                      defaultSubject.current = false;
+                      setEmailSubject(event.target.value);
+                    }}
+                    disabled={isSending}
+                    className="min-w-0 flex-1 rounded-lg border border-border px-2.5 py-1.5 text-sm text-foreground"
+                  />
+                </label>
+              </>
             ) : null}
-            {showBcc ? (
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="w-12 shrink-0">Bcc</span>
-                <EmailChips value={emailBcc} onChange={setEmailBcc} disabled={isSending} />
-              </label>
-            ) : null}
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="w-12 shrink-0">Subject</span>
-              <input
-                value={emailSubject}
-                onChange={(event) => {
-                  defaultSubject.current = false;
-                  setEmailSubject(event.target.value);
-                }}
-                disabled={isSending}
-                className="min-w-0 flex-1 rounded-lg border border-border px-2.5 py-1.5 text-sm text-foreground"
-              />
-            </label>
           </div>
         ) : null}
 
-        {(channel === "email" || channel === "whatsapp") && showAdvancedControls ? (
+        {channel === "email" || (channel === "whatsapp" && showAdvancedControls) ? (
           <div className="flex flex-wrap items-center gap-1 rounded-xl border border-border bg-background p-1">
             <span className="px-2 text-[11px] text-muted-foreground">Format</span>
             <button
@@ -1269,10 +1278,10 @@ export function ReplyComposer({
                   <option value="" disabled>
                     Size
                   </option>
-                  <option value="2">Small</option>
-                  <option value="3">Normal</option>
-                  <option value="4">Large</option>
-                  <option value="5">Larger</option>
+                  <option value="2">12</option>
+                  <option value="3">14</option>
+                  <option value="4">18</option>
+                  <option value="5">24</option>
                 </select>
                 <button
                   type="button"
@@ -1293,6 +1302,36 @@ export function ReplyComposer({
                   className="rounded-lg p-2 text-foreground hover:bg-muted"
                 >
                   <IndentIncrease className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Align left"
+                  aria-label="Align left"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => exec("justifyLeft")}
+                  className="rounded-lg p-2 text-foreground hover:bg-muted"
+                >
+                  <AlignLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Align centre"
+                  aria-label="Align centre"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => exec("justifyCenter")}
+                  className="rounded-lg p-2 text-foreground hover:bg-muted"
+                >
+                  <AlignCenter className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Align right"
+                  aria-label="Align right"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => exec("justifyRight")}
+                  className="rounded-lg p-2 text-foreground hover:bg-muted"
+                >
+                  <AlignRight className="h-4 w-4" />
                 </button>
               </>
             ) : (
