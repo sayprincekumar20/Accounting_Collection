@@ -321,11 +321,49 @@ type CachedReplyDraft = {
 };
 
 const cachedReplyDrafts = new Map<string, CachedReplyDraft>();
+// Drafts survive a page reload: kept in this browser's localStorage for 7 days, removed on send / discard.
+const DRAFT_PREFIX = "rgf-reply-draft:";
+const DRAFT_MAX_AGE_MS = 7 * 86400000;
+function loadStoredDraft(key: string): CachedReplyDraft | undefined {
+  try {
+    const raw = window.localStorage.getItem(DRAFT_PREFIX + key);
+    if (!raw) return undefined;
+    const { savedAt, draft } = JSON.parse(raw) as { savedAt: number; draft: CachedReplyDraft };
+    if (!savedAt || Date.now() - savedAt > DRAFT_MAX_AGE_MS) {
+      window.localStorage.removeItem(DRAFT_PREFIX + key);
+      return undefined;
+    }
+    return draft;
+  } catch {
+    return undefined;
+  }
+}
+function storeDraft(key: string, draft: CachedReplyDraft, hasContent: boolean) {
+  try {
+    if (hasContent)
+      window.localStorage.setItem(
+        DRAFT_PREFIX + key,
+        JSON.stringify({ savedAt: Date.now(), draft }),
+      );
+    else window.localStorage.removeItem(DRAFT_PREFIX + key);
+  } catch {
+    // storage full or unavailable: the in-memory draft still works
+  }
+}
+function forgetDraft(key: string) {
+  cachedReplyDrafts.delete(key);
+  try {
+    window.localStorage.removeItem(DRAFT_PREFIX + key);
+  } catch {
+    // ignore
+  }
+}
 
 export function ReplyComposer({
   channel,
   draftKey,
   lastClientMessageAt,
+  templateClientId,
   clientName,
   email,
   phone,
@@ -338,6 +376,8 @@ export function ReplyComposer({
   draftKey?: string;
   /** WhatsApp: time of the client's last message (24-hour customer service window). */
   lastClientMessageAt?: string | undefined;
+  /** WhatsApp: client whose approved overdue-reminder template can be sent outside the 24-hour window. */
+  templateClientId?: string | undefined;
   clientName?: string;
   email?: string;
   phone?: string;
@@ -350,7 +390,9 @@ export function ReplyComposer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const viberMessageRef = useRef<HTMLTextAreaElement>(null);
   const draftCacheKey = `${channel}:${draftKey ?? threadId ?? phone ?? email ?? clientName ?? "default"}`;
-  const cachedDraft = cachedReplyDrafts.get(draftCacheKey);
+  const cachedDraft =
+    cachedReplyDrafts.get(draftCacheKey) ??
+    (typeof window !== "undefined" ? loadStoredDraft(draftCacheKey) : undefined);
   const [message, setMessage] = useState(cachedDraft?.message ?? "");
   const [formattedHtml, setFormattedHtml] = useState(cachedDraft?.formattedHtml ?? "");
   const [attachments, setAttachments] = useState<ReplyAttachment[]>(cachedDraft?.attachments ?? []);
@@ -376,6 +418,42 @@ export function ReplyComposer({
   const [sent, setSent] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
+  const [templateState, setTemplateState] = useState<{ busy: boolean; note: string; ok: boolean }>({
+    busy: false,
+    note: "",
+    ok: false,
+  });
+  async function sendTemplate() {
+    if (!templateClientId) return;
+    if (
+      !window.confirm(
+        "Send the approved WhatsApp template 'overdue invoice reminder' (with the statement PDF) to this client?",
+      )
+    )
+      return;
+    setTemplateState({ busy: true, note: "", ok: false });
+    try {
+      const r = await fetch("/api/whatsapp-template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: templateClientId }),
+      });
+      const out = (await r.json().catch(() => ({}))) as {
+        ok?: boolean;
+        note?: string;
+        error?: string;
+      };
+      setTemplateState({
+        busy: false,
+        ok: !!out.ok,
+        note:
+          out.note || out.error || (r.ok ? "Template sent." : "The template could not be sent."),
+      });
+      if (out.ok) onSent?.();
+    } catch {
+      setTemplateState({ busy: false, ok: false, note: "The template could not be sent." });
+    }
+  }
   const imageInputRef = useRef<HTMLInputElement>(null);
   const savedRange = useRef<Range | null>(null);
   const [sendStatus, setSendStatus] = useState<string | null>(null);
@@ -402,7 +480,7 @@ export function ReplyComposer({
         ? new Date()
         : null,
     );
-    cachedReplyDrafts.set(draftCacheKey, {
+    const draftValue = {
       message,
       formattedHtml,
       attachments,
@@ -413,7 +491,13 @@ export function ReplyComposer({
       emailSubject,
       showCc,
       showBcc,
-    });
+    };
+    cachedReplyDrafts.set(draftCacheKey, draftValue);
+    storeDraft(
+      draftCacheKey,
+      draftValue,
+      !!(message.trim() || formattedHtml.replace(/<[^>]*>/g, "").trim() || attachments.length),
+    );
   }, [
     draftCacheKey,
     message,
@@ -495,7 +579,7 @@ export function ReplyComposer({
     setFormattedHtml("");
     setAttachments([]);
     if (editorRef.current) editorRef.current.innerHTML = "";
-    cachedReplyDrafts.delete(draftCacheKey);
+    forgetDraft(draftCacheKey);
     setDraftSavedAt(null);
   }
 
@@ -715,6 +799,7 @@ export function ReplyComposer({
       setSendStatus(
         body.result?.status ? `Accepted (${body.result.status})` : "Accepted by provider",
       );
+      forgetDraft(draftCacheKey);
       setSent(true);
       setTimeout(() => setSent(false), 2000);
       onSent?.();
@@ -1135,8 +1220,32 @@ export function ReplyComposer({
           >
             <span className="font-semibold">Outside WhatsApp&apos;s 24-hour window.</span> The
             client has not written in the last 24 hours, so WhatsApp only delivers approved template
-            messages; a free-form reply will most likely be rejected. Use Viber, SMS or Email
-            instead.
+            messages; a free-form reply will most likely be rejected.
+            {templateClientId ? (
+              <span className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={templateState.busy}
+                  onClick={() => void sendTemplate()}
+                  className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                >
+                  {templateState.busy ? "Sending template…" : "Send overdue reminder template"}
+                </button>
+                {templateState.note ? (
+                  <span
+                    className={
+                      templateState.ok
+                        ? "font-semibold text-success"
+                        : "font-semibold text-destructive"
+                    }
+                  >
+                    {templateState.note}
+                  </span>
+                ) : null}
+              </span>
+            ) : (
+              " Use Viber, SMS or Email instead."
+            )}
           </p>
         ) : null}
         <div className="flex items-end gap-2 rounded-2xl border border-border bg-background p-2 shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">

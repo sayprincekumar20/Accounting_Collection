@@ -55,6 +55,7 @@ import { Route as ApiViberConversationsRouteImport } from './routes/api/viber-co
 import { Route as ApiViberSendRouteImport } from './routes/api/viber-send'
 import { Route as ApiWhatsappConversationsRouteImport } from './routes/api/whatsapp-conversations'
 import { Route as ApiWhatsappSendRouteImport } from './routes/api/whatsapp-send'
+import { Route as ApiWhatsappTemplateRouteImport } from './routes/api/whatsapp-template'
 import { Route as ApiWorklistRouteImport } from './routes/api/worklist'
 import { Route as ClientsIndexRouteImport } from './routes/clients.index'
 import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
@@ -298,6 +299,11 @@ const ApiWhatsappSendRoute = ApiWhatsappSendRouteImport.update({
   path: '/api/whatsapp-send',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWhatsappTemplateRoute = ApiWhatsappTemplateRouteImport.update({
+  id: '/api/whatsapp-template',
+  path: '/api/whatsapp-template',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWorklistRoute = ApiWorklistRouteImport.update({
   id: '/api/worklist',
   path: '/api/worklist',
@@ -404,6 +410,7 @@ export interface FileRoutesByFullPath {
   '/api/viber-send': typeof ApiViberSendRoute
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
   '/api/whatsapp-send': typeof ApiWhatsappSendRoute
+  '/api/whatsapp-template': typeof ApiWhatsappTemplateRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
@@ -463,6 +470,7 @@ export interface FileRoutesByTo {
   '/api/viber-send': typeof ApiViberSendRoute
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
   '/api/whatsapp-send': typeof ApiWhatsappSendRoute
+  '/api/whatsapp-template': typeof ApiWhatsappTemplateRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
@@ -523,6 +531,7 @@ export interface FileRoutesById {
   '/api/viber-send': typeof ApiViberSendRoute
   '/api/whatsapp-conversations': typeof ApiWhatsappConversationsRoute
   '/api/whatsapp-send': typeof ApiWhatsappSendRoute
+  '/api/whatsapp-template': typeof ApiWhatsappTemplateRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
@@ -584,6 +593,7 @@ export interface FileRouteTypes {
     | '/api/viber-send'
     | '/api/whatsapp-conversations'
     | '/api/whatsapp-send'
+    | '/api/whatsapp-template'
     | '/api/worklist'
     | '/clients/$clientId'
     | '/verification/$reviewId'
@@ -643,6 +653,7 @@ export interface FileRouteTypes {
     | '/api/viber-send'
     | '/api/whatsapp-conversations'
     | '/api/whatsapp-send'
+    | '/api/whatsapp-template'
     | '/api/worklist'
     | '/clients/$clientId'
     | '/verification/$reviewId'
@@ -702,6 +713,7 @@ export interface FileRouteTypes {
     | '/api/viber-send'
     | '/api/whatsapp-conversations'
     | '/api/whatsapp-send'
+    | '/api/whatsapp-template'
     | '/api/worklist'
     | '/clients/$clientId'
     | '/verification/$reviewId'
@@ -762,6 +774,7 @@ export interface RootRouteChildren {
   ApiViberSendRoute: typeof ApiViberSendRoute
   ApiWhatsappConversationsRoute: typeof ApiWhatsappConversationsRoute
   ApiWhatsappSendRoute: typeof ApiWhatsappSendRoute
+  ApiWhatsappTemplateRoute: typeof ApiWhatsappTemplateRoute
   ApiWorklistRoute: typeof ApiWorklistRoute
   ClientsClientIdRoute: typeof ClientsClientIdRoute
   VerificationReviewIdRoute: typeof VerificationReviewIdRoute
@@ -1095,6 +1108,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWhatsappSendRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/whatsapp-template': {
+      id: '/api/whatsapp-template'
+      path: '/api/whatsapp-template'
+      fullPath: '/api/whatsapp-template'
+      preLoaderRoute: typeof ApiWhatsappTemplateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/worklist': {
       id: '/api/worklist'
       path: '/api/worklist'
@@ -1249,6 +1269,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiViberSendRoute: ApiViberSendRoute,
   ApiWhatsappConversationsRoute: ApiWhatsappConversationsRoute,
   ApiWhatsappSendRoute: ApiWhatsappSendRoute,
+  ApiWhatsappTemplateRoute: ApiWhatsappTemplateRoute,
   ApiWorklistRoute: ApiWorklistRoute,
   ClientsClientIdRoute: ClientsClientIdRoute,
   VerificationReviewIdRoute: VerificationReviewIdRoute,
