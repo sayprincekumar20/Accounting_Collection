@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { createPortal } from "react-dom";
 import {
+  Forward,
+  Reply,
+  ReplyAll,
   AlignCenter,
   AlignLeft,
   AlignRight,
@@ -517,6 +520,27 @@ export function ReplyComposer({
   const [sent, setSent] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
+  // Email: collapsed to 'Reply / Reply all / Forward' until the user starts writing (like Gmail);
+  // stays open when a draft exists; closes again after sending.
+  const [emailOpen, setEmailOpen] = useState(
+    () =>
+      !!(
+        cachedDraft &&
+        ((cachedDraft.message ?? "").trim() ||
+          (cachedDraft.formattedHtml ?? "").replace(/<[^>]*>/g, "").trim())
+      ),
+  );
+  function selectEmailMode(mode: "reply" | "replyAll" | "forward") {
+    setEmailMode(mode);
+    setEmailTo(mode === "forward" ? "" : email || "");
+    defaultRecipient.current = true;
+    defaultSubject.current = true;
+    setEmailSubject(
+      mode === "forward"
+        ? `Fwd: ${(subject || "(no subject)").replace(/^(?:(?:re|fwd):\s*)+/i, "")}`
+        : subject || "",
+    );
+  }
   const [templateState, setTemplateState] = useState<{ busy: boolean; note: string; ok: boolean }>({
     busy: false,
     note: "",
@@ -901,6 +925,7 @@ export function ReplyComposer({
         body.result?.status ? `Accepted (${body.result.status})` : "Accepted by provider",
       );
       forgetDraft(draftCacheKey);
+      setEmailOpen(false);
       setSent(true);
       setTimeout(() => setSent(false), 2000);
       onSent?.();
@@ -924,6 +949,63 @@ export function ReplyComposer({
         : channel === "whatsapp"
           ? "Reply on WhatsApp"
           : "Reply on Viber";
+
+  if (channel === "email" && !emailOpen) {
+    const pill =
+      "inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-sm hover:bg-muted disabled:opacity-50";
+    return (
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={pill}
+            onClick={() => {
+              selectEmailMode("reply");
+              setEmailOpen(true);
+            }}
+          >
+            <Reply className="h-4 w-4" /> Reply
+          </button>
+          <button
+            type="button"
+            className={pill}
+            disabled={!threadId}
+            onClick={() => {
+              selectEmailMode("replyAll");
+              setEmailOpen(true);
+            }}
+          >
+            <ReplyAll className="h-4 w-4" /> Reply all
+          </button>
+          <button
+            type="button"
+            className={pill}
+            disabled={!threadId}
+            onClick={() => {
+              selectEmailMode("forward");
+              setEmailOpen(true);
+            }}
+          >
+            <Forward className="h-4 w-4" /> Forward
+          </button>
+          {draftSavedAt ? (
+            <button
+              type="button"
+              onClick={() => setEmailOpen(true)}
+              className="ml-auto text-xs font-semibold text-primary hover:underline"
+            >
+              Draft · continue
+            </button>
+          ) : null}
+        </div>
+        {sent ? (
+          <p className="px-1 text-xs font-medium text-success" role="status">
+            {sendStatus || "Email sent"}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
   if (channel === "viber" || channel === "email" || channel === "whatsapp" || channel === "sms") {
     return (
@@ -1004,6 +1086,17 @@ export function ReplyComposer({
                 {channel === "email" ? emailTo || "No recipient" : phone || "No phone"}
               </span>
             </div>
+            {channel === "email" ? (
+              <button
+                type="button"
+                title="Close (the draft is kept)"
+                aria-label="Close the email composer"
+                onClick={() => setEmailOpen(false)}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
             {channel === "whatsapp" ? (
               <button
                 type="button"
@@ -1032,17 +1125,7 @@ export function ReplyComposer({
                   type="button"
                   disabled={!threadId && mode !== "reply"}
                   aria-pressed={emailMode === mode}
-                  onClick={() => {
-                    setEmailMode(mode);
-                    setEmailTo(mode === "forward" ? "" : email || "");
-                    defaultRecipient.current = true;
-                    defaultSubject.current = true;
-                    setEmailSubject(
-                      mode === "forward"
-                        ? `Fwd: ${(subject || "(no subject)").replace(/^(?:(?:re|fwd):\s*)+/i, "")}`
-                        : subject || "",
-                    );
-                  }}
+                  onClick={() => selectEmailMode(mode)}
                   className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
                     emailMode === mode
                       ? "bg-primary text-primary-foreground"

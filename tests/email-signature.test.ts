@@ -43,3 +43,20 @@ describe("recipient chips helpers", () => {
     expect(isEmailAddress("not-an-email")).toBe(false);
   });
 });
+
+describe("quoted message from an HTML email", () => {
+  it("quotes readable text, not HTML code", async () => {
+    const { composeEmail, htmlToText } = await import("../src/lib/email-signature");
+    expect(htmlToText('<div dir="auto">okay i will pay you on 5 nov</div><div><br></div>')).toBe(
+      "okay i will pay you on 5 nov",
+    );
+    expect(htmlToText("Tom &amp; Co<br>line 2")).toBe("Tom & Co\nline 2");
+    const r = composeEmail("<p>Thanks</p>", "Thanks", {
+      from: "ZOHO FORM TEST ACCOUNT",
+      text: '<div dir="auto">okay i will pay you on 5 nov</div><div><br></div>',
+    });
+    expect(r.html).not.toContain("&lt;div");
+    expect(r.html).toContain("okay i will pay you on 5 nov");
+    expect(r.text).toContain("> okay i will pay you on 5 nov");
+  });
+});

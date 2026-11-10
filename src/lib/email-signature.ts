@@ -15,6 +15,25 @@ export const SIGNATURE_HTML =
 const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/** HTML (e.g. a client's email body) -> readable plain text: line breaks kept, tags removed, entities decoded. */
+export function htmlToText(input: string): string {
+  if (!/<[a-z!/][^>]*>/i.test(input)) return input;
+  return input
+    .replace(/<\s*(script|style)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/<\s*\/\s*(div|p|li|tr|h[1-6])\s*>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&amp;/gi, "&")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /** Plain text -> simple HTML (line breaks kept). */
 export function textToHtml(text: string): string {
   return escapeHtml(text).replace(/\r?\n/g, "<br>");
@@ -38,7 +57,7 @@ export function composeEmail(
   let html = (bodyHtml.trim() || textToHtml(bodyText.trim())) + (hasSig ? "" : SIGNATURE_HTML);
   let text = bodyText.trim() + (hasSig ? "" : "\n\n" + SIGNATURE_TEXT);
   if (quote && quote.text.trim()) {
-    const q = quote.text.trim().slice(0, 4000);
+    const q = htmlToText(quote.text).trim().slice(0, 4000);
     html +=
       '<div style="margin-top:16px;color:#6b7280;font-size:13px">' +
       (quote.at ? "On " + escapeHtml(quote.at) + ", " : "") +
