@@ -61,7 +61,8 @@ describe("recent rows and the shared KV cache", () => {
     expect(urls[1]).not.toContain("filter=");
   });
 
-  it("a new server instance reads the table from KV without calling n8n; a write clears KV", async () => {
+  // Skipped while the shared KV cache is switched off (hotfix, KV_ENABLED = false in n8n-datatable.ts).
+  it.skip("a new server instance reads the table from KV without calling n8n; a write clears KV", async () => {
     const first = await import("../src/lib/n8n-datatable");
     await first.fetchAllDataTableRows("CLIENTS");
     expect(urls.length).toBe(1);
@@ -82,7 +83,8 @@ describe("KV write limit (free plan: at most one write per table every 10 minute
     vi.unstubAllGlobals();
     vi.resetModules();
   });
-  it("skips KV writes within 10 minutes of the last one", async () => {
+  // Skipped while the shared KV cache is switched off (hotfix).
+  it.skip("skips KV writes within 10 minutes of the last one", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-11-10T00:00:00Z"));
     kvData.clear();

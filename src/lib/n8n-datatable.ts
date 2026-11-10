@@ -143,7 +143,12 @@ interface KvLike {
   put(key: string, value: string, opts?: { expirationTtl?: number }): Promise<void>;
   delete(key: string): Promise<void>;
 }
+// HOTFIX (Nov 10): the shared KV cache is switched OFF. Writing whole tables to KV (large JSON, awaited
+// before answering) is suspected of exceeding the Worker's time / memory limits so pages did not load.
+// The in-memory cache (fresh 2 min, stale-while-revalidate) and 'recent rows' stay active.
+const KV_ENABLED = false;
 async function kvStore(): Promise<KvLike | null> {
+  if (!KV_ENABLED) return null;
   try {
     const kv = (await getCloudflareBinding("DATA_CACHE")) as KvLike | undefined;
     return kv && typeof kv.get === "function" ? kv : null;
@@ -193,7 +198,7 @@ function startLoad<T>(dataTableId: string, q: TableQuery): Promise<DataTableResu
     .then(async (value) => {
       const entry = { at: Date.now(), value };
       cache.set(key, entry);
-      await kvWrite(key, entry);
+      void kvWrite(key, entry); // never make a page wait for the shared cache
       return value;
     })
     .finally(() => inFlight.delete(key));
