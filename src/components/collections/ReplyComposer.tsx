@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import type React from "react";
+import { createPortal } from "react-dom";
 import {
   Baseline,
+  Upload,
   Image as ImageIcon,
   IndentDecrease,
   IndentIncrease,
@@ -30,6 +33,99 @@ import { EmailChips } from "./EmailChips";
 import { getViberAttachmentBatchError } from "../../lib/viber-media";
 
 export type ReplyComposerChannel = "email" | "sms" | "whatsapp" | "viber";
+
+const toolBtn =
+  "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50";
+
+/** Menu / picker rendered on top of the page (never clipped by a scrolling parent), opening above its button. */
+function FloatingPanel({
+  anchorRef,
+  open,
+  onClose,
+  children,
+}: {
+  anchorRef: React.RefObject<HTMLElement | null>;
+  open: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = anchorRef.current?.getBoundingClientRect();
+      if (r)
+        setPos({
+          left: Math.max(8, Math.min(r.left, window.innerWidth - 300)),
+          bottom: window.innerHeight - r.top + 8,
+        });
+    };
+    place();
+    const onDown = (e: MouseEvent) => {
+      if (
+        !panelRef.current?.contains(e.target as Node) &&
+        !anchorRef.current?.contains(e.target as Node)
+      )
+        onClose();
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, anchorRef, onClose]);
+  if (!open || !pos || typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      ref={panelRef}
+      role="menu"
+      style={{ position: "fixed", left: pos.left, bottom: pos.bottom }}
+      className="z-[90] rounded-xl border border-border bg-card shadow-2xl"
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
+/** Google Drive mark (colours of the Drive logo). */
+function DriveLogo() {
+  return (
+    <svg viewBox="0 0 87.3 78" className="h-5 w-5" aria-hidden>
+      <path
+        d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3L27.5 53H0c0 1.55.4 3.1 1.2 4.5z"
+        fill="#0066da"
+      />
+      <path
+        d="M43.65 25L29.9 1.2c-1.35.8-2.5 1.9-3.3 3.3L1.2 48.5C.4 49.9 0 51.45 0 53h27.5z"
+        fill="#00ac47"
+      />
+      <path
+        d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.5z"
+        fill="#ea4335"
+      />
+      <path
+        d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z"
+        fill="#00832d"
+      />
+      <path
+        d="M59.8 53H27.5L13.75 76.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
+        fill="#2684fc"
+      />
+      <path
+        d="M73.4 26.5l-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25 59.8 53h27.45c0-1.55-.4-3.1-1.2-4.5z"
+        fill="#ffba00"
+      />
+    </svg>
+  );
+}
 
 const EMOJIS = [
   "😊",
@@ -455,6 +551,8 @@ export function ReplyComposer({
     }
   }
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const attachBtnRef = useRef<HTMLButtonElement>(null);
+  const emojiBtnRef = useRef<HTMLButtonElement>(null);
   const savedRange = useRef<Range | null>(null);
   const [sendStatus, setSendStatus] = useState<string | null>(null);
   const smsEstimate = estimateSmsSegments(message);
@@ -1248,104 +1346,7 @@ export function ReplyComposer({
             )}
           </p>
         ) : null}
-        <div className="flex items-end gap-2 rounded-2xl border border-border bg-background p-2 shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
-          {canAttach ? (
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                aria-label="Add attachment"
-                aria-expanded={isAttachmentMenuOpen}
-                onClick={() => {
-                  setIsAttachmentMenuOpen((open) => !open);
-                }}
-                className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              >
-                <Paperclip className="h-5 w-5" />
-              </button>
-              {isAttachmentMenuOpen ? (
-                <div className="absolute bottom-12 left-0 z-30 w-52 rounded-xl border border-border bg-card p-1.5 shadow-xl">
-                  <button
-                    type="button"
-                    disabled={isUploading || attachments.length >= maxChannelFiles}
-                    onClick={() => {
-                      setIsAttachmentMenuOpen(false);
-                      fileInputRef.current?.click();
-                    }}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"
-                  >
-                    <Paperclip className="h-4 w-4" />
-                    Upload from Device
-                  </button>
-                  <button
-                    type="button"
-                    disabled={
-                      isUploading || isPickingDrive || attachments.length >= maxChannelFiles
-                    }
-                    onClick={() => {
-                      setIsAttachmentMenuOpen(false);
-                      void selectDriveFiles();
-                    }}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"
-                  >
-                    {isPickingDrive ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <HardDrive className="h-4 w-4" />
-                    )}
-                    Google Drive
-                  </button>
-                  <p className="px-3 pb-1 pt-1 text-[10px] text-muted-foreground">
-                    {channel === "viber"
-                      ? "Images and documents · 15 MB each · 20 MB total"
-                      : `Up to ${maxChannelFiles} ${maxChannelFiles === 1 ? "file" : "files"} · 15 MB each · 20 MB total`}
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          {canAttach ? (
-            <button
-              type="button"
-              aria-label="Add image"
-              title="Add image"
-              disabled={isUploading || attachments.length >= maxChannelFiles}
-              onClick={() => imageInputRef.current?.click()}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
-            >
-              <ImageIcon className="h-5 w-5" />
-            </button>
-          ) : null}
-          {channel !== "sms" ? (
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                aria-label="Insert emoji"
-                title="Emoji"
-                aria-expanded={isEmojiOpen}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => setIsEmojiOpen((open) => !open)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              >
-                <Smile className="h-5 w-5" />
-              </button>
-              {isEmojiOpen ? (
-                <div className="absolute bottom-12 left-0 z-30 grid w-64 grid-cols-8 gap-0.5 rounded-xl border border-border bg-card p-2 shadow-xl">
-                  {EMOJIS.map((e) => (
-                    <button
-                      key={e}
-                      type="button"
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => insertEmoji(e)}
-                      className="rounded-md p-1 text-lg leading-none hover:bg-muted"
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+        <div className="rounded-2xl border border-border bg-background shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
           {channel === "email" || channel === "whatsapp" ? (
             <div
               ref={editorRef}
@@ -1357,27 +1358,37 @@ export function ReplyComposer({
               data-placeholder="Write a message..."
               onKeyUp={rememberSelection}
               onMouseUp={rememberSelection}
-              onInput={(event) => {
-                setEditorValue(event.currentTarget);
-                event.currentTarget.style.height = "auto";
-                event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 120)}px`;
-              }}
+              onInput={(event) => setEditorValue(event.currentTarget)}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                const send =
+                  event.key === "Enter" &&
+                  (event.ctrlKey ||
+                    event.metaKey ||
+                    (channel !== "email" && !event.shiftKey && !event.nativeEvent.isComposing));
+                if (send) {
                   event.preventDefault();
                   if (!disabled) event.currentTarget.closest("form")?.requestSubmit();
                 }
               }}
-              className="max-h-[120px] min-h-10 min-w-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words border-0 bg-transparent px-1 py-2 text-sm leading-5 text-foreground outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus:ring-0"
+              className="max-h-40 min-h-11 w-full overflow-y-auto whitespace-pre-wrap break-words rounded-t-2xl border-0 bg-transparent px-3.5 pt-3 pb-1 text-sm leading-6 text-foreground outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)]"
             />
           ) : (
             <textarea
               ref={viberMessageRef}
               value={message}
               disabled={isSending}
-              onChange={(event) => setMessage(event.target.value)}
+              onChange={(event) => {
+                setMessage(event.target.value);
+                event.currentTarget.style.height = "auto";
+                event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 160)}px`;
+              }}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                const send =
+                  event.key === "Enter" &&
+                  (event.ctrlKey ||
+                    event.metaKey ||
+                    (!event.shiftKey && !event.nativeEvent.isComposing));
+                if (send) {
                   event.preventDefault();
                   if (!disabled) event.currentTarget.form?.requestSubmit();
                 }
@@ -1385,22 +1396,140 @@ export function ReplyComposer({
               aria-label={`${channelLabel} message`}
               placeholder="Write a message..."
               rows={1}
-              className="max-h-[120px] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-1 py-2 text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground focus:ring-0 disabled:opacity-60"
+              className="block max-h-40 min-h-11 w-full resize-none overflow-y-auto rounded-t-2xl border-0 bg-transparent px-3.5 pt-3 pb-1 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground focus:ring-0 disabled:opacity-60"
             />
           )}
 
-          <button
-            type="submit"
-            disabled={disabled}
-            className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:text-sm"
-          >
-            {isSending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-            <span className="hidden sm:inline">{isSending ? "Sending" : "Send"}</span>
-          </button>
+          <div className="flex items-center gap-1 px-2 pb-2 pt-1">
+            {canAttach ? (
+              <>
+                <button
+                  ref={attachBtnRef}
+                  type="button"
+                  aria-label="Add attachment"
+                  title="Attach a file"
+                  aria-expanded={isAttachmentMenuOpen}
+                  onClick={() => setIsAttachmentMenuOpen((open) => !open)}
+                  className={toolBtn}
+                >
+                  <Paperclip className="h-5 w-5" />
+                </button>
+                <FloatingPanel
+                  anchorRef={attachBtnRef}
+                  open={isAttachmentMenuOpen}
+                  onClose={() => setIsAttachmentMenuOpen(false)}
+                >
+                  <div className="w-56 p-1.5">
+                    <button
+                      type="button"
+                      disabled={isUploading || attachments.length >= maxChannelFiles}
+                      onClick={() => {
+                        setIsAttachmentMenuOpen(false);
+                        fileInputRef.current?.click();
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Upload from device
+                    </button>
+                    <button
+                      type="button"
+                      disabled={
+                        isUploading || isPickingDrive || attachments.length >= maxChannelFiles
+                      }
+                      onClick={() => {
+                        setIsAttachmentMenuOpen(false);
+                        void selectDriveFiles();
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50"
+                    >
+                      {isPickingDrive ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <HardDrive className="h-4 w-4" />
+                      )}
+                      Google Drive
+                    </button>
+                    <p className="px-3 pb-1 pt-1 text-[10px] text-muted-foreground">
+                      {channel === "viber"
+                        ? "Images and documents · 15 MB each · 20 MB total"
+                        : `Up to ${maxChannelFiles} ${maxChannelFiles === 1 ? "file" : "files"} · 15 MB each · 20 MB total`}
+                    </p>
+                  </div>
+                </FloatingPanel>
+                <button
+                  type="button"
+                  aria-label="Add from Google Drive"
+                  title="Google Drive"
+                  disabled={isUploading || isPickingDrive || attachments.length >= maxChannelFiles}
+                  onClick={() => void selectDriveFiles()}
+                  className={toolBtn}
+                >
+                  {isPickingDrive ? <Loader2 className="h-5 w-5 animate-spin" /> : <DriveLogo />}
+                </button>
+                <button
+                  type="button"
+                  aria-label="Add image"
+                  title="Add image"
+                  disabled={isUploading || attachments.length >= maxChannelFiles}
+                  onClick={() => imageInputRef.current?.click()}
+                  className={toolBtn}
+                >
+                  <ImageIcon className="h-5 w-5" />
+                </button>
+              </>
+            ) : null}
+            {channel !== "sms" ? (
+              <>
+                <button
+                  ref={emojiBtnRef}
+                  type="button"
+                  aria-label="Insert emoji"
+                  title="Emoji"
+                  aria-expanded={isEmojiOpen}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => setIsEmojiOpen((open) => !open)}
+                  className={toolBtn}
+                >
+                  <Smile className="h-5 w-5" />
+                </button>
+                <FloatingPanel
+                  anchorRef={emojiBtnRef}
+                  open={isEmojiOpen}
+                  onClose={() => setIsEmojiOpen(false)}
+                >
+                  <div className="grid w-72 grid-cols-8 gap-0.5 p-2">
+                    {EMOJIS.map((e) => (
+                      <button
+                        key={e}
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => insertEmoji(e)}
+                        className="rounded-md p-1 text-lg leading-none hover:bg-muted"
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                </FloatingPanel>
+              </>
+            ) : null}
+            <span className="ml-auto hidden pr-2 text-[11px] text-muted-foreground sm:inline">
+              {channel === "email" ? "Ctrl + Enter to send" : "Shift + Enter for new line"}
+            </span>
+            <button
+              type="submit"
+              disabled={disabled}
+              className={`${channel === "email" ? "" : "ml-auto sm:ml-0 "}inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50`}
+            >
+              {isSending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              {isSending ? "Sending" : "Send"}
+            </button>
+          </div>
         </div>
 
         {error ? (
@@ -1422,7 +1551,7 @@ export function ReplyComposer({
                 ? "Uploading attachments…"
                 : channel === "sms"
                   ? `${smsEstimate.characters} chars · ${smsEstimate.units}/${smsEstimate.unitsPerSegment} ${smsEstimate.encoding} units · ${smsEstimate.segments} segment${smsEstimate.segments === 1 ? "" : "s"}`
-                  : `${channel === "viber" ? "Viber" : channel === "whatsapp" ? "WhatsApp" : "Email"} · Ctrl+Enter to send · Enter for a new line`}
+                  : `${channel === "viber" ? "Viber" : channel === "whatsapp" ? "WhatsApp" : "Email"}`}
             </span>
             {channel === "whatsapp" && message.trim() ? (
               <span>{message.trim().length} / 4096 characters</span>
