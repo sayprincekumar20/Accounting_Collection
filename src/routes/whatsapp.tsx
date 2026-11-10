@@ -641,6 +641,9 @@ function WhatsAppInbox() {
                 key={activeItem.client_id}
                 channel="whatsapp"
                 draftKey={activeItem.client_id}
+                lastClientMessageAt={
+                  [...activeItem.messages].reverse().find((m) => m.role === "client")?.ts
+                }
                 clientName={
                   activeClient?.client_name || activeClient?.parent_name || activeItem.client_name
                 }

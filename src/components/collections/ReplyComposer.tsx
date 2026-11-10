@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Baseline,
+  Image as ImageIcon,
+  IndentDecrease,
+  IndentIncrease,
+  Redo2,
+  Smile,
+  Trash2,
+  Undo2,
   Eraser,
   Link2,
   List,
@@ -23,6 +30,41 @@ import { EmailChips } from "./EmailChips";
 import { getViberAttachmentBatchError } from "../../lib/viber-media";
 
 export type ReplyComposerChannel = "email" | "sms" | "whatsapp" | "viber";
+
+const EMOJIS = [
+  "😊",
+  "🙂",
+  "😀",
+  "😉",
+  "🙏",
+  "👍",
+  "👌",
+  "👏",
+  "🤝",
+  "✅",
+  "☑️",
+  "❗",
+  "⚠️",
+  "📌",
+  "📎",
+  "📄",
+  "🧾",
+  "💰",
+  "💵",
+  "💳",
+  "🏦",
+  "📅",
+  "⏰",
+  "📞",
+  "✉️",
+  "📩",
+  "🙌",
+  "💯",
+  "😅",
+  "🤔",
+  "🎉",
+  "❤️",
+];
 
 interface ReplyAttachment {
   id: string;
@@ -283,6 +325,7 @@ const cachedReplyDrafts = new Map<string, CachedReplyDraft>();
 export function ReplyComposer({
   channel,
   draftKey,
+  lastClientMessageAt,
   clientName,
   email,
   phone,
@@ -293,6 +336,8 @@ export function ReplyComposer({
 }: {
   channel: ReplyComposerChannel;
   draftKey?: string;
+  /** WhatsApp: time of the client's last message (24-hour customer service window). */
+  lastClientMessageAt?: string | undefined;
   clientName?: string;
   email?: string;
   phone?: string;
@@ -329,6 +374,10 @@ export function ReplyComposer({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
+  const [isEmojiOpen, setIsEmojiOpen] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const savedRange = useRef<Range | null>(null);
   const [sendStatus, setSendStatus] = useState<string | null>(null);
   const smsEstimate = estimateSmsSegments(message);
 
@@ -347,6 +396,12 @@ export function ReplyComposer({
   }, [subject, emailMode]);
 
   useEffect(() => {
+    // 'Draft saved at …' indicator (drafts are kept while the dashboard is open).
+    setDraftSavedAt(
+      message.trim() || formattedHtml.replace(/<[^>]*>/g, "").trim() || attachments.length
+        ? new Date()
+        : null,
+    );
     cachedReplyDrafts.set(draftCacheKey, {
       message,
       formattedHtml,
@@ -399,6 +454,49 @@ export function ReplyComposer({
     const text = element.innerText.replace(/\u00a0/g, " ").trim();
     setFormattedHtml(html);
     setMessage(text);
+  }
+  // Remember the editor selection so toolbar dropdowns apply to the selected text.
+  function rememberSelection() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && editorRef.current?.contains(sel.anchorNode))
+      savedRange.current = sel.getRangeAt(0).cloneRange();
+  }
+  function exec(command: string, value?: string) {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const sel = window.getSelection();
+    if (savedRange.current && sel) {
+      sel.removeAllRanges();
+      sel.addRange(savedRange.current);
+    }
+    document.execCommand(command, false, value);
+    setEditorValue(editor);
+    rememberSelection();
+  }
+  function insertEmoji(emoji: string) {
+    setIsEmojiOpen(false);
+    if (editorRef.current && (channel === "email" || channel === "whatsapp")) {
+      exec("insertText", emoji);
+      return;
+    }
+    const el = viberMessageRef.current;
+    const start = el?.selectionStart ?? message.length;
+    const end = el?.selectionEnd ?? message.length;
+    setMessage(message.slice(0, start) + emoji + message.slice(end));
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  }
+  function discardDraft() {
+    if (!window.confirm("Discard this draft?")) return;
+    setMessage("");
+    setFormattedHtml("");
+    setAttachments([]);
+    if (editorRef.current) editorRef.current.innerHTML = "";
+    cachedReplyDrafts.delete(draftCacheKey);
+    setDraftSavedAt(null);
   }
 
   function format(
@@ -659,6 +757,17 @@ export function ReplyComposer({
             onChange={(event) => void uploadFiles(Array.from(event.currentTarget.files || []))}
           />
         ) : null}
+        {canAttach ? (
+          <input
+            ref={imageInputRef}
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            className="hidden"
+            aria-label={`Choose images to attach on ${channel}`}
+            onChange={(event) => void uploadFiles(Array.from(event.currentTarget.files || []))}
+          />
+        ) : null}
 
         {canAttach && attachments.length ? (
           <ul className="flex flex-wrap gap-2" aria-label={`${channel} attachments`}>
@@ -910,6 +1019,98 @@ export function ReplyComposer({
                 >
                   <Eraser className="h-4 w-4" />
                 </button>
+                <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+                <button
+                  type="button"
+                  title="Undo"
+                  aria-label="Undo"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => exec("undo")}
+                  className="rounded-lg p-2 text-foreground hover:bg-muted"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Redo"
+                  aria-label="Redo"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => exec("redo")}
+                  className="rounded-lg p-2 text-foreground hover:bg-muted"
+                >
+                  <Redo2 className="h-4 w-4" />
+                </button>
+                <select
+                  aria-label="Paragraph style"
+                  defaultValue=""
+                  onChange={(event) => {
+                    if (event.target.value) exec("formatBlock", event.target.value);
+                    event.target.value = "";
+                  }}
+                  className="h-8 rounded-lg border border-border bg-background px-1.5 text-xs"
+                >
+                  <option value="" disabled>
+                    Paragraph
+                  </option>
+                  <option value="P">Normal</option>
+                  <option value="H2">Heading</option>
+                  <option value="H3">Subheading</option>
+                  <option value="BLOCKQUOTE">Quote</option>
+                </select>
+                <select
+                  aria-label="Font"
+                  defaultValue=""
+                  onChange={(event) => {
+                    if (event.target.value) exec("fontName", event.target.value);
+                    event.target.value = "";
+                  }}
+                  className="h-8 rounded-lg border border-border bg-background px-1.5 text-xs"
+                >
+                  <option value="" disabled>
+                    Font
+                  </option>
+                  <option value="Inter, Arial, sans-serif">Inter</option>
+                  <option value="Arial, sans-serif">Arial</option>
+                  <option value="Georgia, serif">Georgia</option>
+                  <option value="'Courier New', monospace">Courier</option>
+                </select>
+                <select
+                  aria-label="Size"
+                  defaultValue=""
+                  onChange={(event) => {
+                    if (event.target.value) exec("fontSize", event.target.value);
+                    event.target.value = "";
+                  }}
+                  className="h-8 rounded-lg border border-border bg-background px-1.5 text-xs"
+                >
+                  <option value="" disabled>
+                    Size
+                  </option>
+                  <option value="2">Small</option>
+                  <option value="3">Normal</option>
+                  <option value="4">Large</option>
+                  <option value="5">Larger</option>
+                </select>
+                <button
+                  type="button"
+                  title="Decrease indent"
+                  aria-label="Decrease indent"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => exec("outdent")}
+                  className="rounded-lg p-2 text-foreground hover:bg-muted"
+                >
+                  <IndentDecrease className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Increase indent"
+                  aria-label="Increase indent"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => exec("indent")}
+                  className="rounded-lg p-2 text-foreground hover:bg-muted"
+                >
+                  <IndentIncrease className="h-4 w-4" />
+                </button>
               </>
             ) : (
               <button
@@ -925,6 +1126,19 @@ export function ReplyComposer({
           </div>
         ) : null}
 
+        {channel === "whatsapp" &&
+        (!lastClientMessageAt ||
+          Date.now() - (new Date(lastClientMessageAt).getTime() || 0) > 24 * 3600000) ? (
+          <p
+            className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground"
+            role="note"
+          >
+            <span className="font-semibold">Outside WhatsApp&apos;s 24-hour window.</span> The
+            client has not written in the last 24 hours, so WhatsApp only delivers approved template
+            messages; a free-form reply will most likely be rejected. Use Viber, SMS or Email
+            instead.
+          </p>
+        ) : null}
         <div className="flex items-end gap-2 rounded-2xl border border-border bg-background p-2 shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
           {canAttach ? (
             <div className="relative shrink-0">
@@ -981,6 +1195,48 @@ export function ReplyComposer({
             </div>
           ) : null}
 
+          {canAttach ? (
+            <button
+              type="button"
+              aria-label="Add image"
+              title="Add image"
+              disabled={isUploading || attachments.length >= maxChannelFiles}
+              onClick={() => imageInputRef.current?.click()}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+            >
+              <ImageIcon className="h-5 w-5" />
+            </button>
+          ) : null}
+          {channel !== "sms" ? (
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                aria-label="Insert emoji"
+                title="Emoji"
+                aria-expanded={isEmojiOpen}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => setIsEmojiOpen((open) => !open)}
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <Smile className="h-5 w-5" />
+              </button>
+              {isEmojiOpen ? (
+                <div className="absolute bottom-12 left-0 z-30 grid w-64 grid-cols-8 gap-0.5 rounded-xl border border-border bg-card p-2 shadow-xl">
+                  {EMOJIS.map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => insertEmoji(e)}
+                      className="rounded-md p-1 text-lg leading-none hover:bg-muted"
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {channel === "email" || channel === "whatsapp" ? (
             <div
               ref={editorRef}
@@ -990,6 +1246,8 @@ export function ReplyComposer({
               aria-multiline="true"
               aria-label={`${channelLabel} message`}
               data-placeholder="Write a message..."
+              onKeyUp={rememberSelection}
+              onMouseUp={rememberSelection}
               onInput={(event) => {
                 setEditorValue(event.currentTarget);
                 event.currentTarget.style.height = "auto";
@@ -1049,13 +1307,33 @@ export function ReplyComposer({
             {sendStatus || "Message accepted by provider"}
           </p>
         ) : (
-          <p className="px-1 text-[10px] text-muted-foreground">
-            {isUploading
-              ? "Uploading attachments…"
-              : channel === "sms"
-                ? `${smsEstimate.characters} chars · ${smsEstimate.units}/${smsEstimate.unitsPerSegment} ${smsEstimate.encoding} units · ${smsEstimate.segments} segment${smsEstimate.segments === 1 ? "" : "s"}`
-                : `${channel === "viber" ? "Viber" : channel === "whatsapp" ? "WhatsApp" : "Email"} composer · Ctrl+Enter to send`}
-          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[10px] text-muted-foreground">
+            <span>
+              {isUploading
+                ? "Uploading attachments…"
+                : channel === "sms"
+                  ? `${smsEstimate.characters} chars · ${smsEstimate.units}/${smsEstimate.unitsPerSegment} ${smsEstimate.encoding} units · ${smsEstimate.segments} segment${smsEstimate.segments === 1 ? "" : "s"}`
+                  : `${channel === "viber" ? "Viber" : channel === "whatsapp" ? "WhatsApp" : "Email"} · Ctrl+Enter to send · Enter for a new line`}
+            </span>
+            {channel === "whatsapp" && message.trim() ? (
+              <span>{message.trim().length} / 4096 characters</span>
+            ) : null}
+            {draftSavedAt ? (
+              <span className="ml-auto inline-flex items-center gap-2">
+                Draft saved at{" "}
+                {draftSavedAt.toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" })}
+                <button
+                  type="button"
+                  onClick={discardDraft}
+                  title="Discard draft"
+                  aria-label="Discard draft"
+                  className="rounded p-0.5 hover:bg-muted hover:text-foreground"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            ) : null}
+          </div>
         )}
       </form>
     );
