@@ -8,11 +8,16 @@ export function EmailChips({
   onChange,
   disabled,
   placeholder,
+  autoFocus,
+  invalid,
 }: {
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  autoFocus?: boolean;
+  /** Highlight the field (e.g. Forward without a recipient). */
+  invalid?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const list = splitAddresses(value);
@@ -23,7 +28,9 @@ export function EmailChips({
   };
   const remove = (a: string) => onChange(list.filter((x) => x !== a).join(", "));
   return (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
+    <div
+      className={`flex min-w-0 flex-1 flex-wrap items-center gap-1 rounded-lg border bg-background px-2 py-1 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 ${invalid ? "border-destructive/60" : "border-border"}`}
+    >
       {list.map((a) => (
         <span
           key={a}
@@ -46,6 +53,7 @@ export function EmailChips({
       <input
         value={draft}
         disabled={disabled}
+        autoFocus={autoFocus}
         placeholder={list.length ? "" : (placeholder ?? "name@example.com")}
         onChange={(e) => {
           const v = e.target.value;

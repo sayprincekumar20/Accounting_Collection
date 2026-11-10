@@ -1004,20 +1004,16 @@ export function ReplyComposer({
                 {channel === "email" ? emailTo || "No recipient" : phone || "No phone"}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowAdvancedControls((visible) => !visible)}
-              aria-expanded={showAdvancedControls}
-              className="rounded-lg px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted"
-            >
-              {channel === "email"
-                ? showAdvancedControls
-                  ? "Hide To · Cc · Subject"
-                  : "To · Cc · Subject"
-                : showAdvancedControls
-                  ? "Hide options"
-                  : "Format"}
-            </button>
+            {channel === "whatsapp" ? (
+              <button
+                type="button"
+                onClick={() => setShowAdvancedControls((visible) => !visible)}
+                aria-expanded={showAdvancedControls}
+                className="rounded-lg px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted"
+              >
+                {showAdvancedControls ? "Hide format" : "Format"}
+              </button>
+            ) : null}
           </div>
         ) : null}
 
@@ -1057,11 +1053,17 @@ export function ReplyComposer({
                 </button>
               ))}
             </div>
-            {showAdvancedControls ? (
+            {channel === "email" ? (
               <>
                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span className="w-12 shrink-0">To</span>
                   <EmailChips
+                    key={`to-${emailMode}`}
+                    placeholder={
+                      emailMode === "forward" ? "Add a recipient to forward to" : "name@example.com"
+                    }
+                    autoFocus={emailMode === "forward"}
+                    invalid={!emailTo.trim()}
                     value={emailTo}
                     onChange={(v) => {
                       defaultRecipient.current = false;
@@ -1116,8 +1118,10 @@ export function ReplyComposer({
         ) : null}
 
         {channel === "email" || (channel === "whatsapp" && showAdvancedControls) ? (
-          <div className="flex flex-wrap items-center gap-1 rounded-xl border border-border bg-background p-1">
-            <span className="px-2 text-[11px] text-muted-foreground">Format</span>
+          <div className="flex flex-nowrap items-center gap-0.5 overflow-x-auto rounded-xl border border-border bg-background p-1 [scrollbar-width:thin]">
+            {channel !== "email" ? (
+              <span className="px-2 text-[11px] text-muted-foreground">Format</span>
+            ) : null}
             <button
               type="button"
               onMouseDown={(event) => event.preventDefault()}
@@ -1242,7 +1246,7 @@ export function ReplyComposer({
                   className="h-8 rounded-lg border border-border bg-background px-1.5 text-xs"
                 >
                   <option value="" disabled>
-                    Paragraph
+                    Text style
                   </option>
                   <option value="P">Normal</option>
                   <option value="H2">Heading</option>
