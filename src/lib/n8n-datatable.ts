@@ -21,7 +21,11 @@ import { getEnv } from "@/lib/env";
 const N8N_BASE = "https://rareglobalfood.app.n8n.cloud";
 const MAX_PAGE_LIMIT = 250; // n8n's own hard cap per request
 const MAX_PAGES = 40; // 40 x 250 = 10,000 rows per table before we flag truncation
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 120_000; // fresh for 2 minutes
+// After that, a cached table up to STALE_MAX_MS old is returned IMMEDIATELY while a fresh copy is
+// fetched in the background (stale-while-revalidate): pages no longer wait for n8n when this server
+// instance has seen the table recently. Writes from the dashboard clear the cache (see below).
+const STALE_MAX_MS = 10 * 60_000;
 
 export interface DataTableResult<T> {
   rows: T[];
@@ -102,6 +106,11 @@ export async function fetchDataTable<T = Record<string, unknown>>(
     return hit.value as DataTableResult<T>;
   }
   const pending = inFlight.get(dataTableId);
+  // Stale but recent: answer now, refresh in the background (one refresh at a time per table).
+  if (!opts.fresh && hit && now - hit.at < STALE_MAX_MS) {
+    if (!pending) void refreshInBackground<T>(dataTableId);
+    return hit.value as DataTableResult<T>;
+  }
   if (pending) return pending as Promise<DataTableResult<T>>;
 
   const p = loadTable<T>(dataTableId)
@@ -112,6 +121,20 @@ export async function fetchDataTable<T = Record<string, unknown>>(
     .finally(() => inFlight.delete(dataTableId));
   inFlight.set(dataTableId, p as Promise<DataTableResult<unknown>>);
   return p;
+}
+
+function refreshInBackground<T>(dataTableId: string): Promise<void> {
+  const p = loadTable<T>(dataTableId)
+    .then((value) => {
+      cache.set(dataTableId, { at: Date.now(), value });
+      return value;
+    })
+    .finally(() => inFlight.delete(dataTableId));
+  inFlight.set(dataTableId, p as Promise<DataTableResult<unknown>>);
+  return p.then(
+    () => undefined,
+    (err) => console.error(`[n8n-datatable] background refresh of ${dataTableId} failed:`, err),
+  );
 }
 
 /** Backwards-compatible helper used by the existing routes: rows only. */
@@ -172,7 +195,10 @@ export function clearDataTableCache(dataTableId: string): void {
 }
 
 /** Insert rows into an n8n data table (used by the assistant's audit log). */
-export async function insertDataTableRows(dataTableId: string, rows: Record<string, unknown>[]): Promise<void> {
+export async function insertDataTableRows(
+  dataTableId: string,
+  rows: Record<string, unknown>[],
+): Promise<void> {
   if (!rows.length) return;
   const apiKey = await getEnv("N8N_API_KEY");
   if (!apiKey) throw new Error("N8N_API_KEY is not configured");
