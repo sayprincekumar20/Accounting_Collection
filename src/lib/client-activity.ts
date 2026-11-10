@@ -1,4 +1,4 @@
-import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
+import { fetchAllDataTableRows, RECENT_60_DAYS } from "@/lib/n8n-datatable";
 
 // Last contact per client (weekly run or /call): latest text sent, latest call placed and its result.
 // Matched on the company part of client_id (before "___"), so a client whose contact changed keeps
@@ -32,8 +32,9 @@ export function cycleStart(now: Date = new Date()): Date {
 
 export async function loadActivityTables(): Promise<[Act[], Act[], Act[]]> {
   return Promise.all([
-    fetchAllDataTableRows<Act>(MESSAGE_LOGS).catch(() => [] as Act[]),
-    fetchAllDataTableRows<Act>(CONVERSATIONS).catch(() => [] as Act[]),
+    // Only recent activity is needed here (this cycle): read the last 60 days.
+    fetchAllDataTableRows<Act>(MESSAGE_LOGS, RECENT_60_DAYS).catch(() => [] as Act[]),
+    fetchAllDataTableRows<Act>(CONVERSATIONS, RECENT_60_DAYS).catch(() => [] as Act[]),
     fetchAllDataTableRows<Act>(RETRIES).catch(() => [] as Act[]),
   ]);
 }

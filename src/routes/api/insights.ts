@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
+import { fetchAllDataTableRows, RECENT_60_DAYS } from "@/lib/n8n-datatable";
 import { companyKey, cycleStart } from "@/lib/client-activity";
 import { isNotReachedAlert } from "@/lib/authorship";
 import { ESCALATION_TYPES, escalationAgeHours, escalationType } from "@/lib/escalation-type";
@@ -253,8 +253,9 @@ export const Route = createFileRoute("/api/insights")({
             fetchAllDataTableRows<Row>("JyGFOqTqI3QXHJbb").catch(() => [] as Row[]),
             fetchAllDataTableRows<Row>("ANfkZZDIrDuC4RjK").catch(() => [] as Row[]),
             fetchAllDataTableRows<Row>("3IvKKI4AwrBlDeOo").catch(() => [] as Row[]),
-            fetchAllDataTableRows<Row>("a32Z5oGcNi0xzefb").catch(() => [] as Row[]),
-            fetchAllDataTableRows<Row>("2WtfkEaHiBSzgItW").catch(() => [] as Row[]),
+            // the funnel only uses this cycle: last 60 days are enough
+            fetchAllDataTableRows<Row>("a32Z5oGcNi0xzefb", RECENT_60_DAYS).catch(() => [] as Row[]),
+            fetchAllDataTableRows<Row>("2WtfkEaHiBSzgItW", RECENT_60_DAYS).catch(() => [] as Row[]),
           ]);
           return json(computeInsights(clients, promises, escalations, approvals, logs, convos));
         } catch (err) {

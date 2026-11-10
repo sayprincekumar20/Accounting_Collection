@@ -4,6 +4,7 @@ import { z } from "zod";
 const tables: Record<string, Record<string, unknown>[]> = {};
 const inserted: { table: string; rows: Record<string, unknown>[] }[] = [];
 vi.mock("../src/lib/n8n-datatable", () => ({
+  RECENT_60_DAYS: { sinceDays: 60, dateColumn: "timestamp" },
   fetchAllDataTableRows: async (id: string) => tables[id] ?? [],
   fetchDataTable: async (id: string) => ({ rows: tables[id] ?? [], truncated: false }),
   insertDataTableRows: async (table: string, rows: Record<string, unknown>[]) =>

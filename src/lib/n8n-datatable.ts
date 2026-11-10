@@ -1,4 +1,4 @@
-import { getEnv } from "@/lib/env";
+import { getCloudflareBinding, getEnv } from "@/lib/env";
 
 // Direct calls to n8n's Data Table REST API (/api/v1/data-tables/{id}/rows),
 // authenticated with a dedicated read-only N8N_API_KEY. This is a genuine
@@ -56,13 +56,25 @@ async function fetchPage(url: string, apiKey: string): Promise<Response> {
   throw new Error("unreachable");
 }
 
-async function loadTable<T>(dataTableId: string): Promise<DataTableResult<T>> {
+/** Optional: only rows whose `dateColumn` is within the last `sinceDays` days (pages that need recent activity only). */
+export interface TableQuery {
+  sinceDays?: number | undefined;
+  dateColumn?: string | undefined;
+}
+const keyOf = (dataTableId: string, q: TableQuery = {}) =>
+  q.sinceDays ? `${dataTableId}|since:${q.sinceDays}:${q.dateColumn ?? "timestamp"}` : dataTableId;
+// Tables whose API rejected the server-side filter: filtered on our side instead.
+const noServerFilter = new Set<string>();
+
+async function loadTable<T>(dataTableId: string, q: TableQuery = {}): Promise<DataTableResult<T>> {
   const apiKey = await getEnv("N8N_API_KEY");
   if (!apiKey) throw new Error("N8N_API_KEY is not configured");
 
   const rows: T[] = [];
   let cursor: string | undefined;
   let truncated = false;
+  const column = q.dateColumn ?? "timestamp";
+  const sinceIso = q.sinceDays ? new Date(Date.now() - q.sinceDays * 86400000).toISOString() : "";
 
   for (let page = 0; ; page++) {
     if (page >= MAX_PAGES) {
@@ -75,11 +87,24 @@ async function loadTable<T>(dataTableId: string): Promise<DataTableResult<T>> {
     }
     const params = new URLSearchParams({ limit: String(MAX_PAGE_LIMIT) });
     if (cursor) params.set("cursor", cursor);
+    if (sinceIso && !noServerFilter.has(dataTableId))
+      params.set(
+        "filter",
+        JSON.stringify({
+          type: "and",
+          filters: [{ columnName: column, condition: "gte", value: sinceIso }],
+        }),
+      );
 
     const res = await fetchPage(
       `${N8N_BASE}/api/v1/data-tables/${dataTableId}/rows?${params.toString()}`,
       apiKey,
     );
+    if (!res.ok && sinceIso && !noServerFilter.has(dataTableId) && res.status === 400) {
+      // The API did not accept the filter: read everything and filter here (same result, slower).
+      noServerFilter.add(dataTableId);
+      return loadTable<T>(dataTableId, q);
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       throw new Error(
@@ -92,55 +117,124 @@ async function loadTable<T>(dataTableId: string): Promise<DataTableResult<T>> {
     cursor = json.nextCursor;
   }
 
+  if (sinceIso) {
+    const since = new Date(sinceIso).getTime();
+    const kept = rows.filter(
+      (r) =>
+        (new Date(
+          String(
+            (r as Record<string, unknown>)[column] ??
+              (r as Record<string, unknown>)["createdAt"] ??
+              "",
+          ),
+        ).getTime() || 0) >= since,
+    );
+    rows.length = 0;
+    rows.push(...kept);
+  }
   return { rows, truncated };
 }
 
-/** Rows plus a `truncated` flag. Cached for CACHE_TTL_MS; pass fresh=true to bypass the cache. */
-export async function fetchDataTable<T = Record<string, unknown>>(
-  dataTableId: string,
-  opts: { fresh?: boolean } = {},
-): Promise<DataTableResult<T>> {
-  const now = Date.now();
-  const hit = cache.get(dataTableId);
-  if (!opts.fresh && hit && now - hit.at < CACHE_TTL_MS) {
-    return hit.value as DataTableResult<T>;
+// ---- Shared cache (Cloudflare Workers KV, binding DATA_CACHE): one copy for ALL server instances, so a table
+// read by one page or user is instant for every other page and user. Optional: without the binding the
+// in-memory cache above is used alone. Entries expire after 10 minutes.
+interface KvLike {
+  get(key: string, type: "json"): Promise<unknown>;
+  put(key: string, value: string, opts?: { expirationTtl?: number }): Promise<void>;
+  delete(key: string): Promise<void>;
+}
+async function kvStore(): Promise<KvLike | null> {
+  try {
+    const kv = (await getCloudflareBinding("DATA_CACHE")) as KvLike | undefined;
+    return kv && typeof kv.get === "function" ? kv : null;
+  } catch {
+    return null;
   }
-  const pending = inFlight.get(dataTableId);
-  // Stale but recent: answer now, refresh in the background (one refresh at a time per table).
-  if (!opts.fresh && hit && now - hit.at < STALE_MAX_MS) {
-    if (!pending) void refreshInBackground<T>(dataTableId);
-    return hit.value as DataTableResult<T>;
+}
+const kvKey = (key: string) => `dt:${key}`;
+async function kvRead(key: string): Promise<CacheEntry | null> {
+  const kv = await kvStore();
+  if (!kv) return null;
+  try {
+    const e = (await kv.get(kvKey(key), "json")) as CacheEntry | null;
+    return e && typeof e.at === "number" ? e : null;
+  } catch {
+    return null;
   }
-  if (pending) return pending as Promise<DataTableResult<T>>;
+}
+async function kvWrite(key: string, entry: CacheEntry): Promise<void> {
+  const kv = await kvStore();
+  if (!kv) return;
+  try {
+    await kv.put(kvKey(key), JSON.stringify(entry), { expirationTtl: 600 });
+  } catch (err) {
+    console.error(`[n8n-datatable] KV write for ${key} failed:`, err);
+  }
+}
+async function kvDeleteTable(dataTableId: string): Promise<void> {
+  const kv = await kvStore();
+  if (!kv) return;
+  // the plain key plus the 'recent rows' variants used by the dashboard
+  const keys = [dataTableId, ...RECENT_VARIANTS.map((v) => keyOf(dataTableId, v))];
+  await Promise.all(keys.map((k) => kv.delete(kvKey(k)).catch(() => undefined)));
+}
+/** 'Recent rows' variants used in the code (so writes can clear them from KV too). */
+export const RECENT_60_DAYS: TableQuery = { sinceDays: 60, dateColumn: "timestamp" };
+const RECENT_VARIANTS: TableQuery[] = [RECENT_60_DAYS, { sinceDays: 90, dateColumn: "timestamp" }];
 
-  const p = loadTable<T>(dataTableId)
-    .then((value) => {
-      cache.set(dataTableId, { at: Date.now(), value });
+function startLoad<T>(dataTableId: string, q: TableQuery): Promise<DataTableResult<T>> {
+  const key = keyOf(dataTableId, q);
+  const p = loadTable<T>(dataTableId, q)
+    .then(async (value) => {
+      const entry = { at: Date.now(), value };
+      cache.set(key, entry);
+      await kvWrite(key, entry);
       return value;
     })
-    .finally(() => inFlight.delete(dataTableId));
-  inFlight.set(dataTableId, p as Promise<DataTableResult<unknown>>);
+    .finally(() => inFlight.delete(key));
+  inFlight.set(key, p as Promise<DataTableResult<unknown>>);
   return p;
 }
 
-function refreshInBackground<T>(dataTableId: string): Promise<void> {
-  const p = loadTable<T>(dataTableId)
-    .then((value) => {
-      cache.set(dataTableId, { at: Date.now(), value });
-      return value;
-    })
-    .finally(() => inFlight.delete(dataTableId));
-  inFlight.set(dataTableId, p as Promise<DataTableResult<unknown>>);
-  return p.then(
-    () => undefined,
-    (err) => console.error(`[n8n-datatable] background refresh of ${dataTableId} failed:`, err),
-  );
+/**
+ * Rows plus a `truncated` flag. Order: this instance's memory -> shared KV -> n8n. Fresh for CACHE_TTL_MS;
+ * up to STALE_MAX_MS old the cached copy is returned at once and refreshed in the background.
+ * Pass fresh=true to bypass all caches.
+ */
+export async function fetchDataTable<T = Record<string, unknown>>(
+  dataTableId: string,
+  opts: { fresh?: boolean } & TableQuery = {},
+): Promise<DataTableResult<T>> {
+  const q: TableQuery = { sinceDays: opts.sinceDays, dateColumn: opts.dateColumn };
+  const key = keyOf(dataTableId, q);
+  const now = Date.now();
+  const pending = inFlight.get(key) as Promise<DataTableResult<T>> | undefined;
+  if (!opts.fresh) {
+    let hit = cache.get(key);
+    if (!hit || now - hit.at >= CACHE_TTL_MS) {
+      const shared = await kvRead(key);
+      if (shared && (!hit || shared.at > hit.at)) {
+        cache.set(key, shared);
+        hit = shared;
+      }
+    }
+    if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value as DataTableResult<T>;
+    if (hit && Date.now() - hit.at < STALE_MAX_MS) {
+      if (!inFlight.get(key))
+        void startLoad<T>(dataTableId, q).catch((err) =>
+          console.error(`[n8n-datatable] background refresh of ${key} failed:`, err),
+        );
+      return hit.value as DataTableResult<T>;
+    }
+  }
+  if (pending) return pending;
+  return startLoad<T>(dataTableId, q);
 }
 
 /** Backwards-compatible helper used by the existing routes: rows only. */
 export async function fetchAllDataTableRows<T = Record<string, unknown>>(
   dataTableId: string,
-  opts: { fresh?: boolean } = {},
+  opts: { fresh?: boolean } & TableQuery = {},
 ): Promise<T[]> {
   return (await fetchDataTable<T>(dataTableId, opts)).rows;
 }
@@ -187,11 +281,13 @@ export async function updateDataTableRows(
     throw new Error(`n8n data table update failed (${res.status}): ${text.slice(0, 300)}`);
   }
   for (const key of [...cache.keys()]) if (key.includes(dataTableId)) cache.delete(key);
+  await kvDeleteTable(dataTableId);
 }
 
 /** Forget the cached rows of one table, so the next read shows a change made elsewhere. */
 export function clearDataTableCache(dataTableId: string): void {
   for (const key of [...cache.keys()]) if (key.includes(dataTableId)) cache.delete(key);
+  void kvDeleteTable(dataTableId);
 }
 
 /** Insert rows into an n8n data table (used by the assistant's audit log). */
@@ -212,4 +308,5 @@ export async function insertDataTableRows(
     throw new Error(`n8n data table insert failed (${res.status}): ${text.slice(0, 300)}`);
   }
   for (const key of [...cache.keys()]) if (key.includes(dataTableId)) cache.delete(key);
+  await kvDeleteTable(dataTableId);
 }

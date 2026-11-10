@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Mocked data tables (by table id) and a mocked fetch for the n8n webhooks. No real data, no network.
 const tables: Record<string, Record<string, unknown>[]> = {};
 vi.mock("../src/lib/n8n-datatable", () => ({
+  RECENT_60_DAYS: { sinceDays: 60, dateColumn: "timestamp" },
   fetchAllDataTableRows: async (id: string) => tables[id] ?? [],
   fetchDataTable: async (id: string) => ({ rows: tables[id] ?? [], truncated: false }),
   clearDataTableCache: () => {},

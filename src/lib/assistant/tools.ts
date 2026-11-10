@@ -27,6 +27,11 @@ const isActive = (c: Row) => s(c["status"]).toUpperCase() !== "INACTIVE";
 const at = (r: Row) => new Date(s(r["timestamp"]) || s(r["createdAt"])).getTime() || 0;
 const manilaDay = (d: Date) => new Date(d.getTime() + 8 * 3600000).toISOString().slice(0, 10);
 const rows = (id: string) => fetchAllDataTableRows<Row>(id).catch(() => [] as Row[]);
+// Message logs: the assistant's tools look back at most 90 days.
+const recentLogs = () =>
+  fetchAllDataTableRows<Row>(T.logs, { sinceDays: 90, dateColumn: "timestamp" }).catch(
+    () => [] as Row[],
+  );
 
 interface Invoice {
   branch: string;
@@ -235,7 +240,7 @@ registerAction({
     }
     if (a.received_channel) {
       const since = Date.now() - (a.within_days ?? 7) * 86400000;
-      const logs = await rows(T.logs);
+      const logs = await recentLogs();
       const ev = a.received_channel === "VOICE" ? "CALL_INITIATED" : "SEND_SUCCESS";
       const got = new Set(
         logs
@@ -423,7 +428,7 @@ registerAction({
     const scope = scopeIds(a, ctx, active);
     const keys = scope ? new Set([...scope].map((id) => companyKey(id))) : null;
     const since = Date.now() - (a.days ?? 14) * 86400000;
-    const logs = (await rows(T.logs)).filter((l) => {
+    const logs = (await recentLogs()).filter((l) => {
       if (at(l) < since) return false;
       if (keys && !keys.has(companyKey(l["client_id"]))) return false;
       if (a.channel && s(l["channel"]).toUpperCase() !== a.channel) return false;
@@ -463,7 +468,7 @@ registerAction({
   }),
   execute: async (a) => {
     const since = Date.now() - (a.days ?? 7) * 86400000;
-    const logs = (await rows(T.logs)).filter((l) => {
+    const logs = (await recentLogs()).filter((l) => {
       const ev = s(l["event_type"]).toUpperCase();
       return (
         at(l) >= since &&

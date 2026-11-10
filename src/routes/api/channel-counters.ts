@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
+import { fetchAllDataTableRows, RECENT_60_DAYS } from "@/lib/n8n-datatable";
 
 // Direct read of n8n's Channel Counters Data Table (no workflow execution).
 // Same response shape as the old "Channel Counters Webhook (Dashboard)": { counters }.
@@ -22,7 +22,10 @@ export const Route = createFileRoute("/api/channel-counters")({
           const rows = await fetchAllDataTableRows<CounterRow>(CHANNEL_COUNTERS_TABLE_ID);
           // The stored daily counters undercount when several sends run at once (read-then-write race),
           // so "sent today" is counted from the message log since 00:00 Manila instead.
-          const logs = await fetchAllDataTableRows<Record<string, unknown>>("a32Z5oGcNi0xzefb").catch(() => []);
+          const logs = await fetchAllDataTableRows<Record<string, unknown>>(
+            "a32Z5oGcNi0xzefb",
+            RECENT_60_DAYS,
+          ).catch(() => []);
           const now = new Date();
           const manilaMidnight = new Date(
             new Date(now.getTime() + 8 * 3600000).toISOString().slice(0, 10) + "T00:00:00+08:00",
@@ -33,7 +36,8 @@ export const Route = createFileRoute("/api/channel-counters")({
             if (t < manilaMidnight) continue;
             const ch = String(l["channel"] || "").toUpperCase();
             const ev = String(l["event_type"] || "").toUpperCase();
-            if (ev === "SEND_SUCCESS" || (ch === "VOICE" && ev === "CALL_INITIATED")) sentToday[ch] = (sentToday[ch] || 0) + 1;
+            if (ev === "SEND_SUCCESS" || (ch === "VOICE" && ev === "CALL_INITIATED"))
+              sentToday[ch] = (sentToday[ch] || 0) + 1;
           }
           const counters = rows.map((r) => ({
             channel: s(r.channel).toLowerCase(),
