@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { SkeletonCards } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
 import {
   LogFilterBar,
@@ -289,7 +290,7 @@ function Overview() {
           searchPlaceholder="Search client or message…"
         />
       </div>
-      {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
+      {isLoading ? <SkeletonCards /> : null}
       {error ? <p className="text-sm text-destructive">Could not load overview data.</p> : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

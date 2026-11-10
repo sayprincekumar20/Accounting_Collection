@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { SkeletonBlock } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { downloadCsv } from "@/lib/csv";
 import { AppShell } from "@/components/AppShell";
@@ -182,82 +183,6 @@ function ReportsPage() {
         />
       }
     >
-      <div className="mb-5">
-        <Panel
-          title="AR reports (from /call and weekly runs)"
-          description="Built after every /call run: AS OF date, TOTAL, overdue and current, every open invoice with aging, remarks, promise and escalation. Open in Google Sheets or download as Excel (sign in with your @rareglobalfood.com Google account)."
-        >
-          {(callReports ?? []).length === 0 ? (
-            <p className="px-4 py-6 text-sm text-muted-foreground">
-              No AR reports yet. One is created after each /call run.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[860px] text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <th className="px-3 py-2.5 font-semibold">As of</th>
-                    <th className="px-3 py-2.5 font-semibold">Requested by</th>
-                    <th className="px-3 py-2.5 text-right font-semibold">Clients</th>
-                    <th className="px-3 py-2.5 text-right font-semibold">Invoices</th>
-                    <th className="px-3 py-2.5 text-right font-semibold">Total</th>
-                    <th className="px-3 py-2.5 text-right font-semibold">Overdue</th>
-                    <th className="px-3 py-2.5 text-right font-semibold">Current</th>
-                    <th className="px-3 py-2.5 font-semibold">Report</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border tabular-nums">
-                  {(callReports ?? []).slice(0, 20).map((r) => (
-                    <tr key={r.id}>
-                      <td className="px-3 py-2.5 whitespace-nowrap font-semibold">
-                        {runLabel(r.as_of)}
-                        <span className="block text-[11px] font-normal text-muted-foreground">
-                          {r.created_at
-                            ? new Date(r.created_at).toLocaleTimeString("en-PH", {
-                                hour: "numeric",
-                                minute: "2-digit",
-                              })
-                            : ""}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5">{r.requested_by || "—"}</td>
-                      <td className="px-3 py-2.5 text-right">{r.client_count}</td>
-                      <td className="px-3 py-2.5 text-right">{r.invoice_count}</td>
-                      <td className="px-3 py-2.5 text-right whitespace-nowrap">{peso(r.total)}</td>
-                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                        {peso(r.overdue)}
-                      </td>
-                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                        {peso(r.current)}
-                      </td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">
-                        <a
-                          href={r.sheet_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-semibold text-primary hover:underline"
-                        >
-                          Open
-                        </a>
-                        <span className="mx-2 text-muted-foreground">·</span>
-                        <a
-                          href={r.xlsx_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-semibold text-primary hover:underline"
-                        >
-                          Download (Excel)
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Panel>
-      </div>
-
       <LogFilterBar
         filters={filters}
         onChange={setFilters}
@@ -270,7 +195,7 @@ function ReportsPage() {
         searchPlaceholder="Search the exception lists (client, branch, email, invoice)…"
       />
 
-      {isLoading ? <p className="mt-4 text-sm text-muted-foreground">Loading…</p> : null}
+      {isLoading ? <SkeletonBlock className="mt-4 h-48" /> : null}
       {error ? <p className="mt-4 text-sm text-destructive">Could not load run logs.</p> : null}
 
       {current ? (
@@ -533,71 +458,81 @@ function ReportsPage() {
         </Panel>
       </div>
 
-      {current ? (
-        <div className="mt-5 grid gap-5 lg:grid-cols-2">
-          <Panel
-            title={`No contact on file (${current.recorded.no_contact ? noContact.length : "–"})`}
-            description="Overdue branches with no phone and no email: not reachable automatically."
-          >
-            <ExceptionList
-              recorded={current.recorded.no_contact}
-              rows={noContact.map((b) => ({
-                main: b.branch_name || b.parent_name || "",
-                sub: [
-                  b.parent_name !== b.branch_name ? b.parent_name : "",
-                  b.invoices ? `Invoices ${b.invoices}` : "",
-                ]
-                  .filter(Boolean)
-                  .join(" · "),
-                amount: b.amount || 0,
-              }))}
-            />
-          </Panel>
-          <Panel
-            title={`Email only, no mobile (${current.recorded.email_only ? emailOnly.length : "–"})`}
-            description="Reminder emailed, but no phone number for a call."
-          >
-            <ExceptionList
-              recorded={current.recorded.email_only}
-              rows={emailOnly.map((c) => ({
-                main: c.client_name || "",
-                sub: c.email || "",
-                amount: c.amount || 0,
-              }))}
-            />
-          </Panel>
-        </div>
-      ) : null}
+      <div className="mt-6">
+        <Panel
+          title="AR reports (from /call and weekly runs)"
+          description="Built after every /call run: AS OF date, TOTAL, overdue and current, every open invoice with aging, remarks, promise and escalation. Open in Google Sheets or download as Excel (sign in with your @rareglobalfood.com Google account)."
+        >
+          {(callReports ?? []).length === 0 ? (
+            <p className="px-4 py-6 text-sm text-muted-foreground">
+              No AR reports yet. One is created after each /call run.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[860px] text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <th className="px-3 py-2.5 font-semibold">As of</th>
+                    <th className="px-3 py-2.5 font-semibold">Requested by</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Clients</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Invoices</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Total</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Overdue</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Current</th>
+                    <th className="px-3 py-2.5 font-semibold">Report</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border tabular-nums">
+                  {(callReports ?? []).slice(0, 20).map((r) => (
+                    <tr key={r.id}>
+                      <td className="px-3 py-2.5 whitespace-nowrap font-semibold">
+                        {runLabel(r.as_of)}
+                        <span className="block text-[11px] font-normal text-muted-foreground">
+                          {r.created_at
+                            ? new Date(r.created_at).toLocaleTimeString("en-PH", {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })
+                            : ""}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5">{r.requested_by || "—"}</td>
+                      <td className="px-3 py-2.5 text-right">{r.client_count}</td>
+                      <td className="px-3 py-2.5 text-right">{r.invoice_count}</td>
+                      <td className="px-3 py-2.5 text-right whitespace-nowrap">{peso(r.total)}</td>
+                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                        {peso(r.overdue)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                        {peso(r.current)}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        <a
+                          href={r.sheet_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-semibold text-primary hover:underline"
+                        >
+                          Open
+                        </a>
+                        <span className="mx-2 text-muted-foreground">·</span>
+                        <a
+                          href={r.xlsx_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-semibold text-primary hover:underline"
+                        >
+                          Download (Excel)
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+      </div>
     </AppShell>
-  );
-}
-
-function ExceptionList({
-  rows,
-  recorded,
-}: {
-  rows: { main: string; sub: string; amount: number }[];
-  recorded: boolean;
-}) {
-  if (!recorded) {
-    return (
-      <p className="px-4 py-6 text-sm text-muted-foreground">
-        Not recorded for this run (added from 21 Oct).
-      </p>
-    );
-  }
-  if (rows.length === 0) return <p className="px-4 py-6 text-sm text-muted-foreground">None.</p>;
-  return (
-    <ul className="max-h-80 divide-y divide-border overflow-y-auto">
-      {rows.map((r, i) => (
-        <li key={i} className="flex items-start justify-between gap-3 px-4 py-2.5">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{r.main}</p>
-            {r.sub ? <p className="truncate text-[11px] text-muted-foreground">{r.sub}</p> : null}
-          </div>
-          <span className="shrink-0 text-sm tabular-nums">{peso(r.amount)}</span>
-        </li>
-      ))}
-    </ul>
   );
 }

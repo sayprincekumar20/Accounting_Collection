@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
@@ -100,7 +101,7 @@ function NotificationsPage() {
       </div>
       <div className="mt-5">
         <Panel title="Notifications" description={`${visible.length} shown · newest first`}>
-          {isLoading ? <p className="px-4 py-6 text-sm text-muted-foreground">Loading…</p> : null}
+          {isLoading ? <SkeletonRows /> : null}
           {error ? (
             <p className="px-4 py-6 text-sm text-destructive">Could not load notifications.</p>
           ) : null}

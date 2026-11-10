@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Panel, RefreshButton, StatCard } from "@/components/collections/Bits";
@@ -93,7 +94,7 @@ function VerificationListPage() {
           title="Reviews"
           description={`${visible.length} shown · newest first · opens the review to approve, edit or reject`}
         >
-          {isLoading ? <p className="px-4 py-6 text-sm text-muted-foreground">Loading…</p> : null}
+          {isLoading ? <SkeletonRows /> : null}
           {error ? (
             <p className="px-4 py-6 text-sm text-destructive">
               Could not load reviews: {(error as Error).message}

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { downloadCsv } from "@/lib/csv";
 import { AppShell } from "@/components/AppShell";
@@ -219,7 +220,7 @@ function QueuePage() {
 
       <div className="mt-5">
         <Panel title="Queue entries">
-          {isLoading ? <p className="p-4 text-sm text-muted-foreground">Loading…</p> : null}
+          {isLoading ? <SkeletonRows /> : null}
           {error ? <p className="p-4 text-sm text-destructive">Could not load the queue.</p> : null}
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] text-sm">

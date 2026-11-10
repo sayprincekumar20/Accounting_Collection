@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { SkeletonRows } from "@/components/collections/Skeleton";
+import { RunExceptions } from "@/components/collections/RunExceptions";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
@@ -140,7 +142,7 @@ function ContactsPage() {
       </div>
       <div className="mt-5">
         <Panel title="Clients" description={`${visible.length} shown`}>
-          {isLoading ? <p className="px-4 py-6 text-sm text-muted-foreground">Loading…</p> : null}
+          {isLoading ? <SkeletonRows /> : null}
           {error ? <p className="px-4 py-6 text-sm text-destructive">Could not load.</p> : null}
           <ul className="divide-y divide-border">
             {visible.map((i) => (
@@ -178,6 +180,7 @@ function ContactsPage() {
           </ul>
         </Panel>
       </div>
+      <RunExceptions />
     </AppShell>
   );
 }

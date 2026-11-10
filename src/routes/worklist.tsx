@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { escalationAgeHours, escalationType } from "@/lib/escalation-type";
 import { createFileRoute } from "@tanstack/react-router";
+import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
@@ -256,7 +257,7 @@ function WorklistPage() {
 
       <div className="mt-5">
         <Panel title="Escalations" description={`${visible.length} shown · newest first`}>
-          {isLoading ? <p className="px-4 py-6 text-sm text-muted-foreground">Loading…</p> : null}
+          {isLoading ? <SkeletonRows /> : null}
           {error ? (
             <p className="px-4 py-6 text-sm text-destructive">Could not load the worklist.</p>
           ) : null}

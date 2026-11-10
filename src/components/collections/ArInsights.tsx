@@ -1,3 +1,4 @@
+import { SkeletonBlock } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
@@ -57,7 +58,13 @@ export function ArInsights() {
     },
     refetchInterval: 300000,
   });
-  if (isLoading) return <p className="mt-5 text-sm text-muted-foreground">Loading AR summary…</p>;
+  if (isLoading)
+    return (
+      <div className="mt-5 grid gap-5 xl:grid-cols-2">
+        <SkeletonBlock className="h-72" />
+        <SkeletonBlock className="h-72" />
+      </div>
+    );
   if (error || !data)
     return <p className="mt-5 text-sm text-destructive">Could not load the AR summary.</p>;
   const chart = data.aging.map((a) => ({

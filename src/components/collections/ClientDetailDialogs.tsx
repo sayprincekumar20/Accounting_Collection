@@ -1,3 +1,4 @@
+import { SkeletonBlock } from "@/components/collections/Skeleton";
 import { useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { escalationAgeHours, escalationType } from "@/lib/escalation-type";
@@ -360,7 +361,7 @@ export function EscalationBadge({
             </a>
           </div>
           {msg ? <p className="mb-2 rounded-lg bg-muted px-3 py-1.5 text-xs">{msg}</p> : null}
-          {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
+          {isLoading ? <SkeletonBlock className="h-24" /> : null}
           {!isLoading && !mine.length ? (
             <p className="text-sm text-muted-foreground">No escalations found for this client.</p>
           ) : null}
@@ -517,7 +518,7 @@ export function PromiseBadge({
       </button>
       {open ? (
         <Modal title={`Promise to pay · ${clientName || k}`} onClose={() => setOpen(false)}>
-          {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
+          {isLoading ? <SkeletonBlock className="h-24" /> : null}
           {!isLoading && !mine.length ? (
             <p className="text-sm text-muted-foreground">No promise recorded for this client.</p>
           ) : null}

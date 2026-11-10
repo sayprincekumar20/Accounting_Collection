@@ -2,6 +2,7 @@ import { useState } from "react";
 import { DeliveryBadge } from "@/components/collections/DeliveryBadge";
 import { isFailed } from "@/lib/delivery";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { RefTag } from "@/components/collections/LogCells";
 import { downloadCsv } from "@/lib/csv";
@@ -507,7 +508,7 @@ function ClientHistory({ clientId }: { clientId: string }) {
         ) : undefined
       }
     >
-      {isLoading ? <p className="px-4 py-6 text-sm text-muted-foreground">Loading…</p> : null}
+      {isLoading ? <SkeletonRows /> : null}
       {error ? (
         <p className="px-4 py-6 text-sm text-destructive">Could not load the history.</p>
       ) : null}

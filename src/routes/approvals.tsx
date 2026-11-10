@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
@@ -7,6 +8,7 @@ import { downloadCsv } from "@/lib/csv";
 import { ownerName } from "@/lib/owner";
 import { ScheduleLine } from "@/components/collections/ScheduleBadge";
 import { CreditLine } from "@/components/collections/CreditLine";
+import { Pager } from "@/components/collections/Pager";
 import { InvoiceTable, InvoiceToggle } from "@/components/collections/InvoiceTable";
 
 export const Route = createFileRoute("/approvals")({
@@ -101,6 +103,10 @@ function ApprovalsPage() {
   const multibranch = useMemo(() => all.filter((i) => i.multibranch), [all]);
   const [status, setStatus] = useState<"PENDING" | "APPROVED" | "ALL">("PENDING");
   const [overdueOnly, setOverdueOnly] = useState(false);
+  // Two blocks: clients with overdue invoices, and clients with only current (not yet due) invoices.
+  const [kind, setKind] = useState<"OVERDUE" | "CURRENT">("OVERDUE");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<string | null>(null);
@@ -117,6 +123,7 @@ function ApprovalsPage() {
 
   const visible = items.filter(
     (i) =>
+      (kind === "OVERDUE" ? i.overdue > 0 : i.overdue <= 0) &&
       (status === "ALL" || (status === "APPROVED" ? i.approved : !i.approved)) &&
       (!overdueOnly || i.overdue > 0) &&
       (!q ||
@@ -124,6 +131,28 @@ function ApprovalsPage() {
           .toLowerCase()
           .includes(q.toLowerCase())),
   );
+  const overdueCount = items.filter((i) => i.overdue > 0).length;
+  const currentOnlyCount = items.filter((i) => i.overdue <= 0).length;
+  const paged = visible.slice(page * pageSize, (page + 1) * pageSize);
+  useEffect(() => setPage(0), [kind, status, q, overdueOnly, pageSize]);
+  // Data cycle: the weekly refresh is the earliest 'Data from Zoho' time; later ones were refreshed since
+  // (contact now / pre-send on the client's collection day).
+  const refreshTimes = all.map((i) => new Date(i.refreshed_at).getTime()).filter((t) => t > 0);
+  const weeklyAt = refreshTimes.length ? Math.min(...refreshTimes) : 0;
+  const refreshedSince = refreshTimes.filter((t) => t - weeklyAt > 3 * 3600000).length;
+  const manilaNow = new Date(Date.now() + 8 * 3600000);
+  const cycleStartMs = Date.UTC(
+    manilaNow.getUTCFullYear(),
+    manilaNow.getUTCMonth(),
+    manilaNow.getUTCDate() - ((manilaNow.getUTCDay() - 3 + 7) % 7),
+  );
+  const cycleDay = (ms: number) =>
+    new Date(ms).toLocaleDateString("en-PH", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
   const pending = items.filter((i) => !i.approved);
   const approved = items.filter((i) => i.approved);
 
@@ -297,6 +326,33 @@ function ApprovalsPage() {
       subtitle="Accounting approves which clients may be texted and called this cycle (Wed to Tue) · applies to /call and the automation"
       actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
     >
+      {weeklyAt ? (
+        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-border bg-card px-4 py-3 text-sm">
+          <span>
+            <span className="text-muted-foreground">Invoices from Zoho as of </span>
+            <span className="font-semibold">
+              {new Date(weeklyAt).toLocaleString("en-PH", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </span>
+          </span>
+          <span>
+            <span className="text-muted-foreground">This cycle: </span>
+            <span className="font-semibold">
+              {cycleDay(cycleStartMs)} – {cycleDay(cycleStartMs + 6 * 86400000)}
+            </span>
+          </span>
+          {refreshedSince ? (
+            <span className="text-muted-foreground">
+              {refreshedSince} client(s) refreshed since (contacted, or on their collection day)
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Pending approval"
@@ -417,11 +473,33 @@ function ApprovalsPage() {
       {msg ? <p className="mt-2 text-sm">{msg}</p> : null}
 
       <div className="mt-5">
+        <div className="mb-3 flex gap-2">
+          {(
+            [
+              ["OVERDUE", `Overdue (${overdueCount})`],
+              ["CURRENT", `Current only (${currentOnlyCount})`],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setKind(k)}
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold ${kind === k ? "bg-primary text-primary-foreground" : "border border-border bg-card hover:bg-muted"}`}
+            >
+              {label}
+            </button>
+          ))}
+          {kind === "CURRENT" ? (
+            <span className="self-center text-xs text-muted-foreground">
+              Clients with invoices not yet due: decide whether to contact them this cycle.
+            </span>
+          ) : null}
+        </div>
         <Panel
           title="Clients"
           description={`${visible.length} shown · only approved clients are texted or called (by /call or the automation)`}
         >
-          {isLoading ? <p className="px-4 py-6 text-sm text-muted-foreground">Loading…</p> : null}
+          {isLoading ? <SkeletonRows /> : null}
           {error ? (
             <p className="px-4 py-6 text-sm text-destructive">Could not load clients.</p>
           ) : null}
@@ -450,7 +528,7 @@ function ApprovalsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {visible.map((i) => (
+                {paged.map((i) => (
                   <Fragment key={i.client_id}>
                     <tr className={i.approved ? "" : "bg-warning/5"}>
                       <td className="px-3 py-3 align-top">
@@ -593,6 +671,13 @@ function ApprovalsPage() {
               </tbody>
             </table>
           </div>
+          <Pager
+            total={visible.length}
+            page={page}
+            pageSize={pageSize}
+            onPage={setPage}
+            onPageSize={setPageSize}
+          />
         </Panel>
       </div>
 

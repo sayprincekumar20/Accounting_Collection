@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { downloadCsv } from "@/lib/csv";
@@ -239,7 +240,7 @@ function ClientsPage() {
         />
       </div>
       <Panel title="Client ledger" description={`${filtered.length} accounts`}>
-        {isLoading ? <p className="p-4 text-sm text-muted-foreground">Loading…</p> : null}
+        {isLoading ? <SkeletonRows /> : null}
         {error ? <p className="p-4 text-sm text-destructive">Could not load clients.</p> : null}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-sm">

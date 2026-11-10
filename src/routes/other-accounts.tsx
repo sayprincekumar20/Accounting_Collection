@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
@@ -132,7 +133,7 @@ function OtherAccountsPage() {
           title="Not contacted: owner not in Sales Team"
           description={`${visible.length} shown`}
         >
-          {isLoading ? <p className="px-4 py-6 text-sm text-muted-foreground">Loading…</p> : null}
+          {isLoading ? <SkeletonRows /> : null}
           {error ? (
             <p className="px-4 py-6 text-sm text-destructive">Could not load accounts.</p>
           ) : null}
