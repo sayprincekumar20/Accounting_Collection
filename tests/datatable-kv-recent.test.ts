@@ -75,3 +75,33 @@ describe("recent rows and the shared KV cache", () => {
     await vi.waitFor(() => expect(kvData.has("dt:CLIENTS")).toBe(false));
   });
 });
+
+describe("KV write limit (free plan: at most one write per table every 10 minutes)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+  it("skips KV writes within 10 minutes of the last one", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-10T00:00:00Z"));
+    kvData.clear();
+    kvBound = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ data: [{ id: 1 }], nextCursor: null }), { status: 200 }),
+      ),
+    );
+    const mod = await import("../src/lib/n8n-datatable");
+    await mod.fetchAllDataTableRows("T9", { fresh: true });
+    const firstAt = JSON.parse(kvData.get("dt:T9")!).at;
+    vi.setSystemTime(new Date("2026-11-10T00:05:00Z"));
+    await mod.fetchAllDataTableRows("T9", { fresh: true });
+    expect(JSON.parse(kvData.get("dt:T9")!).at).toBe(firstAt); // not rewritten after 5 min
+    vi.setSystemTime(new Date("2026-11-10T00:11:00Z"));
+    await mod.fetchAllDataTableRows("T9", { fresh: true });
+    expect(JSON.parse(kvData.get("dt:T9")!).at).toBeGreaterThan(firstAt); // rewritten after 11 min
+  });
+});

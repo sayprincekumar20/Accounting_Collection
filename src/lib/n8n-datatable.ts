@@ -162,10 +162,15 @@ async function kvRead(key: string): Promise<CacheEntry | null> {
     return null;
   }
 }
+// KV writes are limited on Cloudflare's free plan (1,000 per day): a table is written to KV at most once
+// every KV_WRITE_MIN_MS (reads are not limited this way, so all instances still share the copy).
+const KV_WRITE_MIN_MS = 10 * 60_000;
 async function kvWrite(key: string, entry: CacheEntry): Promise<void> {
   const kv = await kvStore();
   if (!kv) return;
   try {
+    const existing = await kvRead(key);
+    if (existing && entry.at - existing.at < KV_WRITE_MIN_MS) return;
     await kv.put(kvKey(key), JSON.stringify(entry), { expirationTtl: 600 });
   } catch (err) {
     console.error(`[n8n-datatable] KV write for ${key} failed:`, err);
