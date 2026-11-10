@@ -44,21 +44,32 @@ describe("recent rows and the shared KV cache", () => {
     vi.resetModules();
   });
 
-  it("asks n8n for recent rows only and keeps only recent rows even if the filter is ignored", async () => {
+  it("reads the table without a server filter and keeps only recent rows (filtered locally)", async () => {
     const mod = await import("../src/lib/n8n-datatable");
     const rows = await mod.fetchAllDataTableRows<{ id: number }>("LOGS", mod.RECENT_60_DAYS);
     expect(rows.map((r) => r.id)).toEqual([2]);
-    expect(decodeURIComponent(urls[0]!)).toContain('"condition":"gte"');
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).not.toContain("filter=");
   });
 
-  it("falls back to a full read when n8n rejects the filter (same result)", async () => {
-    rejectFilter = true;
-    kvBound = false;
+  it("stops paging when the API repeats the same cursor (no endless loop)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        urls.push(url);
+        return new Response(
+          JSON.stringify({
+            data: [{ id: urls.length, timestamp: "2026-11-09T00:00:00Z" }],
+            nextCursor: "SAME",
+          }),
+          { status: 200 },
+        );
+      }),
+    );
     const mod = await import("../src/lib/n8n-datatable");
-    const rows = await mod.fetchAllDataTableRows<{ id: number }>("LOGS2", mod.RECENT_60_DAYS);
-    expect(rows.map((r) => r.id)).toEqual([2]);
-    expect(urls.length).toBe(2);
-    expect(urls[1]).not.toContain("filter=");
+    const rows = await mod.fetchAllDataTableRows("LOOPY");
+    expect(urls.length).toBe(2); // first page + one page with the repeated cursor, then stop
+    expect(rows.length).toBe(2);
   });
 
   // Skipped while the shared KV cache is switched off (hotfix, KV_ENABLED = false in n8n-datatable.ts).

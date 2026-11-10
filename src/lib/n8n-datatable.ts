@@ -65,6 +65,7 @@ const keyOf = (dataTableId: string, q: TableQuery = {}) =>
   q.sinceDays ? `${dataTableId}|since:${q.sinceDays}:${q.dateColumn ?? "timestamp"}` : dataTableId;
 // Tables whose API rejected the server-side filter: filtered on our side instead.
 const noServerFilter = new Set<string>();
+const SERVER_FILTER_ENABLED = false;
 
 async function loadTable<T>(dataTableId: string, q: TableQuery = {}): Promise<DataTableResult<T>> {
   const apiKey = await getEnv("N8N_API_KEY");
@@ -87,7 +88,9 @@ async function loadTable<T>(dataTableId: string, q: TableQuery = {}): Promise<Da
     }
     const params = new URLSearchParams({ limit: String(MAX_PAGE_LIMIT) });
     if (cursor) params.set("cursor", cursor);
-    if (sinceIso && !noServerFilter.has(dataTableId))
+    // HOTFIX (Nov 10): the server-side filter is NOT sent any more (filtered requests to the conversations
+    // table never finished). Rows are read as before and filtered locally below (same result).
+    if (SERVER_FILTER_ENABLED && sinceIso && !noServerFilter.has(dataTableId))
       params.set(
         "filter",
         JSON.stringify({
@@ -114,6 +117,8 @@ async function loadTable<T>(dataTableId: string, q: TableQuery = {}): Promise<Da
     const json = (await res.json()) as { data: T[]; nextCursor: string | null };
     rows.push(...(json.data || []));
     if (!json.nextCursor) break;
+    // Safety net: stop if the API repeats the same cursor or returns an empty page (no endless paging).
+    if (json.nextCursor === cursor || !(json.data || []).length) break;
     cursor = json.nextCursor;
   }
 
