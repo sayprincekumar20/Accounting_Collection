@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  Baseline,
+  Eraser,
+  Link2,
+  List,
+  ListOrdered,
   Bold,
   CheckCircle2,
   HardDrive,
@@ -13,6 +18,8 @@ import {
   X,
 } from "lucide-react";
 import { estimateSmsSegments } from "../../lib/sms-segments";
+import { composeEmail, SIGNATURE_TEXT } from "../../lib/email-signature";
+import { EmailChips } from "./EmailChips";
 import { getViberAttachmentBatchError } from "../../lib/viber-media";
 
 export type ReplyComposerChannel = "email" | "sms" | "whatsapp" | "viber";
@@ -394,10 +401,30 @@ export function ReplyComposer({
     setMessage(text);
   }
 
-  function format(command: "bold" | "italic" | "underline" | "strikeThrough" | "hiliteColor") {
+  function format(
+    command:
+      | "bold"
+      | "italic"
+      | "underline"
+      | "strikeThrough"
+      | "hiliteColor"
+      | "foreColor"
+      | "insertUnorderedList"
+      | "insertOrderedList"
+      | "createLink"
+      | "removeFormat",
+  ) {
     if (!editorRef.current) return;
     editorRef.current.focus();
-    document.execCommand(command, false, command === "hiliteColor" ? "#fff2a8" : undefined);
+    let value: string | undefined;
+    if (command === "hiliteColor") value = "#fff2a8";
+    if (command === "foreColor") value = "#b91c1c";
+    if (command === "createLink") {
+      const url = window.prompt("Link address (https://…):", "https://");
+      if (!url || url === "https://") return;
+      value = url;
+    }
+    document.execCommand(command, false, value);
     setEditorValue(editorRef.current);
   }
 
@@ -532,6 +559,19 @@ export function ReplyComposer({
 
     if (formattedChannel && formattedHtml.trim()) payload["formattedHtml"] = formattedHtml;
     if (channel === "email") {
+      // Proper email: fixed signature (once) and, for replies, the client's last message quoted below.
+      const lastClient = [...(conversationContext ?? [])]
+        .reverse()
+        .find((m) => m.role === "user" && m.content.trim());
+      const composed = composeEmail(
+        formattedHtml,
+        message,
+        emailMode !== "forward" && lastClient
+          ? { from: clientName || "The client", text: lastClient.content }
+          : null,
+      );
+      payload["formattedHtml"] = composed.html;
+      payload["message"] = composed.text;
       payload["to"] = emailTo;
       payload["cc"] = emailCc;
       payload["bcc"] = emailBcc;
@@ -722,14 +762,13 @@ export function ReplyComposer({
             </div>
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="w-12 shrink-0">To</span>
-              <input
+              <EmailChips
                 value={emailTo}
-                onChange={(event) => {
+                onChange={(v) => {
                   defaultRecipient.current = false;
-                  setEmailTo(event.target.value);
+                  setEmailTo(v);
                 }}
                 disabled={isSending}
-                className="min-w-0 flex-1 rounded-lg border border-border px-2.5 py-1.5 text-sm text-foreground"
               />
             </label>
             <div className="flex gap-3 pl-14">
@@ -751,23 +790,13 @@ export function ReplyComposer({
             {showCc ? (
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="w-12 shrink-0">Cc</span>
-                <input
-                  value={emailCc}
-                  onChange={(event) => setEmailCc(event.target.value)}
-                  disabled={isSending}
-                  className="min-w-0 flex-1 rounded-lg border border-border px-2.5 py-1.5 text-sm text-foreground"
-                />
+                <EmailChips value={emailCc} onChange={setEmailCc} disabled={isSending} />
               </label>
             ) : null}
             {showBcc ? (
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="w-12 shrink-0">Bcc</span>
-                <input
-                  value={emailBcc}
-                  onChange={(event) => setEmailBcc(event.target.value)}
-                  disabled={isSending}
-                  className="min-w-0 flex-1 rounded-lg border border-border px-2.5 py-1.5 text-sm text-foreground"
-                />
+                <EmailChips value={emailBcc} onChange={setEmailBcc} disabled={isSending} />
               </label>
             ) : null}
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -825,6 +854,61 @@ export function ReplyComposer({
                   className="rounded-lg p-2 text-foreground hover:bg-muted"
                 >
                   <Highlighter className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Text colour (red)"
+                  aria-label="Text colour"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => format("foreColor")}
+                  disabled={isSending}
+                  className="rounded-md p-1.5 text-foreground hover:bg-muted disabled:opacity-50"
+                >
+                  <Baseline className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Bulleted list"
+                  aria-label="Bulleted list"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => format("insertUnorderedList")}
+                  disabled={isSending}
+                  className="rounded-md p-1.5 text-foreground hover:bg-muted disabled:opacity-50"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Numbered list"
+                  aria-label="Numbered list"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => format("insertOrderedList")}
+                  disabled={isSending}
+                  className="rounded-md p-1.5 text-foreground hover:bg-muted disabled:opacity-50"
+                >
+                  <ListOrdered className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Insert link"
+                  aria-label="Insert link"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => format("createLink")}
+                  disabled={isSending}
+                  className="rounded-md p-1.5 text-foreground hover:bg-muted disabled:opacity-50"
+                >
+                  <Link2 className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  title="Clear formatting"
+                  aria-label="Clear formatting"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => format("removeFormat")}
+                  disabled={isSending}
+                  className="rounded-md p-1.5 text-foreground hover:bg-muted disabled:opacity-50"
+                >
+                  <Eraser className="h-4 w-4" />
                 </button>
               </>
             ) : (
@@ -1111,17 +1195,13 @@ export function ReplyComposer({
           </div>
           <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <span className="w-14 shrink-0">To</span>
-            <input
-              type="text"
+            <EmailChips
               value={emailTo}
-              onChange={(event) => {
+              onChange={(v) => {
                 defaultRecipient.current = false;
-                setEmailTo(event.target.value);
+                setEmailTo(v);
               }}
               disabled={isSending}
-              placeholder="name@example.com"
-              autoComplete="email"
-              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
             />
           </label>
           <div className="flex gap-3 pl-16">
@@ -1145,27 +1225,13 @@ export function ReplyComposer({
           {showCc ? (
             <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <span className="w-14 shrink-0">Cc</span>
-              <input
-                type="text"
-                value={emailCc}
-                onChange={(event) => setEmailCc(event.target.value)}
-                disabled={isSending}
-                placeholder="name@example.com, other@example.com"
-                className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-              />
+              <EmailChips value={emailCc} onChange={setEmailCc} disabled={isSending} />
             </label>
           ) : null}
           {showBcc ? (
             <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <span className="w-14 shrink-0">Bcc</span>
-              <input
-                type="text"
-                value={emailBcc}
-                onChange={(event) => setEmailBcc(event.target.value)}
-                disabled={isSending}
-                placeholder="name@example.com, other@example.com"
-                className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-              />
+              <EmailChips value={emailBcc} onChange={setEmailBcc} disabled={isSending} />
             </label>
           ) : null}
           <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -1239,6 +1305,61 @@ export function ReplyComposer({
               >
                 <Highlighter className="h-4 w-4" />
               </button>
+              <button
+                type="button"
+                title="Text colour (red)"
+                aria-label="Text colour"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => format("foreColor")}
+                disabled={isSending}
+                className="rounded-md p-1.5 text-foreground hover:bg-muted disabled:opacity-50"
+              >
+                <Baseline className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                title="Bulleted list"
+                aria-label="Bulleted list"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => format("insertUnorderedList")}
+                disabled={isSending}
+                className="rounded-md p-1.5 text-foreground hover:bg-muted disabled:opacity-50"
+              >
+                <List className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                title="Numbered list"
+                aria-label="Numbered list"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => format("insertOrderedList")}
+                disabled={isSending}
+                className="rounded-md p-1.5 text-foreground hover:bg-muted disabled:opacity-50"
+              >
+                <ListOrdered className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                title="Insert link"
+                aria-label="Insert link"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => format("createLink")}
+                disabled={isSending}
+                className="rounded-md p-1.5 text-foreground hover:bg-muted disabled:opacity-50"
+              >
+                <Link2 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                title="Clear formatting"
+                aria-label="Clear formatting"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => format("removeFormat")}
+                disabled={isSending}
+                className="rounded-md p-1.5 text-foreground hover:bg-muted disabled:opacity-50"
+              >
+                <Eraser className="h-4 w-4" />
+              </button>
             </>
           ) : (
             <button
@@ -1284,6 +1405,12 @@ export function ReplyComposer({
           className="min-h-24 max-h-48 w-full overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-background px-3.5 py-3 text-sm leading-relaxed text-foreground outline-none transition empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
         />
       )}
+      {channel === "email" ? (
+        <p className="mt-1.5 whitespace-pre-line rounded-lg border border-dashed border-border px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+          <span className="font-semibold">Signature (added automatically):</span>
+          {"\n" + SIGNATURE_TEXT}
+        </p>
+      ) : null}
 
       {canAttach ? (
         <div className="mt-3 space-y-2">
