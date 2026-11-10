@@ -1,7 +1,8 @@
+import { Pager } from "@/components/collections/Pager";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { downloadCsv } from "@/lib/csv";
 import { AppShell } from "@/components/AppShell";
 import {
@@ -166,6 +167,12 @@ function ClientsPage() {
         { ...filters, status: "all" },
       ),
   );
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, pageCount - 1);
+  const paged = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
+  useEffect(() => setPage(0), [filtered.length, pageSize]);
   return (
     <AppShell
       title="Clients"
@@ -255,7 +262,7 @@ function ClientsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map((c) => {
+              {paged.map((c) => {
                 // The channel actually used for this client (Viber is paused, phone-only clients get SMS),
                 // plus Voice when there is a phone number.
                 const used = String(
@@ -331,6 +338,13 @@ function ClientsPage() {
             </tbody>
           </table>
         </div>
+        <Pager
+          total={filtered.length}
+          page={safePage}
+          pageSize={pageSize}
+          onPage={setPage}
+          onPageSize={setPageSize}
+        />
       </Panel>
     </AppShell>
   );

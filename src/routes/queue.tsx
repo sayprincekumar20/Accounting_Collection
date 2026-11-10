@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { Pager } from "@/components/collections/Pager";
 import { createFileRoute } from "@tanstack/react-router";
 import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
@@ -122,6 +124,12 @@ function QueuePage() {
         { ...filters, status: "all" },
       ),
   );
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
+  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize));
+  const safePage = Math.min(page, pageCount - 1);
+  const paged = visible.slice(safePage * pageSize, (safePage + 1) * pageSize);
+  useEffect(() => setPage(0), [visible.length, pageSize]);
   const toggle = (st: string) => setFilters({ status: filters.status === st ? "all" : st });
 
   return (
@@ -237,7 +245,7 @@ function QueuePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {visible.map((q) => (
+                {paged.map((q) => (
                   <tr key={q.queue_id} className="hover:bg-muted/60">
                     <td className="px-4 py-3 font-semibold">{q.client_name}</td>
                     <td className="px-4 py-3">
@@ -279,6 +287,13 @@ function QueuePage() {
               </tbody>
             </table>
           </div>
+          <Pager
+            total={visible.length}
+            page={safePage}
+            pageSize={pageSize}
+            onPage={setPage}
+            onPageSize={setPageSize}
+          />
         </Panel>
       </div>
     </AppShell>
