@@ -23,6 +23,16 @@ export const Route = createFileRoute("/api/whatsapp-template")({
           return json({ error: "invalid JSON" }, 400);
         }
         if (!clientId) return json({ error: "client_id is required" }, 400);
+        // A bare phone number is not a client_id (the n8n workflow needs the Clients row).
+        if (/^\+?\d{8,}$/.test(clientId))
+          return json(
+            {
+              ok: false,
+              error:
+                "This WhatsApp number is not linked to a client, so the template cannot be filled in.",
+            },
+            400,
+          );
         try {
           const r = await fetch(N8N_WEBHOOK, {
             method: "POST",

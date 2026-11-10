@@ -52,6 +52,14 @@ describe("POST /api/whatsapp-template (existing n8n template workflow)", () => {
     expect(r.note).toContain("statement PDF missing");
   });
 
+  it("refuses a phone number instead of a client_id", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await (await handlers()).POST({ request: post({ client_id: "639173249458" }) });
+    expect(res.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("requires a client_id", async () => {
     expect((await (await handlers()).POST({ request: post({}) })).status).toBe(400);
   });

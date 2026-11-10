@@ -39,6 +39,8 @@ interface ClientRow {
 
 interface ConversationOut {
   client_id: string; // phone digits — matches page's phoneDigitsFromClientId() expectation
+  /** The client's real client_id in the Clients table ('' when the number is not a client). */
+  client_ref?: string;
   client_name: string;
   notified_ar: boolean;
   promise_recorded: boolean;
@@ -95,12 +97,17 @@ export const Route = createFileRoute("/api/whatsapp-conversations")({
           ) as [HistoryEntry[], HistoryEntry[], ClientRow[]];
 
           const nameByPhone = new Map<string, string>();
+          // Real client_id per phone (conversations are keyed by phone digits): used e.g. by the
+          // 'Send overdue reminder template' button, which needs the Clients row.
+          const clientIdByPhone = new Map<string, string>();
           const phoneByClientId = new Map<string, string>();
           for (const c of clients) {
             const d = digits(c.phone).slice(-10);
             if (!d) continue;
-            if ((c.status || "").toUpperCase() !== "INACTIVE" || !nameByPhone.has(d))
+            if ((c.status || "").toUpperCase() !== "INACTIVE" || !nameByPhone.has(d)) {
               nameByPhone.set(d, c.client_name);
+              clientIdByPhone.set(d, c.client_id);
+            }
             phoneByClientId.set(c.client_id, d);
           }
 
@@ -142,6 +149,7 @@ export const Route = createFileRoute("/api/whatsapp-conversations")({
               byPhone.set(otherPartyDigits, {
                 client_id: otherPartyDigits,
                 client_name: nameByPhone.get(otherPartyDigits.slice(-10)) || "",
+                client_ref: clientIdByPhone.get(otherPartyDigits.slice(-10)) || "",
                 notified_ar: escalatedPhones.has(otherPartyDigits.slice(-10)),
                 promise_recorded: promisedPhones.has(otherPartyDigits.slice(-10)),
                 messages: [],

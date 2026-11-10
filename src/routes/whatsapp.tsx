@@ -53,6 +53,7 @@ interface WaMessage {
 }
 interface WaConversation {
   client_id: string;
+  client_ref?: string;
   client_name: string;
   notified_ar: boolean;
   promise_recorded: boolean;
@@ -650,7 +651,7 @@ function WhatsAppInbox() {
                 lastClientMessageAt={
                   [...activeItem.messages].reverse().find((m) => m.role === "client")?.ts
                 }
-                templateClientId={activeItem.client_id}
+                templateClientId={activeItem.client_ref || undefined}
                 clientName={
                   activeClient?.client_name || activeClient?.parent_name || activeItem.client_name
                 }
