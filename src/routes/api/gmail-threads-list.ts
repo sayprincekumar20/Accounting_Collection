@@ -35,6 +35,24 @@ interface HistoryEntry {
   channel: string;
 }
 
+/** Run `fn` over `items` with at most `limit` running at once; results keep the input order. */
+export async function mapWithLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]!);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
 async function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -167,8 +185,12 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
           );
           const nextPageTokenOut: string | null = null;
           let truncated = false;
-          for (const chunk of emailChunks) {
+          // Search the email chunks in parallel (at most 4 at a time, to respect Gmail's rate limits);
+          // pages within a chunk stay sequential. Results are merged in chunk order (same list as before).
+          const searchChunk = async (chunk: string[]) => {
             const emailQuery = chunk.map((e) => `from:${e} OR to:${e}`).join(" OR ");
+            const ids: string[] = [];
+            let chunkTruncated = false;
             let pageCursor: string | undefined;
             for (let page = 0; page < MAX_PAGES; page++) {
               const chunkParams = new URLSearchParams(listParams);
@@ -178,16 +200,22 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
                 threads?: { id: string }[];
                 nextPageToken?: string;
               }>(`/threads?${chunkParams.toString()}`, accessToken);
-              for (const t of chunkList.threads || []) seenThreadIds.add(t.id);
+              for (const t of chunkList.threads || []) ids.push(t.id);
               pageCursor = chunkList.nextPageToken || undefined;
               if (!pageCursor) break;
               if (page === MAX_PAGES - 1) {
-                truncated = true;
+                chunkTruncated = true;
                 console.warn(
                   `[gmail-threads-list] more than ${MAX_PAGES * Number(maxResults)} threads in one email chunk; truncated`,
                 );
               }
             }
+            return { ids, chunkTruncated };
+          };
+          const chunkResults = await mapWithLimit(emailChunks, 4, searchChunk);
+          for (const r of chunkResults) {
+            for (const id of r.ids) seenThreadIds.add(id);
+            if (r.chunkTruncated) truncated = true;
           }
           // Each thread is one Gmail request; stay well inside Cloudflare's per-request subrequest limit.
           const MAX_THREADS = 350;
