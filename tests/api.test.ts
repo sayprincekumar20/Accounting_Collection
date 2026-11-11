@@ -1,3 +1,7 @@
+process.env.N8N_APPROVAL_SECRET = "test-approval";
+process.env.N8N_CONTACT_SECRET = "test-contact";
+process.env.N8N_WORKLIST_SECRET = "test-worklist";
+process.env.N8N_WA_REMINDER_KEY = "test-wa";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mocked data tables (by table id) and a mocked fetch for the n8n webhooks. No real data, no network.

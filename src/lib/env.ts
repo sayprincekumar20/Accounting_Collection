@@ -45,3 +45,10 @@ export async function getCloudflareBinding(key: string): Promise<unknown> {
   if (!cfEnv || typeof cfEnv !== "object") return undefined;
   return cfEnv[key];
 }
+
+/** A secret that must be configured (Cloudflare secret, or env var in tests); throws a clear error otherwise. */
+export async function requireSecret(key: string): Promise<string> {
+  const v = await getEnv(key);
+  if (!v) throw new Error(`Missing secret ${key} (set it with: npx wrangler secret put ${key})`);
+  return v;
+}

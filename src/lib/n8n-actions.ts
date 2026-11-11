@@ -3,9 +3,10 @@
 //  - contactClients: the contact command (21 -> 22 / 26): Zoho refresh, PDF, text, call, with all the usual
 //    checks (approval, Sales Team, promise, 5+ branches, cooldown). Replaces the Zoho Cliq /call command:
 //    Cliq no longer knows this key.
+import { requireSecret } from "@/lib/env";
+
+// Keys are Cloudflare secrets (N8N_APPROVAL_SECRET, N8N_CONTACT_SECRET), never in the code.
 const N8N = "https://rareglobalfood.app.n8n.cloud/webhook";
-const APPROVAL_SECRET = "ap_9d3e71c4b2a85f06e1d7c3b9a4f2e58d";
-const CONTACT_SECRET = "cc_44cac751af79f8caca264811b0f2fbad8266bf14";
 
 export interface ApprovalItem {
   client_id: string;
@@ -21,7 +22,10 @@ export async function approveClients(
 ): Promise<{ ok: boolean; saved: number }> {
   const res = await fetch(`${N8N}/contact-approval-update`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-approval-secret": APPROVAL_SECRET },
+    headers: {
+      "Content-Type": "application/json",
+      "x-approval-secret": await requireSecret("N8N_APPROVAL_SECRET"),
+    },
     body: JSON.stringify({ approved_by: approvedBy.slice(0, 80), items: items.slice(0, 500) }),
   });
   const out = (await res.json().catch(() => ({}))) as { ok?: boolean; saved?: number };
@@ -42,7 +46,10 @@ export async function contactClients(
   if (!list.length) throw new Error("No client names");
   const res = await fetch(`${N8N}/cliq-call-command`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-cliq-secret": CONTACT_SECRET },
+    headers: {
+      "Content-Type": "application/json",
+      "x-cliq-secret": await requireSecret("N8N_CONTACT_SECRET"),
+    },
     body: JSON.stringify({
       text: (force ? "force\n" : "") + list.join("\n"),
       user_name: requestedBy.slice(0, 80) + " (dashboard)",

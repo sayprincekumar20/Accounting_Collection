@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireSecret } from "@/lib/env";
 
 // Sends the approved WhatsApp template 'overdue_invoice_reminder_v3' (with the statement PDF) to one client
 // through the existing n8n workflow 06_WhatsApp_Channel_Workflow (webhook /whatsapp-reminder). The workflow
@@ -36,7 +37,10 @@ export const Route = createFileRoute("/api/whatsapp-template")({
         try {
           const r = await fetch(N8N_WEBHOOK, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-reminder-key": await requireSecret("N8N_WA_REMINDER_KEY"),
+            },
             body: JSON.stringify({ client_id: clientId }),
           });
           const out = (await r.json().catch(() => ({}))) as {

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireSecret } from "@/lib/env";
 import { clearDataTableCache, fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { buildActivity, cycleStart, loadActivityTables } from "@/lib/client-activity";
 
@@ -8,7 +9,6 @@ import { buildActivity, cycleStart, loadActivityTables } from "@/lib/client-acti
 const CLIENTS = "rJpqXxmxhqJnlLrJ";
 const APPROVALS = "3IvKKI4AwrBlDeOo";
 const APPROVAL_WEBHOOK = "https://rareglobalfood.app.n8n.cloud/webhook/contact-approval-update";
-const APPROVAL_SECRET = "ap_9d3e71c4b2a85f06e1d7c3b9a4f2e58d";
 type Row = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? "" : String(v));
 const companyKey = (id: unknown) => s(id).split("___")[0]!.trim().toLowerCase();
@@ -177,7 +177,10 @@ export const Route = createFileRoute("/api/contact-approvals")({
             return json({ error: "approved_by and at least one client are required" }, 400);
           const res = await fetch(APPROVAL_WEBHOOK, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "x-approval-secret": APPROVAL_SECRET },
+            headers: {
+              "Content-Type": "application/json",
+              "x-approval-secret": await requireSecret("N8N_APPROVAL_SECRET"),
+            },
             body: JSON.stringify({ approved_by: s(b.approved_by).trim(), items }),
           });
           const out = (await res.json().catch(() => ({}))) as { ok?: boolean; saved?: number };

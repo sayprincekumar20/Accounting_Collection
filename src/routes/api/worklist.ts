@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireSecret } from "@/lib/env";
 import { escalationType } from "@/lib/escalation-type";
 import { clearDataTableCache, fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { isNotReachedAlert } from "@/lib/authorship";
@@ -11,7 +12,6 @@ type Row = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? "" : String(v));
 const STATUSES = ["OPEN", "IN_PROGRESS", "DONE"];
 const WORKLIST_WEBHOOK = "https://rareglobalfood.app.n8n.cloud/webhook/worklist-update";
-const WORKLIST_SECRET = "wl_7c41e9a2b05d4f63a8e1c92f6d0b7a35";
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -85,7 +85,10 @@ export const Route = createFileRoute("/api/worklist")({
           // dashboard's read-only API key never needs write access.
           const res = await fetch(WORKLIST_WEBHOOK, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "x-worklist-secret": WORKLIST_SECRET },
+            headers: {
+              "Content-Type": "application/json",
+              "x-worklist-secret": await requireSecret("N8N_WORKLIST_SECRET"),
+            },
             body: JSON.stringify({
               entry_id: entryId,
               status,
