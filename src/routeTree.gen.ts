@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as ContactsRouteImport } from './routes/contacts'
 import { Route as EmailRouteImport } from './routes/email'
+import { Route as EscalationsRouteImport } from './routes/escalations'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as OtherAccountsRouteImport } from './routes/other-accounts'
@@ -86,6 +87,11 @@ const ContactsRoute = ContactsRouteImport.update({
 const EmailRoute = EmailRouteImport.update({
   id: '/email',
   path: '/email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EscalationsRoute = EscalationsRouteImport.update({
+  id: '/escalations',
+  path: '/escalations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -368,6 +374,7 @@ export interface FileRoutesByFullPath {
   '/approvals': typeof ApprovalsRoute
   '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
+  '/escalations': typeof EscalationsRoute
   '/login': typeof LoginRoute
   '/notifications': typeof NotificationsRoute
   '/other-accounts': typeof OtherAccountsRoute
@@ -428,6 +435,7 @@ export interface FileRoutesByTo {
   '/approvals': typeof ApprovalsRoute
   '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
+  '/escalations': typeof EscalationsRoute
   '/login': typeof LoginRoute
   '/notifications': typeof NotificationsRoute
   '/other-accounts': typeof OtherAccountsRoute
@@ -489,6 +497,7 @@ export interface FileRoutesById {
   '/approvals': typeof ApprovalsRoute
   '/contacts': typeof ContactsRoute
   '/email': typeof EmailRoute
+  '/escalations': typeof EscalationsRoute
   '/login': typeof LoginRoute
   '/notifications': typeof NotificationsRoute
   '/other-accounts': typeof OtherAccountsRoute
@@ -551,6 +560,7 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/contacts'
     | '/email'
+    | '/escalations'
     | '/login'
     | '/notifications'
     | '/other-accounts'
@@ -611,6 +621,7 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/contacts'
     | '/email'
+    | '/escalations'
     | '/login'
     | '/notifications'
     | '/other-accounts'
@@ -671,6 +682,7 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/contacts'
     | '/email'
+    | '/escalations'
     | '/login'
     | '/notifications'
     | '/other-accounts'
@@ -732,6 +744,7 @@ export interface RootRouteChildren {
   ApprovalsRoute: typeof ApprovalsRoute
   ContactsRoute: typeof ContactsRoute
   EmailRoute: typeof EmailRoute
+  EscalationsRoute: typeof EscalationsRoute
   LoginRoute: typeof LoginRoute
   NotificationsRoute: typeof NotificationsRoute
   OtherAccountsRoute: typeof OtherAccountsRoute
@@ -812,6 +825,13 @@ declare module '@tanstack/react-router' {
       path: '/email'
       fullPath: '/email'
       preLoaderRoute: typeof EmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/escalations': {
+      id: '/escalations'
+      path: '/escalations'
+      fullPath: '/escalations'
+      preLoaderRoute: typeof EscalationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -1227,6 +1247,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApprovalsRoute: ApprovalsRoute,
   ContactsRoute: ContactsRoute,
   EmailRoute: EmailRoute,
+  EscalationsRoute: EscalationsRoute,
   LoginRoute: LoginRoute,
   NotificationsRoute: NotificationsRoute,
   OtherAccountsRoute: OtherAccountsRoute,

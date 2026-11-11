@@ -9,6 +9,7 @@ import { ownerName } from "@/lib/owner";
 import { ScheduleLine } from "@/components/collections/ScheduleBadge";
 import { CreditLine } from "@/components/collections/CreditLine";
 import { Pager } from "@/components/collections/Pager";
+import { OtherAccountsContent } from "./other-accounts";
 import { InvoiceTable, InvoiceToggle } from "@/components/collections/InvoiceTable";
 
 export const Route = createFileRoute("/approvals")({
@@ -104,7 +105,12 @@ function ApprovalsPage() {
   const [status, setStatus] = useState<"PENDING" | "APPROVED" | "ALL">("PENDING");
   const [overdueOnly, setOverdueOnly] = useState(false);
   // Two blocks: clients with overdue invoices, and clients with only current (not yet due) invoices.
-  const [kind, setKind] = useState<"OVERDUE" | "CURRENT">("OVERDUE");
+  const [kind, setKind] = useState<"OVERDUE" | "CURRENT" | "OTHER">(() =>
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("tab") === "other"
+      ? "OTHER"
+      : "OVERDUE",
+  );
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
   const [q, setQ] = useState("");
@@ -133,6 +139,8 @@ function ApprovalsPage() {
   );
   const overdueCount = items.filter((i) => i.overdue > 0).length;
   const currentOnlyCount = items.filter((i) => i.overdue <= 0).length;
+  // Other accounts: CRM owner not in the Sales Team group, and internal Rare accounts (never contacted).
+  const otherCount = (data ?? []).filter((i) => i.sales_team === false).length;
   const paged = visible.slice(page * pageSize, (page + 1) * pageSize);
   useEffect(() => setPage(0), [kind, status, q, overdueOnly, pageSize]);
   // Data cycle: the weekly refresh is the earliest 'Data from Zoho' time; later ones were refreshed since
@@ -478,6 +486,7 @@ function ApprovalsPage() {
             [
               ["OVERDUE", `Overdue (${overdueCount})`],
               ["CURRENT", `Current only (${currentOnlyCount})`],
+              ["OTHER", `Other accounts (${otherCount})`],
             ] as const
           ).map(([k, label]) => (
             <button
@@ -495,190 +504,199 @@ function ApprovalsPage() {
             </span>
           ) : null}
         </div>
-        <Panel
-          title="Clients"
-          description={`${visible.length} shown · only approved clients are texted or called (by /call or the automation)`}
-        >
-          {isLoading ? <SkeletonRows /> : null}
-          {error ? (
-            <p className="px-4 py-6 text-sm text-destructive">Could not load clients.</p>
-          ) : null}
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-3 py-2.5">
-                    <input
-                      type="checkbox"
-                      aria-label="Select all shown"
-                      checked={allVisibleSelected}
-                      onChange={() =>
-                        setSelected(
-                          allVisibleSelected ? new Set() : new Set(visible.map((i) => i.client_id)),
-                        )
-                      }
-                    />
-                  </th>
-                  <th className="px-3 py-2.5 font-semibold">Client</th>
-                  <th className="px-3 py-2.5 font-semibold">Contact</th>
-                  <th className="px-3 py-2.5 text-right font-semibold">Overdue</th>
-                  <th className="px-3 py-2.5 text-right font-semibold">Current</th>
-                  <th className="px-3 py-2.5 text-right font-semibold">Total</th>
-                  <th className="px-3 py-2.5 font-semibold">Approval</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {paged.map((i) => (
-                  <Fragment key={i.client_id}>
-                    <tr className={i.approved ? "" : "bg-warning/5"}>
-                      <td className="px-3 py-3 align-top">
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${i.client_name}`}
-                          checked={selected.has(i.client_id)}
-                          onChange={() => toggle(i.client_id)}
-                        />
-                      </td>
-                      <td className="px-3 py-3 align-top">
-                        <a
-                          href={`/clients/${encodeURIComponent(i.client_id)}`}
-                          className="font-semibold hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {i.client_name}
-                        </a>
-                        <p className="text-xs text-muted-foreground">
-                          {[
-                            i.parent_name !== i.client_name ? i.parent_name : "",
-                            i.segment,
-                            i.ar_owner && `Account Owner: ${ownerName(i.ar_owner)}`,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </p>
-                        <ScheduleLine value={i.collection_schedule} />
-                        <CreditLine terms={i.credit_terms} limit={i.credit_limit} />
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {future(i.promise_until) ? (
-                            <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
-                              Promise until {day(i.promise_until)}
-                            </span>
-                          ) : null}
-                          {future(i.ar_handoff_until) ? (
-                            <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-semibold text-warning">
-                              AR handling until {day(i.ar_handoff_until)}
-                            </span>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() => setOpen(open === i.client_id ? null : i.client_id)}
-                            className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold hover:bg-muted"
+        {kind === "OTHER" ? (
+          <OtherAccountsContent />
+        ) : (
+          <Panel
+            title="Clients"
+            description={`${visible.length} shown · only approved clients are texted or called (by /call or the automation)`}
+          >
+            {isLoading ? <SkeletonRows /> : null}
+            {error ? (
+              <p className="px-4 py-6 text-sm text-destructive">Could not load clients.</p>
+            ) : null}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1000px] text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <th className="px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all shown"
+                        checked={allVisibleSelected}
+                        onChange={() =>
+                          setSelected(
+                            allVisibleSelected
+                              ? new Set()
+                              : new Set(visible.map((i) => i.client_id)),
+                          )
+                        }
+                      />
+                    </th>
+                    <th className="px-3 py-2.5 font-semibold">Client</th>
+                    <th className="px-3 py-2.5 font-semibold">Contact</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Overdue</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Current</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Total</th>
+                    <th className="px-3 py-2.5 font-semibold">Approval</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {paged.map((i) => (
+                    <Fragment key={i.client_id}>
+                      <tr className={i.approved ? "" : "bg-warning/5"}>
+                        <td className="px-3 py-3 align-top">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${i.client_name}`}
+                            checked={selected.has(i.client_id)}
+                            onChange={() => toggle(i.client_id)}
+                          />
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          <a
+                            href={`/clients/${encodeURIComponent(i.client_id)}`}
+                            className="font-semibold hover:underline"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            {open === i.client_id
-                              ? "Hide invoices"
-                              : `Show ${i.invoices.length} invoice(s)`}
-                          </button>
-                        </div>
-                        <p className="mt-1 text-[10px] text-muted-foreground">
-                          Data from Zoho: {when(i.refreshed_at)}
-                        </p>
-                      </td>
-                      <td className="px-3 py-3 align-top text-xs">
-                        <p className="font-semibold">
-                          {i.contact_person || (
-                            <span className="text-destructive">No contact person</span>
+                            {i.client_name}
+                          </a>
+                          <p className="text-xs text-muted-foreground">
+                            {[
+                              i.parent_name !== i.client_name ? i.parent_name : "",
+                              i.segment,
+                              i.ar_owner && `Account Owner: ${ownerName(i.ar_owner)}`,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                          <ScheduleLine value={i.collection_schedule} />
+                          <CreditLine terms={i.credit_terms} limit={i.credit_limit} />
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {future(i.promise_until) ? (
+                              <span className="rounded-full bg-success/12 px-2 py-0.5 text-[10px] font-semibold text-success">
+                                Promise until {day(i.promise_until)}
+                              </span>
+                            ) : null}
+                            {future(i.ar_handoff_until) ? (
+                              <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-semibold text-warning">
+                                AR handling until {day(i.ar_handoff_until)}
+                              </span>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => setOpen(open === i.client_id ? null : i.client_id)}
+                              className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold hover:bg-muted"
+                            >
+                              {open === i.client_id
+                                ? "Hide invoices"
+                                : `Show ${i.invoices.length} invoice(s)`}
+                            </button>
+                          </div>
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            Data from Zoho: {when(i.refreshed_at)}
+                          </p>
+                        </td>
+                        <td className="px-3 py-3 align-top text-xs">
+                          <p className="font-semibold">
+                            {i.contact_person || (
+                              <span className="text-destructive">No contact person</span>
+                            )}
+                          </p>
+                          <p>{i.phone || <span className="text-destructive">No phone</span>}</p>
+                          <p className="truncate">
+                            {i.email || <span className="text-muted-foreground">No email</span>}
+                          </p>
+                        </td>
+                        <td className="px-3 py-3 text-right align-top tabular-nums font-semibold text-destructive">
+                          {i.overdue ? peso(i.overdue) : "–"}
+                        </td>
+                        <td className="px-3 py-3 text-right align-top tabular-nums">
+                          {i.current ? peso(i.current) : "–"}
+                        </td>
+                        <td className="px-3 py-3 text-right align-top tabular-nums font-semibold">
+                          {peso(i.total)}
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          {i.approved ? (
+                            <>
+                              <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
+                                Approved
+                              </span>
+                              <p className="mt-1 text-[11px] text-muted-foreground">
+                                {i.approved_by} · {when(i.approved_at)}
+                              </p>
+                              <CycleStatus i={i} />
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => save([i], false)}
+                                className="mt-1 rounded-md border border-border px-2 py-0.5 text-xs font-semibold hover:bg-muted disabled:opacity-50"
+                              >
+                                Remove
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-[11px] font-semibold text-warning">
+                                Pending
+                              </span>
+                              {i.approval_expired ? (
+                                <p className="mt-1 text-[11px] text-muted-foreground">
+                                  Approved last cycle{i.approved_by ? ` by ${i.approved_by}` : ""}:
+                                  approve again for this cycle
+                                </p>
+                              ) : null}
+                              <CycleStatus i={i} />
+                              {i.approval_note ? (
+                                <p className="mt-1 text-[11px] text-muted-foreground">
+                                  Note: {i.approval_note}
+                                </p>
+                              ) : null}
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => save([i], true)}
+                                className="mt-1 block rounded-md bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                              >
+                                Approve
+                              </button>
+                            </>
                           )}
-                        </p>
-                        <p>{i.phone || <span className="text-destructive">No phone</span>}</p>
-                        <p className="truncate">
-                          {i.email || <span className="text-muted-foreground">No email</span>}
-                        </p>
-                      </td>
-                      <td className="px-3 py-3 text-right align-top tabular-nums font-semibold text-destructive">
-                        {i.overdue ? peso(i.overdue) : "–"}
-                      </td>
-                      <td className="px-3 py-3 text-right align-top tabular-nums">
-                        {i.current ? peso(i.current) : "–"}
-                      </td>
-                      <td className="px-3 py-3 text-right align-top tabular-nums font-semibold">
-                        {peso(i.total)}
-                      </td>
-                      <td className="px-3 py-3 align-top">
-                        {i.approved ? (
-                          <>
-                            <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-[11px] font-semibold text-success">
-                              Approved
-                            </span>
-                            <p className="mt-1 text-[11px] text-muted-foreground">
-                              {i.approved_by} · {when(i.approved_at)}
-                            </p>
-                            <CycleStatus i={i} />
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => save([i], false)}
-                              className="mt-1 rounded-md border border-border px-2 py-0.5 text-xs font-semibold hover:bg-muted disabled:opacity-50"
-                            >
-                              Remove
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-[11px] font-semibold text-warning">
-                              Pending
-                            </span>
-                            {i.approval_expired ? (
-                              <p className="mt-1 text-[11px] text-muted-foreground">
-                                Approved last cycle{i.approved_by ? ` by ${i.approved_by}` : ""}:
-                                approve again for this cycle
-                              </p>
-                            ) : null}
-                            <CycleStatus i={i} />
-                            {i.approval_note ? (
-                              <p className="mt-1 text-[11px] text-muted-foreground">
-                                Note: {i.approval_note}
-                              </p>
-                            ) : null}
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => save([i], true)}
-                              className="mt-1 block rounded-md bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-                            >
-                              Approve
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                    {open === i.client_id ? (
-                      <tr>
-                        <td />
-                        <td colSpan={6} className="px-3 pb-4">
-                          <InvoiceTable invoices={i.invoices} />
                         </td>
                       </tr>
-                    ) : null}
-                  </Fragment>
-                ))}
-                {!isLoading && visible.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      Nothing here.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-          <Pager
-            total={visible.length}
-            page={page}
-            pageSize={pageSize}
-            onPage={setPage}
-            onPageSize={setPageSize}
-          />
-        </Panel>
+                      {open === i.client_id ? (
+                        <tr>
+                          <td />
+                          <td colSpan={6} className="px-3 pb-4">
+                            <InvoiceTable invoices={i.invoices} />
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  ))}
+                  {!isLoading && visible.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-4 py-8 text-center text-sm text-muted-foreground"
+                      >
+                        Nothing here.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+            <Pager
+              total={visible.length}
+              page={page}
+              pageSize={pageSize}
+              onPage={setPage}
+              onPageSize={setPageSize}
+            />
+          </Panel>
+        )}
       </div>
 
       <div className="mt-5">

@@ -1,16 +1,23 @@
 import { useEffect, useState } from "react";
 import { escalationAgeHours, escalationType } from "@/lib/escalation-type";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 import { RefTag } from "@/components/collections/LogCells";
 import { downloadCsv } from "@/lib/csv";
 
 export const Route = createFileRoute("/worklist")({
-  head: () => ({ meta: [{ title: "AR Worklist | Rare Global Food Collections" }] }),
-  component: WorklistPage,
+  // Moved: this content now lives on another page (kept as a redirect so old links keep working).
+  beforeLoad: () => {
+    throw redirect({
+      href:
+        "/escalations?tab=worklist" +
+        (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("q")
+          ? "&q=" + encodeURIComponent(new URLSearchParams(window.location.search).get("q") || "")
+          : ""),
+    });
+  },
 });
 
 interface Item {
@@ -58,7 +65,7 @@ const STATUS_TONE: Record<string, string> = {
   DONE: "bg-success/12 text-success",
 };
 
-function WorklistPage() {
+export function WorklistContent() {
   const qc = useQueryClient();
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["worklist"],
@@ -152,11 +159,10 @@ function WorklistPage() {
   const select =
     "h-9 rounded-lg border border-border bg-background px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
   return (
-    <AppShell
-      title="AR Worklist"
-      subtitle="Everything the AI agents and Grace escalated to the AR team · mark each one in progress or done"
-      actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
-    >
+    <>
+      <div className="mb-4 flex justify-end">
+        <RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />
+      </div>
       <div className="grid gap-4 sm:grid-cols-3">
         {(["OPEN", "IN_PROGRESS", "DONE"] as const).map((st) => (
           <StatCard
@@ -364,6 +370,6 @@ function WorklistPage() {
           </ul>
         </Panel>
       </div>
-    </AppShell>
+    </>
   );
 }

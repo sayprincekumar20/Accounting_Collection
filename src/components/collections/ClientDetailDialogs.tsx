@@ -460,10 +460,10 @@ export function EscalationBadge({
                         : e.channel.charAt(0) + e.channel.slice(1).toLowerCase()}
                     </a>
                     <a
-                      href={`/worklist?q=${encodeURIComponent(e.ref || clientName || "")}`}
+                      href={`/escalations?tab=worklist&q=${encodeURIComponent(e.ref || clientName || "")}`}
                       className="rounded-lg border border-border px-2.5 py-1 font-semibold hover:bg-muted"
                     >
-                      Open in AR Worklist
+                      Open in Escalations
                     </a>
                   </div>
                 </li>

@@ -157,7 +157,7 @@ export function ArInsights() {
                 .map((e) => (
                   <tr key={e.type}>
                     <td className="px-3 py-2">
-                      <a href={`/worklist?q=`} className="font-semibold hover:underline">
+                      <a href="/escalations?tab=worklist" className="font-semibold hover:underline">
                         {e.type}
                       </a>
                     </td>

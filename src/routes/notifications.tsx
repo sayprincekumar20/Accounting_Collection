@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 
 export const Route = createFileRoute("/notifications")({
-  head: () => ({ meta: [{ title: "Notifications | Rare Global Food Collections" }] }),
-  component: NotificationsPage,
+  // Moved: this content now lives on another page (kept as a redirect so old links keep working).
+  beforeLoad: () => {
+    throw redirect({ href: "/escalations?tab=notifications" });
+  },
 });
 
 interface Item {
@@ -38,7 +39,7 @@ const tone: Record<string, string> = {
 };
 
 /** System messages that used to be posted to Zoho Cliq #sales (Cliq notifications are switched off). */
-function NotificationsPage() {
+export function NotificationsContent() {
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["notifications"],
     queryFn: async () => {
@@ -64,11 +65,10 @@ function NotificationsPage() {
   const control =
     "h-9 rounded-lg border border-border bg-background px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
   return (
-    <AppShell
-      title="Notifications"
-      subtitle="System messages: errors, /call results, cycle close-out, client callbacks (previously posted to Zoho Cliq)"
-      actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
-    >
+    <>
+      <div className="mb-4 flex justify-end">
+        <RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />
+      </div>
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Today" value={String(todayCount)} tone="primary" />
         <StatCard
@@ -139,6 +139,6 @@ function NotificationsPage() {
           </ul>
         </Panel>
       </div>
-    </AppShell>
+    </>
   );
 }

@@ -1,8 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 import { downloadCsv } from "@/lib/csv";
 import { ownerName } from "@/lib/owner";
@@ -15,8 +14,10 @@ import {
 } from "@/components/collections/InvoiceTable";
 
 export const Route = createFileRoute("/other-accounts")({
-  head: () => ({ meta: [{ title: "Other Accounts | Rare Global Food Collections" }] }),
-  component: OtherAccountsPage,
+  // Moved: this content now lives on another page (kept as a redirect so old links keep working).
+  beforeLoad: () => {
+    throw redirect({ href: "/approvals?tab=other" });
+  },
 });
 
 interface Item {
@@ -46,7 +47,7 @@ const peso = (v: number) =>
   Number(v || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** Clients with unpaid invoices whose CRM Account Owner is NOT in the 'Sales Team' group: read-only, never contacted. */
-function OtherAccountsPage() {
+export function OtherAccountsContent() {
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["contact-approvals"],
     queryFn: async () => {
@@ -72,11 +73,10 @@ function OtherAccountsPage() {
   const control =
     "h-9 rounded-lg border border-border bg-background px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
   return (
-    <AppShell
-      title="Other Accounts"
-      subtitle="Clients whose CRM Account Owner is not in the Sales Team group, and internal Rare accounts · read-only · never texted or called"
-      actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
-    >
+    <>
+      <div className="mb-4 flex justify-end">
+        <RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />
+      </div>
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Accounts (owner not in Sales Team)"
@@ -243,6 +243,6 @@ function OtherAccountsPage() {
           </div>
         </Panel>
       </div>
-    </AppShell>
+    </>
   );
 }

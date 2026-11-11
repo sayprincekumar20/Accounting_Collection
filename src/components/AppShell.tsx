@@ -1,5 +1,6 @@
 import { Assistant } from "@/components/assistant/Assistant";
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import {
   LayoutDashboard,
@@ -24,9 +25,7 @@ const nav = [
   { to: "/clients", label: "Clients", icon: Users },
   { to: "/queue", label: "Reminder Queue", icon: ListChecks },
   { to: "/approvals", label: "Contact Approvals", icon: ShieldCheck },
-  { to: "/other-accounts", label: "Other Accounts", icon: UserX },
-  { to: "/worklist", label: "AR Worklist", icon: ClipboardCheck },
-  { to: "/notifications", label: "Notifications", icon: Bell },
+  { to: "/escalations", label: "Escalations", icon: ClipboardCheck },
   { to: "/promises", label: "Promises", icon: CalendarClock },
   { to: "/contacts", label: "Contacts to Fix", icon: UserX },
   { to: "/reports", label: "Reports", icon: FileBarChart },
@@ -100,6 +99,7 @@ export function AppShell({
             >
               <item.icon className="h-4 w-4" />
               {item.label}
+              {item.to === "/escalations" ? <OpenEscalationsBadge /> : null}
             </Link>
           ))}
         </nav>
@@ -171,5 +171,28 @@ export function AppShell({
         <Assistant />
       </div>
     </div>
+  );
+}
+
+/** Number of open / in-progress client escalations (same data as the Escalations page). */
+function OpenEscalationsBadge() {
+  const { data } = useQuery({
+    queryKey: ["worklist"],
+    queryFn: async () => {
+      const r = await fetch("/api/worklist");
+      if (!r.ok) throw new Error("Fetch failed");
+      return ((await r.json()).items ?? []) as { status?: string }[];
+    },
+    refetchInterval: 300000,
+  });
+  const open = (data ?? []).filter((e) => (e.status || "OPEN") !== "DONE").length;
+  if (!open) return null;
+  return (
+    <span
+      className="ml-auto rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground"
+      aria-label={`${open} open escalations`}
+    >
+      {open}
+    </span>
   );
 }
