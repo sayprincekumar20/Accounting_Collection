@@ -20,6 +20,7 @@ export const Route = createFileRoute("/other-accounts")({
 });
 
 interface Item {
+  internal_account?: boolean;
   credit_terms?: string;
   credit_limit?: number | null;
   collection_schedule?: string;
@@ -58,22 +59,25 @@ function OtherAccountsPage() {
   const items = useMemo(() => (data ?? []).filter((i) => i.sales_team === false), [data]);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
+  const [internalOnly, setInternalOnly] = useState(false);
+  const internalCount = items.filter((i) => i.internal_account).length;
   const visible = items.filter(
     (i) =>
-      !q ||
-      `${i.client_name} ${i.ar_owner} ${i.contact_person} ${i.sales_person}`
-        .toLowerCase()
-        .includes(q.toLowerCase()),
+      (!internalOnly || i.internal_account) &&
+      (!q ||
+        `${i.client_name} ${i.ar_owner} ${i.contact_person} ${i.sales_person}`
+          .toLowerCase()
+          .includes(q.toLowerCase())),
   );
   const control =
     "h-9 rounded-lg border border-border bg-background px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
   return (
     <AppShell
       title="Other Accounts"
-      subtitle="Clients whose CRM Account Owner is not in the Sales Team group · read-only · never texted or called"
+      subtitle="Clients whose CRM Account Owner is not in the Sales Team group, and internal Rare accounts · read-only · never texted or called"
       actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Accounts (owner not in Sales Team)"
           value={String(items.length)}
@@ -83,6 +87,17 @@ function OtherAccountsPage() {
           label="Outstanding"
           value={peso(items.reduce((t, i) => t + i.total, 0))}
           hint={peso(items.reduce((t, i) => t + i.overdue, 0)) + " overdue"}
+        />
+        <StatCard
+          label="Internal accounts"
+          value={String(internalCount)}
+          hint={
+            internalOnly
+              ? "Showing internal only · click to show all"
+              : "Internal Rare accounts · click to filter"
+          }
+          onClick={() => setInternalOnly((v) => !v)}
+          active={internalOnly}
         />
       </div>
       <div className="surface-card mt-5 flex flex-wrap items-center gap-2.5 p-3">
@@ -101,6 +116,7 @@ function OtherAccountsPage() {
                 "Client",
                 "Parent",
                 "Account owner",
+                "Internal",
                 "Contact",
                 "Phone",
                 "Email",
@@ -113,6 +129,7 @@ function OtherAccountsPage() {
                 i.client_name,
                 i.parent_name,
                 ownerName(i.ar_owner),
+                i.internal_account ? "Yes" : "",
                 i.contact_person,
                 i.phone,
                 i.email,
@@ -161,6 +178,14 @@ function OtherAccountsPage() {
                         >
                           {i.client_name}
                         </a>
+                        {i.internal_account ? (
+                          <span
+                            title="Internal Rare account: never contacted"
+                            className="ml-2 rounded-full bg-secondary px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-secondary-foreground"
+                          >
+                            Internal
+                          </span>
+                        ) : null}
                         <ScheduleLine value={i.collection_schedule} />
                         <CreditLine terms={i.credit_terms} limit={i.credit_limit} />
 

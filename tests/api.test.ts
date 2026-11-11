@@ -599,3 +599,18 @@ describe("GET /api/notifications (system messages formerly posted to Cliq)", () 
     expect(items[2]!.message).toContain("MANUAL RUN FINISHED");
   });
 });
+
+describe("Other Accounts: internal Rare accounts", () => {
+  it("returns internal_account from the client row", async () => {
+    tables["rJpqXxmxhqJnlLrJ"] = [
+      client("MCSSI___docs@x.co", { sales_team: false, internal_account: true }),
+      client("Other Co___o@x.co", { sales_team: false }),
+    ];
+    const items = (await (await call("contact-approvals", "GET")).json()).items as {
+      client_name: string;
+      internal_account: boolean;
+    }[];
+    const by = Object.fromEntries(items.map((i) => [i.client_name, i.internal_account]));
+    expect(by).toMatchObject({ MCSSI: true, "Other Co": false });
+  });
+});

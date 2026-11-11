@@ -137,6 +137,9 @@ export const Route = createFileRoute("/api/contact-approvals")({
                       ? true
                       : null,
                 collection_schedule: s(c["collection_schedule"]),
+                // Internal Rare account (set by the weekly refresh): shown on Other Accounts with an "Internal" tag.
+                internal_account:
+                  c["internal_account"] === true || s(c["internal_account"]) === "true",
                 credit_terms: s(c["credit_terms"]),
                 credit_limit:
                   c["credit_limit"] != null && s(c["credit_limit"]) !== ""
