@@ -653,6 +653,9 @@ describe("Other Accounts: internal Rare accounts", () => {
 });
 
 describe("GET /api/worklist (automatic 'Not reached' alerts)", () => {
+  const ago = (hours: number) => new Date(Date.now() - hours * 3600_000).toISOString();
+  const NOT_REACHED =
+    "Not reached by phone (customer-did-not-answer), including the automatic retry.";
   const rows = () => {
     tables["ANfkZZDIrDuC4RjK"] = [
       {
@@ -660,9 +663,9 @@ describe("GET /api/worklist (automatic 'Not reached' alerts)", () => {
         client_id: "102 IZAKAYA___639108278710",
         client_name: "102 IZAKAYA",
         channel: "VOICE",
-        reason: "Not reached by phone (customer-did-not-answer), including the automatic retry.",
-        ref: "102 IZAKAYA-20261105-143101",
-        timestamp: "2026-11-05T14:31:02.329+08:00",
+        reason: NOT_REACHED,
+        ref: "A1",
+        timestamp: ago(24),
       },
       {
         entry_id: "E2",
@@ -671,30 +674,45 @@ describe("GET /api/worklist (automatic 'Not reached' alerts)", () => {
         channel: "EMAIL",
         reason: "Dispute: wrong amount",
         ref: "R2",
-        timestamp: "2026-11-06T10:00:00+08:00",
+        timestamp: ago(1),
       },
       {
         entry_id: "E3",
         client_id: "OTHER___x",
         client_name: "OTHER",
         channel: "VOICE",
-        reason: "Not reached by phone (busy), including the automatic retry.",
+        reason: NOT_REACHED,
         ref: "R3",
-        timestamp: "2026-11-05T10:00:00+08:00",
+        timestamp: ago(24 * 20),
+      },
+      {
+        entry_id: "E4",
+        client_id: "102 IZAKAYA___639108278710",
+        client_name: "102 IZAKAYA",
+        channel: "VOICE",
+        reason: NOT_REACHED,
+        ref: "A4",
+        timestamp: ago(24 * 20),
       },
     ];
     tables["rJpqXxmxhqJnlLrJ"] = [];
   };
 
-  it("the AR Worklist still leaves the automatic alerts out", async () => {
+  it("lists real escalations plus RECENT automatic alerts (older alerts stay out)", async () => {
     rows();
     const items = (await (await call("worklist", "GET", "/api/worklist")).json()).items as {
       entry_id: string;
+      automatic: boolean;
+      type: string;
     }[];
-    expect(items.map((i) => i.entry_id)).toEqual(["E2"]);
+    expect(items.map((i) => [i.entry_id, i.automatic])).toEqual([
+      ["E2", false],
+      ["E1", true],
+    ]);
+    expect(items.find((i) => i.entry_id === "E1")!.type).toBe("Not reached");
   });
 
-  it("the client pop-up can ask for the alerts of ONE client, marked as automatic", async () => {
+  it("the client pop-up can ask for ALL alerts of ONE client, marked as automatic", async () => {
     rows();
     const url =
       "/api/worklist?include_alerts=1&client_id=" +
@@ -706,6 +724,7 @@ describe("GET /api/worklist (automatic 'Not reached' alerts)", () => {
     expect(items.map((i) => [i.entry_id, i.automatic])).toEqual([
       ["E2", false],
       ["E1", true],
+      ["E4", true],
     ]);
   });
 });

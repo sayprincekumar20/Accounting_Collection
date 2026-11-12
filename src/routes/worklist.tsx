@@ -22,6 +22,7 @@ export const Route = createFileRoute("/worklist")({
 
 interface Item {
   type?: string;
+  automatic?: boolean;
   message?: string;
   entry_id: string;
   client_id: string;
@@ -83,6 +84,7 @@ export function WorklistContent() {
   const [status, setStatus] = useState<"ALL" | Item["status"]>(linkQ ? "ALL" : "OPEN");
   const [q, setQ] = useState(linkQ);
   const [channel, setChannel] = useState("ALL");
+  const [kind, setKind] = useState<"ALL" | "REAL" | "ALERT">("ALL");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState("");
@@ -107,6 +109,7 @@ export function WorklistContent() {
     (i) =>
       (status === "ALL" || i.status === status) &&
       (channel === "ALL" || i.channel === channel) &&
+      (kind === "ALL" || (kind === "ALERT" ? !!i.automatic : !i.automatic)) &&
       (!q ||
         `${i.client_name} ${i.contact_person} ${i.reason} ${i.ref} ${i.ar_owner} ${i.handled_by}`
           .toLowerCase()
@@ -193,6 +196,16 @@ export function WorklistContent() {
           <option value="OPEN">Open</option>
           <option value="IN_PROGRESS">In progress</option>
           <option value="DONE">Done</option>
+        </select>
+        <select
+          value={kind}
+          onChange={(e) => setKind(e.target.value as typeof kind)}
+          className={select}
+          aria-label="Kind"
+        >
+          <option value="ALL">All kinds</option>
+          <option value="REAL">Client replies / requests</option>
+          <option value="ALERT">Not reached by phone (automatic)</option>
         </select>
         <select
           value={channel}
@@ -304,6 +317,13 @@ export function WorklistContent() {
                     })()}
                   </div>
                   <p className="mt-0.5 whitespace-pre-line text-sm">{i.reason}</p>
+                  {i.automatic ? (
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Automatic alert: Grace called and the automatic retry also went unanswered.
+                      Check the phone number or reach the client on another channel, then mark it
+                      done.
+                    </p>
+                  ) : null}
                   {i.message && i.message !== i.reason ? (
                     <details className="mt-1">
                       <summary className="cursor-pointer text-xs font-semibold text-primary">

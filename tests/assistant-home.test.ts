@@ -147,3 +147,29 @@ describe("priorities", () => {
     expect(p[2]!.badge).toBe("3 due");
   });
 });
+
+describe("recent 'Not reached by phone' alerts count as open escalations", () => {
+  const day = 86400000;
+  const alert = (ageDays: number) => ({
+    channel: "VOICE",
+    status: "",
+    reason: "Not reached by phone (customer-did-not-answer), including the automatic retry.",
+    timestamp: new Date(Date.now() - ageDays * day).toISOString(),
+  });
+  it("only while they are under 7 days old", () => {
+    expect(isClientEscalation(alert(1))).toBe(true);
+    expect(isClientEscalation(alert(6))).toBe(true);
+    expect(isClientEscalation(alert(8))).toBe(false);
+  });
+  it("are grouped as 'Not reached' and described for the priority card", () => {
+    const r = openEscalations([
+      alert(1),
+      alert(2),
+      alert(30),
+      { channel: "EMAIL", reason: "Dispute: x" },
+    ]);
+    expect(r.count).toBe(3);
+    expect(r.byType).toEqual({ "Not reached": 2, Dispute: 1 });
+    expect(describeEscalationTypes(r.byType)).toBe("2 not-reached alerts, 1 dispute");
+  });
+});

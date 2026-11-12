@@ -1,6 +1,7 @@
 // AI assistant home screen: pure calculations (no network), so they can be unit-tested.
 // The numbers use the same definitions as the dashboard pages (Contact Approvals, Promises, Escalations).
 import { escalationType, type EscalationType } from "@/lib/escalation-type";
+import { isNotReachedReason, isRecentNotReachedAlert } from "@/lib/escalation-alerts";
 
 type Row = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? "" : String(v));
@@ -21,12 +22,12 @@ export interface HomeClient {
   ar_handoff_until: string;
 }
 
-/** A client-related escalation: not a system notification, not a "not reached by phone" alert. */
+/** A client-related escalation: not a system notification; "not reached by phone" alerts only while recent. */
 export function isClientEscalation(e: Row): boolean {
   const ch = s(e["channel"]).toUpperCase();
   if (ch.startsWith("SYSTEM") || ch === "VOICE_CALLBACK") return false;
   if (s(e["client_id"]).toUpperCase().startsWith("SYSTEM")) return false;
-  if (/^not reached by phone/i.test(s(e["reason"]))) return false;
+  if (isNotReachedReason(e["reason"])) return isRecentNotReachedAlert(e);
   return true;
 }
 
@@ -39,7 +40,9 @@ export function openEscalations(rows: Row[]): { count: number; byType: Record<st
   for (const e of rows) {
     if (!isOpenEscalation(e)) continue;
     count++;
-    const t: EscalationType = escalationType(e["reason"]);
+    const t: EscalationType | "Not reached" = isNotReachedReason(e["reason"])
+      ? "Not reached"
+      : escalationType(e["reason"]);
     byType[t] = (byType[t] || 0) + 1;
   }
   return { count, byType };
@@ -160,6 +163,7 @@ export function describeEscalationTypes(byType: Record<string, number>): string 
     Callback: ["callback request", "callback requests"],
     "Contact change": ["contact change", "contact changes"],
     "Wrong contact": ["wrong contact", "wrong contacts"],
+    "Not reached": ["not-reached alert", "not-reached alerts"],
     Other: ["other case", "other cases"],
   };
   return Object.entries(byType)
