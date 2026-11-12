@@ -70,7 +70,7 @@ const CLIENT_STATUSES = [
   { value: "c_nocontact", label: "No contact channel" },
   { value: "c_overdue", label: "Has overdue invoices" },
   { value: "c_callcmd", label: "Contacted via /call" },
-  { value: "c_notreached", label: "Last call: not reached" },
+  { value: "c_notreached", label: "Last call: not reached (incl. retry pending)" },
 ];
 const todayStart = () => {
   const d = new Date();
@@ -93,7 +93,11 @@ function clientStatusMatch(c: ClientRow, status: string) {
     case "c_callcmd":
       return !!c.contacted_via_call_command;
     case "c_notreached":
-      return c.last_call_result === "Not reached" || c.last_call_result === "No answer";
+      return (
+        c.last_call_result === "Not reached" ||
+        c.last_call_result === "No answer" ||
+        c.last_call_result === "Retry pending"
+      );
     case "c_overdue":
       return Number(c.overdue_total || 0) > 0;
     default:

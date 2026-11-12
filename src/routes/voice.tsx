@@ -14,6 +14,7 @@ import {
   RefTag,
 } from "@/components/collections/LogCells";
 import { isNotReachedReason } from "@/lib/escalation-alerts";
+import { promiseForCall } from "@/lib/overview-calc";
 import {
   LogFilterBar,
   matchesLogFilters,
@@ -353,7 +354,7 @@ function VoiceLogs() {
       contact: client?.contact_person,
       extra: `${c.phone || ""} ${c.call_id}`,
       reached: callOutcome(c.endedReason, c.status) === "connected",
-      hasPromise: !!latestFor(promises, c.client_id),
+      hasPromise: !!promiseForCall(promises, c),
       hasEscalation: !!latestFor(escalations, c.client_id),
       lastActivity: c.endedAt || c.startedAt,
       source: c.triggerSource,
@@ -391,7 +392,7 @@ function VoiceLogs() {
         />
         <StatCard
           label="Promises to pay"
-          value={String(calls.filter((c) => latestFor(promises, c.client_id)).length)}
+          value={String(calls.filter((c) => promiseForCall(promises, c)).length)}
           hint="Confirmed on a call"
           onClick={() => toggleStatus("promised")}
           active={filters.status === "promised"}

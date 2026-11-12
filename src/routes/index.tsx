@@ -1,3 +1,4 @@
+import { queueBreakdown } from "@/lib/overview-calc";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SkeletonCards } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
@@ -132,10 +133,12 @@ function useRecentActivity() {
         fetch(u)
           .then((r) => (r.ok ? r.json() : {}))
           .catch(() => ({}));
-      const [smsRes, voiceRes, gmailRes] = await Promise.all([
+      const [smsRes, voiceRes, gmailRes, waRes, viberRes] = await Promise.all([
         get("/api/sms-conversations"),
         get("/api/vapi-calls-list"),
         get("/api/gmail-threads-list"),
+        get("/api/whatsapp-conversations"),
+        get("/api/viber-conversations"),
       ]);
       const recent: RecentItem[] = [];
       for (const c of smsRes["conversations"] || []) {
@@ -145,8 +148,35 @@ function useRecentActivity() {
             channel: "sms",
             client_name: c.client_name,
             preview: last.content,
-            direction: last.role === "ai" ? "outbound" : "inbound",
+            // Only a message FROM the client is inbound (AI and AR replies are outbound).
+            direction: last.role === "client" ? "inbound" : "outbound",
             occurred_at: last.ts,
+            status: last.status || "",
+          });
+        }
+      }
+      for (const c of viberRes["conversations"] || []) {
+        const last = c.messages?.[c.messages.length - 1];
+        if (last) {
+          recent.push({
+            channel: "viber",
+            client_name: c.client_name,
+            preview: last.content,
+            direction: last.role === "client" ? "inbound" : "outbound",
+            occurred_at: last.ts || c.lastMessageAt,
+            status: last.status || "",
+          });
+        }
+      }
+      for (const c of waRes["conversations"] || []) {
+        const last = c.messages?.[c.messages.length - 1];
+        if (last) {
+          recent.push({
+            channel: "whatsapp",
+            client_name: c.client_name,
+            preview: last.content,
+            direction: last.role === "client" ? "inbound" : "outbound",
+            occurred_at: last.ts || c.lastMessageAt,
             status: last.status || "",
           });
         }
@@ -191,6 +221,8 @@ function Overview() {
     { value: "all", label: "All channels" },
     { value: "ch_email", label: "Email" },
     { value: "ch_sms", label: "SMS" },
+    { value: "ch_viber", label: "Viber" },
+    { value: "ch_whatsapp", label: "WhatsApp" },
     { value: "ch_voice", label: "Voice" },
   ];
   const channelFilter =
@@ -232,6 +264,7 @@ function Overview() {
     email?: string;
     phone?: string;
     collection_amount: number;
+    overdue_total?: number;
   };
   const visibleClients = (clients as ClientLite[]).filter((c) =>
     matchesLogFilters(
@@ -258,6 +291,10 @@ function Overview() {
       matchesLogFilters({ name: q.client_name, lastActivity: q.sent_date || q.created_date }, base),
   );
   const outstanding = visibleClients.reduce((sum, c) => sum + Number(c.collection_amount), 0);
+  const overdueSum = visibleClients.reduce((sum, c) => sum + Number(c.overdue_total || 0), 0);
+  const overdueAccounts = visibleClients.filter((c) => Number(c.overdue_total || 0) > 0).length;
+  // "In the queue" = still to be sent; already sent and skipped (by a rule) are shown apart.
+  const qb = queueBreakdown(visibleQueue as unknown as Record<string, unknown>[]);
   const replies = recentAll.filter((m) => m.direction === "inbound").length;
   // Clients contacted today through /call in #Sales (their queue row was sent today by /call).
   const todayManila = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
@@ -311,13 +348,17 @@ function Overview() {
         <StatCard
           label="Total outstanding"
           value={peso(outstanding)}
-          hint={`${visibleClients.length} accounts tracked`}
+          hint={`${visibleClients.length} accounts · ${peso(overdueSum)} overdue (${overdueAccounts} accounts)`}
           tone="primary"
         />
         <StatCard
-          label="Messages"
+          label="Conversations"
           value={String(recentAll.length)}
-          hint={channelFilter ? channelFilter.toUpperCase() : "Across all channels"}
+          hint={
+            channelFilter
+              ? channelFilter.toUpperCase()
+              : "Email threads, SMS / Viber / WhatsApp chats and calls"
+          }
         />
         <StatCard
           label="Client replies"
@@ -325,7 +366,7 @@ function Overview() {
           hint={
             filtersActive
               ? "Matching filters"
-              : `This cycle · ${cycle?.clients_replied ?? 0} clients`
+              : `This cycle · ${cycle?.clients_replied ?? 0} clients (as of the last run)`
           }
         />
         <StatCard
@@ -337,13 +378,8 @@ function Overview() {
         />
         <StatCard
           label="In the queue"
-          value={String(visibleQueue.length)}
-          hint={peso(
-            visibleQueue.reduce(
-              (s: number, q: { collection_amount: number }) => s + Number(q.collection_amount),
-              0,
-            ),
-          )}
+          value={String(qb.waiting)}
+          hint={`${peso(qb.waitingAmount)} waiting · ${qb.sent} sent · ${qb.skipped} skipped this cycle`}
         />
         <StatCard
           label="Contacted manually today"

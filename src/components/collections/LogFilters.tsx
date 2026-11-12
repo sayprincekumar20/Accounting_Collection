@@ -92,7 +92,7 @@ export function sourceGroup(source: string | undefined): Exclude<SourceFilter, "
 export function sourceLabel(source: string | undefined, requestedBy?: string): string {
   switch (sourceGroup(source)) {
     case "cliq":
-      return requestedBy ? `/call · ${requestedBy}` : "/call";
+      return requestedBy ? `Manual · ${requestedBy}` : "Manual";
     case "retry":
       return "Retry";
     case "weekly":
@@ -252,7 +252,7 @@ export function LogFilterBar({
         >
           <option value="all">All sources</option>
           <option value="weekly">Weekly run (auto)</option>
-          <option value="cliq">/call from Cliq</option>
+          <option value="cliq">Manual (dashboard / assistant)</option>
           <option value="retry">Same-day retry</option>
           <option value="untagged">Not tagged (before 14 Oct)</option>
         </select>
