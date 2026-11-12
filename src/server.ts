@@ -97,7 +97,7 @@ export default {
   async fetch(
     request: Request,
     env: unknown,
-    ctx: { waitUntil?: (promise: Promise<unknown>) => void },
+    ctx?: { waitUntil?: (promise: Promise<unknown>) => void },
   ) {
     try {
       const authResponse = await handleAuth(request);
@@ -107,7 +107,7 @@ export default {
       if (cached) return cached;
       const response = await handler.fetch(request, env, ctx);
       const cacheWrite = writeSharedCache(request, response);
-      if (ctx.waitUntil) ctx.waitUntil(cacheWrite);
+      if (ctx?.waitUntil) ctx.waitUntil(cacheWrite);
       else await cacheWrite;
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
