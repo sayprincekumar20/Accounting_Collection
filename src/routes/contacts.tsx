@@ -56,7 +56,7 @@ function ContactsPage() {
       subtitle="Clients whose contact details should be corrected in Zoho CRM / Inventory · biggest balance first"
       actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
     >
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-4">
         <StatCard
           label="Clients to fix"
           value={String(items.length)}
@@ -70,6 +70,14 @@ function ContactsPage() {
             setIssue(issue === "No phone and no email" ? "ALL" : "No phone and no email")
           }
           active={issue === "No phone and no email"}
+        />
+        <StatCard
+          label="Email bounced"
+          value={String(
+            items.filter((i) => i.issues.some((x) => x.startsWith("Email bounced"))).length,
+          )}
+          onClick={() => setIssue(issue === "Email bounced" ? "ALL" : "Email bounced")}
+          active={issue === "Email bounced"}
         />
         <StatCard
           label="Wrong / former contact"

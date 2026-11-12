@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
+import { bounceIssue, latestBounces } from "@/lib/contact-bounces";
 
 // Clients whose contact details should be corrected in Zoho, with the reasons.
 const CLIENTS = "rJpqXxmxhqJnlLrJ";
 const ESCALATIONS = "ANfkZZDIrDuC4RjK";
+const BOUNCES = "mVW2GYHfpumghEeP"; // written by the n8n workflow 18_Email_Bounce_Watcher
 type Row = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? "" : String(v));
 const WRONG_PERSON =
@@ -14,10 +16,12 @@ export const Route = createFileRoute("/api/contacts-to-fix")({
     handlers: {
       GET: async () => {
         try {
-          const [clients, esc] = await Promise.all([
+          const [clients, esc, bounceRows] = await Promise.all([
             fetchAllDataTableRows<Row>(CLIENTS),
             fetchAllDataTableRows<Row>(ESCALATIONS).catch(() => [] as Row[]),
+            fetchAllDataTableRows<Row>(BOUNCES).catch(() => [] as Row[]),
           ]);
+          const bounces = latestBounces(bounceRows);
           const since = Date.now() - 45 * 86400000;
           const wrongBy = new Map<string, string>();
           for (const e of esc) {
@@ -45,6 +49,8 @@ export const Route = createFileRoute("/api/contacts-to-fix")({
                 issues.push("Phone is not a valid PH mobile number");
               if (!s(c["contact_person"]).trim())
                 issues.push("No contact person (no Accounting / Primary contact in CRM)");
+              const bounced = bounceIssue(email, bounces.get(s(c["client_id"])));
+              if (bounced) issues.push(bounced);
               const wrong = wrongBy.get(s(c["client_id"]));
               if (wrong) issues.push("Escalated as wrong / former contact: " + wrong);
               return {
