@@ -41,6 +41,8 @@ interface WorkItem {
   handled_at?: string;
   message?: string;
   type?: string;
+  /** Automatic "Not reached by phone" alert (no client message, nothing to answer). */
+  automatic?: boolean;
 }
 interface PromiseItem {
   client_id: string;
@@ -281,9 +283,11 @@ export function EscalationBadge({
   const [msg, setMsg] = useState("");
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
-    queryKey: ["worklist"],
+    queryKey: ["client-escalations", clientId],
     queryFn: async () => {
-      const r = await fetch("/api/worklist");
+      const r = await fetch(
+        `/api/worklist?include_alerts=1&client_id=${encodeURIComponent(clientId)}`,
+      );
       if (!r.ok) throw new Error("Fetch failed");
       const j = (await r.json()) as { items?: WorkItem[] };
       return (j.items ?? []) as WorkItem[];
@@ -321,6 +325,7 @@ export function EscalationBadge({
       });
       if (!r.ok) throw new Error("Saving failed");
       await qc.invalidateQueries({ queryKey: ["worklist"] });
+      await qc.invalidateQueries({ queryKey: ["client-escalations"] });
       setMsg(`Saved: ${e.ref ? "Ref " + e.ref : "escalation"} is now ${status.replace("_", " ")}.`);
     } catch (err) {
       setMsg(err instanceof Error ? err.message : "Saving failed");
@@ -386,21 +391,38 @@ export function EscalationBadge({
                     <span className="rounded-full bg-secondary px-2 py-0.5 font-semibold text-secondary-foreground">
                       {e.type || escalationType(e.reason)}
                     </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 font-semibold ${STATUS_TONE[e.status] ?? STATUS_TONE["OPEN"]}`}
-                    >
-                      {(e.status || "OPEN").replace("_", " ")}
-                    </span>
-                    <span
-                      className={late ? "font-semibold text-destructive" : "text-muted-foreground"}
-                    >
-                      {e.status === "DONE" ? `handled in ${ageText(h)}` : `open ${ageText(h)}`}
-                    </span>
+                    {e.automatic ? (
+                      <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-muted-foreground">
+                        Automatic alert
+                      </span>
+                    ) : (
+                      <>
+                        <span
+                          className={`rounded-full px-2 py-0.5 font-semibold ${STATUS_TONE[e.status] ?? STATUS_TONE["OPEN"]}`}
+                        >
+                          {(e.status || "OPEN").replace("_", " ")}
+                        </span>
+                        <span
+                          className={
+                            late ? "font-semibold text-destructive" : "text-muted-foreground"
+                          }
+                        >
+                          {e.status === "DONE" ? `handled in ${ageText(h)}` : `open ${ageText(h)}`}
+                        </span>
+                      </>
+                    )}
                     <span className="ml-auto text-muted-foreground">
                       {e.channel} · {when(e.recorded_at ?? "")}
                     </span>
                   </div>
                   <p className="mt-2 text-sm font-semibold">{e.reason}</p>
+                  {e.automatic ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Raised automatically after Grace called and the automatic retry also went
+                      unanswered. The client did not say anything, so there is nothing to answer:
+                      check the phone number or reach the client on another channel.
+                    </p>
+                  ) : null}
                   {e.message && e.message !== e.reason ? (
                     <details className="mt-1">
                       <summary className="cursor-pointer text-xs font-semibold text-primary">
@@ -421,7 +443,7 @@ export function EscalationBadge({
                     </p>
                   ) : null}
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    {e.status === "OPEN" ? (
+                    {!e.automatic && e.status === "OPEN" ? (
                       <button
                         type="button"
                         disabled={busy === e.entry_id}
@@ -431,7 +453,7 @@ export function EscalationBadge({
                         Start
                       </button>
                     ) : null}
-                    {e.status !== "DONE" ? (
+                    {e.automatic ? null : e.status !== "DONE" ? (
                       <button
                         type="button"
                         disabled={busy === e.entry_id}
@@ -459,12 +481,14 @@ export function EscalationBadge({
                         ? "Voice"
                         : e.channel.charAt(0) + e.channel.slice(1).toLowerCase()}
                     </a>
-                    <a
-                      href={`/escalations?tab=worklist&q=${encodeURIComponent(e.ref || clientName || "")}`}
-                      className="rounded-lg border border-border px-2.5 py-1 font-semibold hover:bg-muted"
-                    >
-                      Open in Escalations
-                    </a>
+                    {e.automatic ? null : (
+                      <a
+                        href={`/escalations?tab=worklist&q=${encodeURIComponent(e.ref || clientName || "")}`}
+                        className="rounded-lg border border-border px-2.5 py-1 font-semibold hover:bg-muted"
+                      >
+                        Open in Escalations
+                      </a>
+                    )}
                   </div>
                 </li>
               );

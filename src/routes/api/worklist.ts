@@ -21,8 +21,13 @@ const json = (body: unknown, status = 200) =>
 export const Route = createFileRoute("/api/worklist")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
         try {
+          // The AR Worklist leaves out the automatic "Not reached by phone" alerts. The per-client escalation
+          // pop-up asks for them with ?include_alerts=1&client_id=... so the badge and the pop-up agree.
+          const q = new URL(request.url).searchParams;
+          const includeAlerts = q.get("include_alerts") === "1";
+          const onlyCompany = (q.get("client_id") || "").split("___")[0]!.trim().toLowerCase();
           const [esc, clients] = await Promise.all([
             fetchAllDataTableRows<Row>(ESCALATIONS),
             fetchAllDataTableRows<Row>(CLIENTS).catch(() => [] as Row[]),
@@ -32,7 +37,9 @@ export const Route = createFileRoute("/api/worklist")({
             .filter(
               (e) =>
                 s(e["channel"]).toUpperCase() !== "SYSTEM" &&
-                !isNotReachedAlert(e["reason"]) &&
+                (includeAlerts || !isNotReachedAlert(e["reason"])) &&
+                (!onlyCompany ||
+                  s(e["client_id"]).split("___")[0]!.trim().toLowerCase() === onlyCompany) &&
                 s(e["entry_id"]),
             )
             .map((e) => {
@@ -60,6 +67,8 @@ export const Route = createFileRoute("/api/worklist")({
                 // Full text saved with the escalation (what the client said / the call excerpt) and its type.
                 message: s(e["message"]),
                 type: escalationType(e["reason"]),
+                // The automatic "Not reached by phone" alert: nothing for AR to answer.
+                automatic: isNotReachedAlert(e["reason"]),
               };
             })
             .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime());

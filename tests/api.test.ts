@@ -651,3 +651,61 @@ describe("Other Accounts: internal Rare accounts", () => {
     expect(by).toMatchObject({ MCSSI: true, "Other Co": false });
   });
 });
+
+describe("GET /api/worklist (automatic 'Not reached' alerts)", () => {
+  const rows = () => {
+    tables["ANfkZZDIrDuC4RjK"] = [
+      {
+        entry_id: "E1",
+        client_id: "102 IZAKAYA___639108278710",
+        client_name: "102 IZAKAYA",
+        channel: "VOICE",
+        reason: "Not reached by phone (customer-did-not-answer), including the automatic retry.",
+        ref: "102 IZAKAYA-20261105-143101",
+        timestamp: "2026-11-05T14:31:02.329+08:00",
+      },
+      {
+        entry_id: "E2",
+        client_id: "102 IZAKAYA___639108278710",
+        client_name: "102 IZAKAYA",
+        channel: "EMAIL",
+        reason: "Dispute: wrong amount",
+        ref: "R2",
+        timestamp: "2026-11-06T10:00:00+08:00",
+      },
+      {
+        entry_id: "E3",
+        client_id: "OTHER___x",
+        client_name: "OTHER",
+        channel: "VOICE",
+        reason: "Not reached by phone (busy), including the automatic retry.",
+        ref: "R3",
+        timestamp: "2026-11-05T10:00:00+08:00",
+      },
+    ];
+    tables["rJpqXxmxhqJnlLrJ"] = [];
+  };
+
+  it("the AR Worklist still leaves the automatic alerts out", async () => {
+    rows();
+    const items = (await (await call("worklist", "GET", "/api/worklist")).json()).items as {
+      entry_id: string;
+    }[];
+    expect(items.map((i) => i.entry_id)).toEqual(["E2"]);
+  });
+
+  it("the client pop-up can ask for the alerts of ONE client, marked as automatic", async () => {
+    rows();
+    const url =
+      "/api/worklist?include_alerts=1&client_id=" +
+      encodeURIComponent("102 IZAKAYA___639108278710");
+    const items = (await (await call("worklist", "GET", url)).json()).items as {
+      entry_id: string;
+      automatic: boolean;
+    }[];
+    expect(items.map((i) => [i.entry_id, i.automatic])).toEqual([
+      ["E2", false],
+      ["E1", true],
+    ]);
+  });
+});
