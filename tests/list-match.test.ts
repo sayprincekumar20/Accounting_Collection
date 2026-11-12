@@ -306,3 +306,57 @@ describe("outsideOfficeHours (Manila)", () => {
     expect(outsideOfficeHours(Date.UTC(2026, 10, 13, 8, 0))).toBe(false); // Fri 16:00
   });
 });
+
+import { normalizeReviewRows } from "../src/lib/assistant/list-match";
+
+describe("normalizeReviewRows (the browser never trusts the server's exact shape)", () => {
+  it("rebuilds odd rows with safe types and drops unusable ones", () => {
+    const rows = normalizeReviewRows([
+      null,
+      "x",
+      { file: { name: "" } },
+      {
+        id: "4:A",
+        file: { row: "4", name: "Alpha", owner: null, amount: "oops", remarks: undefined },
+        match: "weird",
+        suggestions: [null, "Alpha Foods", 7],
+        status: "nonsense",
+        flags: [null, { label: "" }, { code: "promise", level: "zzz", label: "Promise" }],
+        selectable: "true",
+        default_selected: 1,
+        client: {
+          client_id: "A___1",
+          client_name: null,
+          email: null,
+          overdue: "1200.5",
+          current: undefined,
+          sales_team: "false",
+          invoices: [null, { number: 5, balance: "abc", due: null }],
+        },
+      },
+      { id: "4:A", file: { name: "Alpha again" }, client: null },
+    ]);
+    expect(rows).toHaveLength(2);
+    const a = rows[0]!;
+    expect(a.file).toEqual({ row: 4, name: "Alpha", owner: "", amount: null, remarks: "" });
+    expect(a.match).toBe("none");
+    expect(a.suggestions).toEqual(["Alpha Foods", "7"]);
+    expect(a.status).toBe("blocked");
+    expect(a.flags).toEqual([{ code: "promise", level: "info", label: "Promise" }]);
+    expect(a.selectable).toBe(true);
+    expect(a.default_selected).toBe(false); // only a real `true` counts
+    expect(a.client).toMatchObject({
+      client_name: "",
+      email: "",
+      overdue: 1200.5,
+      current: 0,
+      sales_team: null,
+    });
+    expect(a.client!.invoices).toEqual([
+      { branch: "", number: "5", due: "", balance: 0, status: "", counter: "", days_overdue: 0 },
+    ]);
+    expect(rows[1]!.id).not.toBe(rows[0]!.id); // unique React keys
+    expect(rows[1]!.status).toBe("no_match");
+    expect(normalizeReviewRows("not a list")).toEqual([]);
+  });
+});

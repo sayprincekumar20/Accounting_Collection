@@ -18,9 +18,11 @@ import {
 import { setLogFilters } from "@/components/collections/LogFilters";
 import { AssistantHome } from "./AssistantHome";
 import { ListReview, SheetPicker } from "./ListReview";
+import { ListBoundary } from "./AssistantBoundary";
+import { CONVERSATIONS_KEY } from "./store-key";
 import { fileStore, reviewStore } from "./list-store";
 import { parseListFile } from "@/lib/assistant/list-file";
-import { reviewSummaryText, type ReviewRow } from "@/lib/assistant/list-match";
+import { normalizeReviewRows, reviewSummaryText, type ReviewRow } from "@/lib/assistant/list-match";
 import { EXAMPLE_COMMANDS, fetchAssistantHome } from "./home-data";
 
 // AI operations assistant: floating button -> side panel / full screen. Conversations are kept in this
@@ -57,7 +59,7 @@ interface Convo {
   workingSet: { ids: string[]; label: string } | null;
 }
 
-const STORE = "rgf-assistant-conversations";
+const STORE = CONVERSATIONS_KEY;
 const TOOL_LABEL: Record<string, string> = {
   get_overview: "Reading the overview",
   find_clients: "Searching clients",
@@ -304,24 +306,25 @@ export function Assistant() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows: sheet.rows }),
       });
-      const j = (await res.json().catch(() => ({}))) as { rows?: ReviewRow[]; error?: string };
-      if (!res.ok || !j.rows) throw new Error(j.error || `Matching failed (${res.status})`);
+      const j = (await res.json().catch(() => ({}))) as { rows?: unknown; error?: string };
+      if (!res.ok || !Array.isArray(j.rows))
+        throw new Error(j.error || `Matching failed (${res.status})`);
+      // Never trust the exact shape of the server's answer: rebuild every row with safe types.
+      const rows: ReviewRow[] = normalizeReviewRows(j.rows);
+      if (!rows.length) throw new Error("The matching returned no rows to review.");
+      const summary = reviewSummaryText(sheetName, rows);
       const reviewId = newId();
       reviewStore.set(reviewId, {
         id: reviewId,
         fileName: f.name,
         sheet: sheetName,
-        rows: j.rows,
+        rows,
         result: null,
       });
       const ids = [
-        ...new Set(j.rows.filter((r) => r.client && r.selectable).map((r) => r.client!.client_id)),
+        ...new Set(rows.filter((r) => r.client && r.selectable).map((r) => r.client!.client_id)),
       ];
-      patchMsg(convoId, uid, (m) => ({
-        ...m,
-        content: reviewSummaryText(sheetName, j.rows!),
-        review: { id: reviewId },
-      }));
+      patchMsg(convoId, uid, (m) => ({ ...m, content: summary, review: { id: reviewId } }));
       if (ids.length)
         update(convoId, (c) => ({ ...c, workingSet: { ids, label: `list ${sheetName}` } }));
     } catch (e) {
@@ -554,13 +557,21 @@ export function Assistant() {
                   </div>
                 ) : null}
                 {m.sheetPick ? (
-                  <SheetPicker
-                    fileId={m.sheetPick.fileId}
-                    onPick={(name) => pickSheet(m.sheetPick!.fileId, name)}
-                  />
+                  <ListBoundary>
+                    <SheetPicker
+                      fileId={m.sheetPick.fileId}
+                      onPick={(name) => pickSheet(m.sheetPick!.fileId, name)}
+                    />
+                  </ListBoundary>
                 ) : null}
                 {m.review && active ? (
-                  <ListReview reviewId={m.review.id} sessionId={active.id} getUserName={userName} />
+                  <ListBoundary>
+                    <ListReview
+                      reviewId={m.review.id}
+                      sessionId={active.id}
+                      getUserName={userName}
+                    />
+                  </ListBoundary>
                 ) : null}
               </div>
             </div>

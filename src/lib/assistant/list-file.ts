@@ -67,7 +67,9 @@ export async function parseListFile(file: File): Promise<ParsedFile> {
     return { id, name: file.name, sheets: sheetsFromData([{ sheet: "CSV", data }]) };
   }
   if (lower.endsWith(".xlsx")) {
-    const { default: readXlsxFile } = await import("read-excel-file/browser");
+    // The "web-worker" build reads in this page (no Web Worker, no Blob URL): the lists are small (5 MB limit) and
+    // this keeps the reader independent of the browser's worker / security settings.
+    const { default: readXlsxFile } = await import("read-excel-file/web-worker");
     let sheets: { sheet: string; data: unknown[][] }[];
     try {
       sheets = (await readXlsxFile(file)) as { sheet: string; data: unknown[][] }[];

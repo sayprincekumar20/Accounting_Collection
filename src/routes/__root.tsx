@@ -8,7 +8,8 @@ import {
   Scripts,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { reportClientError } from "@/components/assistant/client-error";
 
 import appCss from "../styles.css?url";
 
@@ -39,6 +40,8 @@ function ErrorComponent({ error: thrown, reset }: ErrorComponentProps) {
   const error = thrown instanceof Error ? thrown : new Error(String(thrown ?? "Unknown error"));
   console.error(error);
   const router = useRouter();
+  // Saved in the assistant audit log (action client_error) so the exact message can be read afterwards.
+  useEffect(() => reportClientError("page", thrown), [thrown]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -48,6 +51,9 @@ function ErrorComponent({ error: thrown, reset }: ErrorComponentProps) {
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Something went wrong on our end. You can try refreshing or head back home.
+        </p>
+        <p className="mt-3 break-words rounded bg-muted px-2 py-1 text-left text-[11px] text-muted-foreground">
+          {`${error.name}: ${error.message}`.slice(0, 300)}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button

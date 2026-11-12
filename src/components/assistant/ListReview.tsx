@@ -15,7 +15,11 @@ import { fileStore, reviewStore } from "./list-store";
 // and current invoices, contacts and flags. The AR team ticks the clients and presses "Approve + contact"; after
 // one confirmation the approvals are saved and the text and call start (like the automatic Wednesday run).
 const peso = (n: number) =>
-  "PHP " + n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  "PHP " +
+  (Number.isFinite(n) ? n : 0).toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 const STATUS: Record<ReviewRow["status"], { label: string; cls: string }> = {
   ready: { label: "Approved", cls: "bg-emerald-100 text-emerald-800" },

@@ -1,4 +1,5 @@
 import { Assistant } from "@/components/assistant/Assistant";
+import { AssistantBoundary } from "@/components/assistant/AssistantBoundary";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -168,7 +169,9 @@ export function AppShell({
           </nav>
         </header>
         <main className="flex-1 px-5 py-6 md:px-8">{children}</main>
-        <Assistant />
+        <AssistantBoundary>
+          <Assistant />
+        </AssistantBoundary>
       </div>
     </div>
   );

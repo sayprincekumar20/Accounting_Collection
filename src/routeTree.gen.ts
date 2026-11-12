@@ -63,6 +63,7 @@ import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
 import { Route as VerificationIndexRouteImport } from './routes/verification.index'
 import { Route as VerificationReviewIdRouteImport } from './routes/verification.$reviewId'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant.chat'
+import { Route as ApiAssistantClientErrorRouteImport } from './routes/api/assistant.client-error'
 import { Route as ApiAssistantContactListRouteImport } from './routes/api/assistant.contact-list'
 import { Route as ApiAssistantHomeRouteImport } from './routes/api/assistant.home'
 import { Route as ApiAssistantListMatchRouteImport } from './routes/api/assistant.list-match'
@@ -343,6 +344,11 @@ const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
   path: '/api/assistant/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAssistantClientErrorRoute = ApiAssistantClientErrorRouteImport.update({
+  id: '/api/assistant/client-error',
+  path: '/api/assistant/client-error',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAssistantContactListRoute = ApiAssistantContactListRouteImport.update({
   id: '/api/assistant/contact-list',
   path: '/api/assistant/contact-list',
@@ -442,6 +448,7 @@ export interface FileRoutesByFullPath {
   '/clients/': typeof ClientsIndexRoute
   '/verification/': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
+  '/api/assistant/client-error': typeof ApiAssistantClientErrorRoute
   '/api/assistant/contact-list': typeof ApiAssistantContactListRoute
   '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/assistant/list-match': typeof ApiAssistantListMatchRoute
@@ -506,6 +513,7 @@ export interface FileRoutesByTo {
   '/clients': typeof ClientsIndexRoute
   '/verification': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
+  '/api/assistant/client-error': typeof ApiAssistantClientErrorRoute
   '/api/assistant/contact-list': typeof ApiAssistantContactListRoute
   '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/assistant/list-match': typeof ApiAssistantListMatchRoute
@@ -571,6 +579,7 @@ export interface FileRoutesById {
   '/clients/': typeof ClientsIndexRoute
   '/verification/': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
+  '/api/assistant/client-error': typeof ApiAssistantClientErrorRoute
   '/api/assistant/contact-list': typeof ApiAssistantContactListRoute
   '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/assistant/list-match': typeof ApiAssistantListMatchRoute
@@ -637,6 +646,7 @@ export interface FileRouteTypes {
     | '/clients/'
     | '/verification/'
     | '/api/assistant/chat'
+    | '/api/assistant/client-error'
     | '/api/assistant/contact-list'
     | '/api/assistant/home'
     | '/api/assistant/list-match'
@@ -701,6 +711,7 @@ export interface FileRouteTypes {
     | '/clients'
     | '/verification'
     | '/api/assistant/chat'
+    | '/api/assistant/client-error'
     | '/api/assistant/contact-list'
     | '/api/assistant/home'
     | '/api/assistant/list-match'
@@ -765,6 +776,7 @@ export interface FileRouteTypes {
     | '/clients/'
     | '/verification/'
     | '/api/assistant/chat'
+    | '/api/assistant/client-error'
     | '/api/assistant/contact-list'
     | '/api/assistant/home'
     | '/api/assistant/list-match'
@@ -830,6 +842,7 @@ export interface RootRouteChildren {
   ClientsIndexRoute: typeof ClientsIndexRoute
   VerificationIndexRoute: typeof VerificationIndexRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
+  ApiAssistantClientErrorRoute: typeof ApiAssistantClientErrorRoute
   ApiAssistantContactListRoute: typeof ApiAssistantContactListRoute
   ApiAssistantHomeRoute: typeof ApiAssistantHomeRoute
   ApiAssistantListMatchRoute: typeof ApiAssistantListMatchRoute
@@ -1216,6 +1229,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAssistantChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/assistant/client-error': {
+      id: '/api/assistant/client-error'
+      path: '/api/assistant/client-error'
+      fullPath: '/api/assistant/client-error'
+      preLoaderRoute: typeof ApiAssistantClientErrorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/assistant/contact-list': {
       id: '/api/assistant/contact-list'
       path: '/api/assistant/contact-list'
@@ -1357,6 +1377,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClientsIndexRoute: ClientsIndexRoute,
   VerificationIndexRoute: VerificationIndexRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
+  ApiAssistantClientErrorRoute: ApiAssistantClientErrorRoute,
   ApiAssistantContactListRoute: ApiAssistantContactListRoute,
   ApiAssistantHomeRoute: ApiAssistantHomeRoute,
   ApiAssistantListMatchRoute: ApiAssistantListMatchRoute,

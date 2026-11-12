@@ -215,7 +215,11 @@ export interface Flag {
 const ms = (v: string) => new Date(v).getTime() || 0;
 const day = (v: string) => v.slice(0, 10);
 const peso = (n: number) =>
-  "PHP " + n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  "PHP " +
+  (Number.isFinite(n) ? n : 0).toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 export interface AssessInput {
   match: "exact" | "possible";
@@ -508,4 +512,117 @@ export function outsideOfficeHours(now = Date.now()): boolean {
   const d = m.getUTCDay();
   const h = m.getUTCHours();
   return d === 0 || d === 6 || h < 9 || h >= 18;
+}
+
+// ---------------------------------------------------------------------------------------------- safe reading
+const str = (v: unknown) => (v == null ? "" : String(v));
+const num = (v: unknown) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+const yes = (v: unknown) => v === true || v === "true";
+
+function cleanClient(c: unknown): ReviewClientOut | null {
+  if (!c || typeof c !== "object") return null;
+  const o = c as Record<string, unknown>;
+  const id = str(o["client_id"]);
+  if (!id) return null;
+  const inv = Array.isArray(o["invoices"]) ? o["invoices"] : [];
+  return {
+    client_id: id,
+    client_name: str(o["client_name"]),
+    parent_name: str(o["parent_name"]),
+    contact_person: str(o["contact_person"]),
+    email: str(o["email"]),
+    phone: str(o["phone"]),
+    ar_owner: str(o["ar_owner"]),
+    sales_person: str(o["sales_person"]),
+    collection_schedule: str(o["collection_schedule"]),
+    overdue: num(o["overdue"]),
+    current: num(o["current"]),
+    total: num(o["total"]),
+    branch_count: num(o["branch_count"]),
+    multibranch: yes(o["multibranch"]),
+    approved: yes(o["approved"]),
+    allow_multibranch: yes(o["allow_multibranch"]),
+    text_this_cycle: yes(o["text_this_cycle"]),
+    call_this_cycle: yes(o["call_this_cycle"]),
+    promise_until: str(o["promise_until"]),
+    ar_handoff_until: str(o["ar_handoff_until"]),
+    sales_team: yes(o["sales_team"]) ? true : o["sales_team"] === false ? false : null,
+    internal_account: yes(o["internal_account"]),
+    invoices: inv
+      .filter((x) => x && typeof x === "object")
+      .map((x) => {
+        const i = x as Record<string, unknown>;
+        return {
+          branch: str(i["branch"]),
+          number: str(i["number"]),
+          due: str(i["due"]),
+          balance: num(i["balance"]),
+          status: str(i["status"]),
+          counter: str(i["counter"]),
+          days_overdue: num(i["days_overdue"]),
+        };
+      }),
+  };
+}
+
+const STATUSES = ["ready", "needs_approval", "blocked", "no_match"] as const;
+const MATCHES = ["exact", "possible", "none"] as const;
+const LEVELS = ["block", "warn", "info"] as const;
+
+/**
+ * The browser does not trust the exact shape of the server's answer: every row is rebuilt with safe types
+ * (text, numbers, arrays), so one odd value can never break the review screen.
+ */
+export function normalizeReviewRows(input: unknown): ReviewRow[] {
+  if (!Array.isArray(input)) return [];
+  const out: ReviewRow[] = [];
+  const seen = new Set<string>();
+  for (const r of input) {
+    if (!r || typeof r !== "object") continue;
+    const o = r as Record<string, unknown>;
+    const f = (o["file"] && typeof o["file"] === "object" ? o["file"] : {}) as Record<
+      string,
+      unknown
+    >;
+    const name = str(f["name"]).trim();
+    if (!name) continue;
+    const client = cleanClient(o["client"]);
+    const status = STATUSES.find((s) => s === o["status"]) ?? (client ? "blocked" : "no_match");
+    let id = str(o["id"]) || `${num(f["row"])}:${client?.client_id ?? "none"}`;
+    while (seen.has(id)) id += "#";
+    seen.add(id);
+    out.push({
+      id,
+      file: {
+        row: num(f["row"]),
+        name,
+        owner: str(f["owner"]),
+        amount:
+          typeof f["amount"] === "number" && Number.isFinite(f["amount"]) ? f["amount"] : null,
+        remarks: str(f["remarks"]),
+      },
+      match: MATCHES.find((m) => m === o["match"]) ?? "none",
+      suggestions: (Array.isArray(o["suggestions"]) ? o["suggestions"] : [])
+        .map(str)
+        .filter(Boolean),
+      client,
+      status: client ? status : "no_match",
+      flags: (Array.isArray(o["flags"]) ? o["flags"] : [])
+        .filter((x) => x && typeof x === "object" && str((x as Record<string, unknown>)["label"]))
+        .map((x) => {
+          const fl = x as Record<string, unknown>;
+          return {
+            code: str(fl["code"]) as FlagCode,
+            level: LEVELS.find((l) => l === fl["level"]) ?? "info",
+            label: str(fl["label"]),
+          };
+        }),
+      selectable: client ? yes(o["selectable"]) : false,
+      default_selected: client ? yes(o["default_selected"]) : false,
+    });
+  }
+  return out;
 }
