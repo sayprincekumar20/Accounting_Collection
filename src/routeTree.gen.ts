@@ -63,6 +63,7 @@ import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
 import { Route as VerificationIndexRouteImport } from './routes/verification.index'
 import { Route as VerificationReviewIdRouteImport } from './routes/verification.$reviewId'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant.chat'
+import { Route as ApiAssistantHomeRouteImport } from './routes/api/assistant.home'
 import { Route as ApiDvReviewsReviewIdRouteImport } from './routes/api/dv-reviews.$reviewId'
 import { Route as ApiOutboundMediaTokenRouteImport } from './routes/api/outbound-media.$token'
 import { Route as ApiDvReviewsReviewIdActionRouteImport } from './routes/api/dv-reviews.$reviewId.$action'
@@ -340,6 +341,11 @@ const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
   path: '/api/assistant/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAssistantHomeRoute = ApiAssistantHomeRouteImport.update({
+  id: '/api/assistant/home',
+  path: '/api/assistant/home',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDvReviewsReviewIdRoute = ApiDvReviewsReviewIdRouteImport.update({
   id: '/$reviewId',
   path: '/$reviewId',
@@ -424,6 +430,7 @@ export interface FileRoutesByFullPath {
   '/clients/': typeof ClientsIndexRoute
   '/verification/': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
+  '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
@@ -485,6 +492,7 @@ export interface FileRoutesByTo {
   '/clients': typeof ClientsIndexRoute
   '/verification': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
+  '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
@@ -547,6 +555,7 @@ export interface FileRoutesById {
   '/clients/': typeof ClientsIndexRoute
   '/verification/': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
+  '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
@@ -610,6 +619,7 @@ export interface FileRouteTypes {
     | '/clients/'
     | '/verification/'
     | '/api/assistant/chat'
+    | '/api/assistant/home'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
     | '/api/dv-reviews/$reviewId/$action'
@@ -671,6 +681,7 @@ export interface FileRouteTypes {
     | '/clients'
     | '/verification'
     | '/api/assistant/chat'
+    | '/api/assistant/home'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
     | '/api/dv-reviews/$reviewId/$action'
@@ -732,6 +743,7 @@ export interface FileRouteTypes {
     | '/clients/'
     | '/verification/'
     | '/api/assistant/chat'
+    | '/api/assistant/home'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
     | '/api/dv-reviews/$reviewId/$action'
@@ -794,6 +806,7 @@ export interface RootRouteChildren {
   ClientsIndexRoute: typeof ClientsIndexRoute
   VerificationIndexRoute: typeof VerificationIndexRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
+  ApiAssistantHomeRoute: typeof ApiAssistantHomeRoute
   ApiOutboundMediaTokenRoute: typeof ApiOutboundMediaTokenRoute
 }
 
@@ -1177,6 +1190,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAssistantChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/assistant/home': {
+      id: '/api/assistant/home'
+      path: '/api/assistant/home'
+      fullPath: '/api/assistant/home'
+      preLoaderRoute: typeof ApiAssistantHomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dv-reviews/$reviewId': {
       id: '/api/dv-reviews/$reviewId'
       path: '/$reviewId'
@@ -1297,6 +1317,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClientsIndexRoute: ClientsIndexRoute,
   VerificationIndexRoute: VerificationIndexRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
+  ApiAssistantHomeRoute: ApiAssistantHomeRoute,
   ApiOutboundMediaTokenRoute: ApiOutboundMediaTokenRoute,
 }
 export const routeTree = rootRouteImport

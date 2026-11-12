@@ -1,10 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Bot, Maximize2, Minimize2, Plus, Send, X, History, Loader2 } from "lucide-react";
+import {
+  Bot,
+  BrainCircuit,
+  Maximize2,
+  Minimize2,
+  Plus,
+  Send,
+  X,
+  History,
+  Loader2,
+} from "lucide-react";
 import { setLogFilters } from "@/components/collections/LogFilters";
+import { AssistantHome } from "./AssistantHome";
+import { EXAMPLE_COMMANDS, fetchAssistantHome } from "./home-data";
 
 // AI operations assistant: floating button -> side panel / full screen. Conversations are kept in this
 // browser; every question is answered by /api/assistant/chat (OpenAI + the dashboard's Action Registry).
@@ -47,16 +59,10 @@ const TOOL_LABEL: Record<string, string> = {
   queue_status: "Reading the reminder queue",
   reports: "Listing reports",
   run_logs: "Reading run logs",
+  workflow_health: "Checking workflow health",
   navigate: "Opening the page",
   refresh_data: "Refreshing",
 };
-const SUGGESTIONS = [
-  "Show me the overdue customers above PHP 30,000",
-  "How many customers promised to pay but haven't paid?",
-  "Show failed messages of the last 7 days and why they failed",
-  "Which clients are approved this cycle and not contacted yet?",
-  "Open the voice call history",
-];
 
 const newId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 const loadConvos = (): Convo[] => {
@@ -86,6 +92,14 @@ export function Assistant() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const home = useQuery({
+    queryKey: ["assistant-home"],
+    queryFn: fetchAssistantHome,
+    enabled: open,
+    staleTime: 30_000,
+    refetchInterval: open ? 60_000 : false,
+    retry: 1,
+  });
 
   useEffect(() => {
     const c = loadConvos();
@@ -276,21 +290,26 @@ export function Assistant() {
     <div
       className={`${panel} flex flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl`}
     >
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <Bot className="h-5 w-5 text-primary" />
+      <div className="flex items-center gap-2 bg-primary px-4 py-3 text-primary-foreground">
+        <BrainCircuit className="h-6 w-6 shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Collections assistant</p>
-          <p className="truncate text-[11px] text-muted-foreground">
+          <p className="text-sm font-semibold leading-tight">Rare Global AI</p>
+          <p className="truncate text-[11px] opacity-80">
             {active?.workingSet?.ids.length
               ? `Working set: ${active.workingSet.ids.length} clients · ${active.workingSet.label}`
-              : `Page: ${path}`}
+              : "Collections Intelligence Center"}
           </p>
         </div>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${home.isError ? "bg-white/20" : "bg-emerald-400/25 text-emerald-100"}`}
+        >
+          {home.isError ? "Offline" : "Online"}
+        </span>
         <button
           type="button"
           title="History"
           onClick={() => setShowHistory((v) => !v)}
-          className="rounded p-1.5 hover:bg-muted"
+          className="rounded p-1.5 hover:bg-white/15"
         >
           <History className="h-4 w-4" />
         </button>
@@ -298,7 +317,7 @@ export function Assistant() {
           type="button"
           title="New conversation"
           onClick={newConvo}
-          className="rounded p-1.5 hover:bg-muted"
+          className="rounded p-1.5 hover:bg-white/15"
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -306,7 +325,7 @@ export function Assistant() {
           type="button"
           title={full ? "Exit full screen" : "Full screen"}
           onClick={() => setFull((v) => !v)}
-          className="rounded p-1.5 hover:bg-muted"
+          className="rounded p-1.5 hover:bg-white/15"
         >
           {full ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </button>
@@ -314,7 +333,7 @@ export function Assistant() {
           type="button"
           title="Close"
           onClick={() => setOpen(false)}
-          className="rounded p-1.5 hover:bg-muted"
+          className="rounded p-1.5 hover:bg-white/15"
         >
           <X className="h-4 w-4" />
         </button>
@@ -345,22 +364,13 @@ export function Assistant() {
       ) : (
         <div className="flex-1 space-y-3 overflow-y-auto p-4">
           {!active?.messages.length ? (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Ask about clients, invoices, reminders, calls, promises or reports. I can also open
-                pages for you.
-              </p>
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => void ask(s)}
-                  className="block w-full rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-muted"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
+            <AssistantHome
+              data={home.data}
+              loading={home.isLoading}
+              failed={home.isError}
+              onAsk={(q) => void ask(q)}
+              onNavigate={(to) => void navigate({ to: to as "/" })}
+            />
           ) : null}
           {active?.messages.map((m, i) => (
             <div key={i} className={m.role === "user" ? "flex justify-end" : ""}>
@@ -437,6 +447,24 @@ export function Assistant() {
         </div>
       )}
 
+      {!showHistory && !active?.messages.length ? (
+        <div className="border-t border-border px-3 pt-2">
+          <p className="mb-1 text-[11px] text-muted-foreground">Example commands</p>
+          <div className="flex flex-wrap gap-1.5">
+            {EXAMPLE_COMMANDS.map((c) => (
+              <button
+                key={c.label}
+                type="button"
+                disabled={busy}
+                onClick={() => void ask(c.prompt)}
+                className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium hover:bg-muted/70 disabled:opacity-50"
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -454,7 +482,7 @@ export function Assistant() {
             }
           }}
           rows={1}
-          placeholder="Ask about clients, invoices, calls…"
+          placeholder="Ask anything or give a command…"
           className="max-h-32 min-h-[40px] flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
         <button

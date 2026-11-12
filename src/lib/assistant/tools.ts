@@ -5,6 +5,7 @@ import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { buildActivity, companyKey, cycleStart, loadActivityTables } from "@/lib/client-activity";
 import { registerAction, type ActionContext } from "./registry";
 import { approveClients, contactClients } from "@/lib/n8n-actions";
+import { isOpenEscalation } from "./home-calc";
 
 type Row = Record<string, unknown>;
 const T = {
@@ -18,6 +19,7 @@ const T = {
   retries: "OgCEYfz7eGjS3dPz",
   reports: "bqDZYdPyb3JaFAsM",
   runLogs: "BVGj7FvvvVsg1QxY",
+  health: "vu4Ar3YK7tj0VaKy",
 };
 const s = (v: unknown) => (v == null ? "" : String(v));
 const n = (v: unknown) => Number(v) || 0;
@@ -152,10 +154,7 @@ registerAction({
       current: peso(sum("current_total")),
       approved_this_cycle: approved.size,
       reminder_queue: qd,
-      open_escalations: esc.filter(
-        (e) =>
-          s(e["status"]).toUpperCase() !== "DONE" && s(e["channel"]).toUpperCase() !== "SYSTEM",
-      ).length,
+      open_escalations: esc.filter(isOpenEscalation).length,
       promises_recorded: prom.length,
     };
     return { data, summary: `overview: ${active.length} clients` };
@@ -683,6 +682,53 @@ const PAGES: Record<string, string> = {
   voice: "/voice",
   document_verification: "/verification",
 };
+
+registerAction({
+  id: "workflow_health",
+  description:
+    "Health of the automation, checked every 30 minutes: SMS phone, Viber / Twilio / Vapi credit, stuck SMS or queues, failing workflows, failed sends and calls. Returns the open problems (urgent first) with what they affect and what to do, plus problems resolved in the last 24 hours. Use for 'check the workflows', 'is anything broken', 'why did X fail'.",
+  kind: "read",
+  permission: "viewer",
+  needsConfirmation: false,
+  params: z.object({}),
+  execute: async () => {
+    const all = await rows(T.health);
+    const day = Date.now() - 24 * 3600000;
+    const open = all
+      .filter((r) => s(r["status"]).toLowerCase() === "open")
+      .sort(
+        (a, b) =>
+          (s(a["severity"]) === "urgent" ? 0 : 1) - (s(b["severity"]) === "urgent" ? 0 : 1) ||
+          s(b["last_seen"]).localeCompare(s(a["last_seen"])),
+      )
+      .map((r) => ({
+        severity: s(r["severity"]),
+        title: s(r["title"]),
+        detail: s(r["detail"]).slice(0, 400),
+        affected: s(r["affected"]),
+        what_to_do: s(r["suggested_fix"]),
+        first_seen: s(r["first_seen"]),
+        last_seen: s(r["last_seen"]),
+        times_seen: n(r["occurrences"]),
+      }));
+    const resolved = all
+      .filter(
+        (r) =>
+          s(r["status"]).toLowerCase() === "resolved" &&
+          (new Date(s(r["resolved_at"])).getTime() || 0) >= day,
+      )
+      .map((r) => ({ title: s(r["title"]), resolved_at: s(r["resolved_at"]) }));
+    return {
+      data: {
+        open_problems: open.length,
+        open,
+        resolved_last_24h: resolved,
+        note: open.length ? undefined : "No open problems at the last check.",
+      },
+      summary: `workflow_health: ${open.length} open`,
+    };
+  },
+});
 
 registerAction({
   id: "navigate",
