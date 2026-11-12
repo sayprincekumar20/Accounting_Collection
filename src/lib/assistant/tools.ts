@@ -6,7 +6,7 @@ import { buildActivity, companyKey, cycleStart, loadActivityTables } from "@/lib
 import { registerAction, type ActionContext } from "./registry";
 import { approveClients, contactClients } from "@/lib/n8n-actions";
 import { isOpenEscalation } from "./home-calc";
-import { isNotReachedReason, isRecentNotReachedAlert } from "@/lib/escalation-alerts";
+import { isNotReachedReason } from "@/lib/escalation-alerts";
 
 type Row = Record<string, unknown>;
 const T = {
@@ -553,7 +553,7 @@ registerAction({
 registerAction({
   id: "escalations",
   description:
-    "AR Worklist escalations (client replies / calls needing AR, plus recent automatic 'Not reached by phone' alerts): status OPEN, IN_PROGRESS or DONE; with Ref, reason, channel.",
+    "AR Worklist escalations (client replies / calls needing AR, not the automatic 'Not reached by phone' alerts): status OPEN, IN_PROGRESS or DONE; with Ref, reason, channel.",
   kind: "read",
   permission: "viewer",
   needsConfirmation: false,
@@ -565,7 +565,7 @@ registerAction({
     const list = (await rows(T.escalations)).filter(
       (e) =>
         s(e["channel"]).toUpperCase() !== "SYSTEM" &&
-        (!isNotReachedReason(e["reason"]) || isRecentNotReachedAlert(e)) &&
+        !isNotReachedReason(e["reason"]) &&
         (!a.status || (s(e["status"]).toUpperCase() || "OPEN") === a.status),
     );
     list.sort((x, y) => at(y) - at(x));

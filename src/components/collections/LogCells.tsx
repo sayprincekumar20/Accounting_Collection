@@ -282,3 +282,40 @@ export function RefTag({
     </button>
   );
 }
+
+/**
+ * Voice log: Grace's call AND the automatic retry went unanswered. Not an escalation (the client did not ask
+ * anything): shown as its own amber status; "details" opens the client card with "Call again".
+ */
+export function NotReachedCell({
+  row,
+}: {
+  row?:
+    | { recorded_at: string; client_id?: string | undefined; client_name?: string | undefined }
+    | undefined;
+}) {
+  if (!row) return <span className="text-xs text-muted-foreground">—</span>;
+  const when = dayTime(row.recorded_at);
+  const tone =
+    "max-w-[260px] truncate rounded-full bg-warning/18 px-2.5 py-0.5 text-[11px] font-semibold text-warning underline-offset-2 hover:underline";
+  return (
+    <span className="inline-flex max-w-[200px] flex-col items-start gap-0.5">
+      {row.client_id ? (
+        <EscalationBadge
+          clientId={row.client_id}
+          clientName={row.client_name ?? ""}
+          label="Not reached · details"
+          className={tone}
+        />
+      ) : (
+        <span className={tone}>Not reached</span>
+      )}
+      {when ? (
+        <span className="whitespace-nowrap text-[10px] text-muted-foreground">{when}</span>
+      ) : null}
+      <span className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+        Call and automatic retry unanswered (not an escalation)
+      </span>
+    </span>
+  );
+}

@@ -148,7 +148,7 @@ describe("priorities", () => {
   });
 });
 
-describe("recent 'Not reached by phone' alerts count as open escalations", () => {
+describe("'Not reached by phone' alerts are never escalations", () => {
   const day = 86400000;
   const alert = (ageDays: number) => ({
     channel: "VOICE",
@@ -156,20 +156,13 @@ describe("recent 'Not reached by phone' alerts count as open escalations", () =>
     reason: "Not reached by phone (customer-did-not-answer), including the automatic retry.",
     timestamp: new Date(Date.now() - ageDays * day).toISOString(),
   });
-  it("only while they are under 7 days old", () => {
-    expect(isClientEscalation(alert(1))).toBe(true);
-    expect(isClientEscalation(alert(6))).toBe(true);
-    expect(isClientEscalation(alert(8))).toBe(false);
+  it("however recent they are", () => {
+    expect(isClientEscalation(alert(0))).toBe(false);
+    expect(isClientEscalation(alert(30))).toBe(false);
   });
-  it("are grouped as 'Not reached' and described for the priority card", () => {
-    const r = openEscalations([
-      alert(1),
-      alert(2),
-      alert(30),
-      { channel: "EMAIL", reason: "Dispute: x" },
-    ]);
-    expect(r.count).toBe(3);
-    expect(r.byType).toEqual({ "Not reached": 2, Dispute: 1 });
-    expect(describeEscalationTypes(r.byType)).toBe("2 not-reached alerts, 1 dispute");
+  it("only client-raised cases are counted", () => {
+    const r = openEscalations([alert(1), alert(2), { channel: "EMAIL", reason: "Dispute: x" }]);
+    expect(r.count).toBe(1);
+    expect(r.byType).toEqual({ Dispute: 1 });
   });
 });

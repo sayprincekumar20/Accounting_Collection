@@ -322,6 +322,9 @@ export function EscalationBadge({
   const mine = (data ?? [])
     .filter((e) => companyKey(e.client_id) === k)
     .sort((a, b) => String(b.recorded_at ?? "").localeCompare(String(a.recorded_at ?? "")));
+  // Escalations = raised by the client. "Not reached by phone" (call + retry unanswered) is listed apart.
+  const realEsc = mine.filter((e) => !e.automatic);
+  const notReached = mine.filter((e) => e.automatic);
 
   async function setStatus(e: WorkItem, status: "IN_PROGRESS" | "DONE" | "OPEN") {
     const who = askHandler();
@@ -382,11 +385,11 @@ export function EscalationBadge({
           </div>
           {msg ? <p className="mb-2 rounded-lg bg-muted px-3 py-1.5 text-xs">{msg}</p> : null}
           {isLoading ? <SkeletonBlock className="h-24" /> : null}
-          {!isLoading && !mine.length ? (
+          {!isLoading && !realEsc.length ? (
             <p className="text-sm text-muted-foreground">No escalations found for this client.</p>
           ) : null}
           <ul className="space-y-3">
-            {mine.map((e) => {
+            {realEsc.map((e) => {
               const h = escalationAgeHours(e.recorded_at ?? "", e.status, e.handled_at);
               const late = e.status !== "DONE" && h >= 48;
               const page = CHANNEL_PAGE[e.channel] ?? "/email";
@@ -510,6 +513,23 @@ export function EscalationBadge({
               );
             })}
           </ul>
+          {notReached.length ? (
+            <div className="mt-4 rounded-xl border border-border p-3">
+              <p className="text-xs font-semibold">Not reached by phone (not an escalation)</p>
+              <p className="text-[11px] text-muted-foreground">
+                Grace called and the automatic retry also went unanswered. The client did not ask
+                anything, so this is not an escalation. Use Call again above, or another channel.
+              </p>
+              <ul className="mt-2 space-y-1 text-xs">
+                {notReached.slice(0, 6).map((e) => (
+                  <li key={e.entry_id} className="text-muted-foreground">
+                    {e.recorded_at ? when(e.recorded_at) + " · " : ""}
+                    {e.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </Modal>
       ) : null}
     </>

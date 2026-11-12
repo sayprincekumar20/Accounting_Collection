@@ -698,18 +698,12 @@ describe("GET /api/worklist (automatic 'Not reached' alerts)", () => {
     tables["rJpqXxmxhqJnlLrJ"] = [];
   };
 
-  it("lists real escalations plus RECENT automatic alerts (older alerts stay out)", async () => {
+  it("lists only escalations raised by clients: 'Not reached by phone' is never an escalation", async () => {
     rows();
     const items = (await (await call("worklist", "GET", "/api/worklist")).json()).items as {
       entry_id: string;
-      automatic: boolean;
-      type: string;
     }[];
-    expect(items.map((i) => [i.entry_id, i.automatic])).toEqual([
-      ["E2", false],
-      ["E1", true],
-    ]);
-    expect(items.find((i) => i.entry_id === "E1")!.type).toBe("Not reached");
+    expect(items.map((i) => i.entry_id)).toEqual(["E2"]);
   });
 
   it("the client pop-up can ask for ALL alerts of ONE client, marked as automatic", async () => {

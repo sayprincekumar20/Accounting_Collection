@@ -3,9 +3,8 @@ import { requireSecret } from "@/lib/env";
 import { escalationType } from "@/lib/escalation-type";
 import { clearDataTableCache, fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { isNotReachedAlert } from "@/lib/authorship";
-import { isRecentNotReachedAlert } from "@/lib/escalation-alerts";
 
-// AR worklist: every real escalation plus the recent automatic "Not reached by phone" alerts, with its
+// AR worklist: every escalation raised by a client (not the automatic "Not reached by phone" alert), with its
 // handling status. POST updates status / handled_by / note for one escalation (entry_id).
 const ESCALATIONS = "ANfkZZDIrDuC4RjK";
 const CLIENTS = "rJpqXxmxhqJnlLrJ";
@@ -24,8 +23,8 @@ export const Route = createFileRoute("/api/worklist")({
     handlers: {
       GET: async ({ request }) => {
         try {
-          // Automatic "Not reached by phone" alerts (call + retry unanswered) are listed while they are recent.
-          // The per-client pop-up asks for ALL of that client's alerts with ?include_alerts=1&client_id=...
+          // An escalation is something the CLIENT raised that the agents could not handle. The automatic "Not
+          // reached by phone" alert (call + retry unanswered) is not one; the client pop-up asks for it apart.
           const q = new URL(request.url).searchParams;
           const includeAlerts = q.get("include_alerts") === "1";
           const onlyCompany = (q.get("client_id") || "").split("___")[0]!.trim().toLowerCase();
@@ -38,7 +37,7 @@ export const Route = createFileRoute("/api/worklist")({
             .filter(
               (e) =>
                 s(e["channel"]).toUpperCase() !== "SYSTEM" &&
-                (includeAlerts || !isNotReachedAlert(e["reason"]) || isRecentNotReachedAlert(e)) &&
+                (includeAlerts || !isNotReachedAlert(e["reason"])) &&
                 (!onlyCompany ||
                   s(e["client_id"]).split("___")[0]!.trim().toLowerCase() === onlyCompany) &&
                 s(e["entry_id"]),

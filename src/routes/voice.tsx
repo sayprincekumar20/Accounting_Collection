@@ -6,7 +6,14 @@ import { useEffect, useState } from "react";
 import { PhoneIncoming, PhoneOutgoing, Globe, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StatCard, ChannelBadge, RefreshButton } from "@/components/collections/Bits";
-import { SummaryCell, PromiseCell, EscalatedCell, RefTag } from "@/components/collections/LogCells";
+import {
+  SummaryCell,
+  PromiseCell,
+  EscalatedCell,
+  NotReachedCell,
+  RefTag,
+} from "@/components/collections/LogCells";
+import { isNotReachedReason } from "@/lib/escalation-alerts";
 import {
   LogFilterBar,
   matchesLogFilters,
@@ -304,7 +311,10 @@ function VoiceLogs() {
   const calls = callsData ?? [];
   const { data: flags } = usePromisesAndEscalations();
   const promises = flags?.promises ?? [];
-  const escalations = flags?.escalations ?? [];
+  // Escalations are raised by the client. "Not reached by phone" (call + retry unanswered) is its own status.
+  const allEscalations = flags?.escalations ?? [];
+  const escalations = allEscalations.filter((e) => !isNotReachedReason(e.reason));
+  const notReachedRows = allEscalations.filter((e) => isNotReachedReason(e.reason));
   const { data: clientsData } = useClientsList();
   const clients = clientsData ?? [];
 
@@ -429,6 +439,7 @@ function VoiceLogs() {
               {visible.map((c) => {
                 const promise = latestFor(promises, c.client_id);
                 const escalation = latestFor(escalations, c.client_id);
+                const notReached = escalation ? undefined : latestFor(notReachedRows, c.client_id);
                 const client = clients.find((cl) => cl.client_id === c.client_id);
                 const type = callType(c.type);
                 return (
@@ -490,7 +501,11 @@ function VoiceLogs() {
                       <PromiseCell promise={promise} />
                     </td>
                     <td className="px-4 py-3">
-                      <EscalatedCell escalation={escalation} />
+                      {escalation || !notReached ? (
+                        <EscalatedCell escalation={escalation} />
+                      ) : (
+                        <NotReachedCell row={notReached} />
+                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                       {formatClientTime(c.startedAt)}
