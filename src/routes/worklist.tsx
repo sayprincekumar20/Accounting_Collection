@@ -1,3 +1,4 @@
+import { nextWeeklyRunLabel } from "@/lib/retry-schedule";
 import { useEffect, useState } from "react";
 import { escalationAgeHours, escalationType } from "@/lib/escalation-type";
 import { createFileRoute, redirect } from "@tanstack/react-router";
@@ -321,7 +322,7 @@ export function WorklistContent() {
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       Automatic alert: Grace called and the automatic retry also went unanswered.
                       Check the phone number or reach the client on another channel, then mark it
-                      done.
+                      done. The next automatic contact is the weekly run on {nextWeeklyRunLabel()}.
                     </p>
                   ) : null}
                   {i.message && i.message !== i.reason ? (

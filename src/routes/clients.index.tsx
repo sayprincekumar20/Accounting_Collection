@@ -1,3 +1,4 @@
+import { nextAttemptLabel } from "@/lib/retry-schedule";
 import { Pager } from "@/components/collections/Pager";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SkeletonRows } from "@/components/collections/Skeleton";
@@ -53,6 +54,8 @@ interface ClientRow {
   last_call_at?: string;
   last_call_source?: string;
   last_call_result?: string;
+  next_retry_at?: string;
+  retry_reason?: string;
   contacted_via_call_command?: boolean;
   sales_person?: string;
 }
@@ -407,6 +410,11 @@ function LastContact({ c }: { c: ClientRow }) {
           {c.last_call_result ? (
             <span className={`ml-1 font-semibold ${tone[c.last_call_result] ?? ""}`}>
               {c.last_call_result}
+            </span>
+          ) : null}
+          {c.next_retry_at ? (
+            <span className="ml-1 text-muted-foreground">
+              · next attempt {nextAttemptLabel(c.next_retry_at)}
             </span>
           ) : null}
           <span className="block text-[11px] text-muted-foreground">{c.last_call_source}</span>

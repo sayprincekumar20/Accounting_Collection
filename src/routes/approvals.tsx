@@ -1,3 +1,4 @@
+import { nextAttemptLabel } from "@/lib/retry-schedule";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { SkeletonRows } from "@/components/collections/Skeleton";
@@ -65,6 +66,8 @@ interface Item {
   last_call_at: string;
   last_call_source: string;
   last_call_result: string;
+  next_retry_at?: string;
+  retry_reason?: string;
 }
 
 const peso = (v: number) =>
@@ -879,6 +882,12 @@ function CycleStatus({ i }: { i: Item }) {
           <span className={`font-semibold ${tone[i.last_call_result] ?? ""}`}>
             {i.last_call_result}
           </span>
+          {i.next_retry_at ? (
+            <span className="text-muted-foreground">
+              {" "}
+              · next attempt {nextAttemptLabel(i.next_retry_at)}
+            </span>
+          ) : null}
           <span className="text-muted-foreground"> · {i.last_call_source}</span>
         </p>
       ) : (

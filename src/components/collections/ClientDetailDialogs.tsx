@@ -1,3 +1,4 @@
+import { nextAttemptLabel, nextWeeklyRunLabel } from "@/lib/retry-schedule";
 import { SkeletonBlock } from "@/components/collections/Skeleton";
 import { useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -139,6 +140,8 @@ interface Snapshot {
     last_text_channel: string;
     last_call_at: string;
     last_call_result: string;
+    next_retry_at?: string;
+    retry_reason?: string;
   };
 }
 const peso = (v: number) =>
@@ -227,6 +230,12 @@ function ClientContext({ snap }: { snap: Snapshot }) {
         · Last call:{" "}
         {lc.last_call_at ? `${when(lc.last_call_at)} · ${lc.last_call_result}` : "none"}
       </p>
+      {lc.next_retry_at ? (
+        <p className="mt-1 font-semibold text-warning">
+          Next attempt: {nextAttemptLabel(lc.next_retry_at)}
+          {lc.retry_reason ? ` (last call: ${lc.retry_reason})` : ""}
+        </p>
+      ) : null}
       {snap.invoices.length ? (
         <div className="mt-2 overflow-x-auto">
           <table className="w-full">
@@ -420,7 +429,8 @@ export function EscalationBadge({
                     <p className="mt-1 text-xs text-muted-foreground">
                       Raised automatically after Grace called and the automatic retry also went
                       unanswered. The client did not say anything, so there is nothing to answer:
-                      check the phone number or reach the client on another channel.
+                      check the phone number or reach the client on another channel. The next
+                      automatic contact is the weekly run on {nextWeeklyRunLabel()}.
                     </p>
                   ) : null}
                   {e.message && e.message !== e.reason ? (

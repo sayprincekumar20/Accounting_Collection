@@ -1,3 +1,4 @@
+import { endedReasonLabel } from "@/lib/retry-schedule";
 import { fetchAllDataTableRows, RECENT_60_DAYS } from "@/lib/n8n-datatable";
 
 // Last contact per client (weekly run or /call): latest text sent, latest call placed and its result.
@@ -111,7 +112,11 @@ export function buildActivity(
       else if (Date.now() - t < 15 * 60000) callResult = "In progress";
       else callResult = "No answer";
     }
+    // The automatic retry is scheduled: tell when (and why it is needed).
+    const rtNow = callResult === "Retry pending" ? retryOf(k) : undefined;
     return {
+      next_retry_at: rtNow ? str(rtNow["next_retry_at"]) : "",
+      retry_reason: rtNow ? endedReasonLabel(str(rtNow["last_ended_reason"])) : "",
       last_text_at: tx ? str(tx["timestamp"]) : "",
       last_text_channel: tx ? str(tx["channel"]).toUpperCase() : "",
       last_text_source: tx ? textSource(k, tx) : "",
