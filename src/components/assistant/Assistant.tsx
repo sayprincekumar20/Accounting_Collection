@@ -8,6 +8,7 @@ import {
   BrainCircuit,
   Maximize2,
   Minimize2,
+  Paperclip,
   Plus,
   Send,
   X,
@@ -16,6 +17,10 @@ import {
 } from "lucide-react";
 import { setLogFilters } from "@/components/collections/LogFilters";
 import { AssistantHome } from "./AssistantHome";
+import { ListReview, SheetPicker } from "./ListReview";
+import { fileStore, reviewStore } from "./list-store";
+import { parseListFile } from "@/lib/assistant/list-file";
+import { reviewSummaryText, type ReviewRow } from "@/lib/assistant/list-match";
 import { EXAMPLE_COMMANDS, fetchAssistantHome } from "./home-data";
 
 // AI operations assistant: floating button -> side panel / full screen. Conversations are kept in this
@@ -37,6 +42,12 @@ interface Msg {
   content: string;
   tools?: ToolStatus[];
   confirm?: ConfirmReq;
+  /** Contact lists: identifies this message when it is updated later. */
+  uid?: string;
+  /** Contact lists: the attached file whose sheets the user can pick (data lives in list-store, in memory). */
+  sheetPick?: { fileId: string };
+  /** Contact lists: the review table of one sheet (data lives in list-store, in memory). */
+  review?: { id: string };
 }
 interface Convo {
   id: string;
@@ -89,6 +100,7 @@ export function Assistant() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const qc = useQueryClient();
   const path = useRouterState({ select: (s) => s.location.pathname });
@@ -255,6 +267,107 @@ export function Assistant() {
       setBusy(false);
     }
   }
+
+  // ---- contact lists: attach an Excel / CSV file, pick a sheet, review the matched clients
+  const appendMsg = (convoId: string, m: Msg) =>
+    update(convoId, (c) => ({
+      ...c,
+      updated: Date.now(),
+      title: c.messages.length ? c.title : "Contact list",
+      messages: [...c.messages, m],
+    }));
+  const patchMsg = (convoId: string, uid: string, fn: (m: Msg) => Msg) =>
+    update(convoId, (c) => ({
+      ...c,
+      messages: c.messages.map((m) => (m.uid === uid ? fn(m) : m)),
+    }));
+  const failMsg = (convoId: string, uid: string, e: unknown) =>
+    patchMsg(convoId, uid, (m) => ({
+      ...m,
+      content: `I could not do that: ${e instanceof Error ? e.message : "something went wrong"}`,
+    }));
+
+  async function matchSheet(convoId: string, uid: string, fileId: string, sheetName: string) {
+    const f = fileStore.get(fileId);
+    const sheet = f?.sheets.find((s) => s.name === sheetName);
+    if (!f || !sheet) {
+      failMsg(convoId, uid, new Error("the file is no longer loaded, please attach it again"));
+      return;
+    }
+    patchMsg(convoId, uid, (m) => ({
+      ...m,
+      content: `Matching ${sheet.rows.length} customers from sheet "${sheetName}" to our clients…`,
+    }));
+    try {
+      const res = await fetch("/api/assistant/list-match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: sheet.rows }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { rows?: ReviewRow[]; error?: string };
+      if (!res.ok || !j.rows) throw new Error(j.error || `Matching failed (${res.status})`);
+      const reviewId = newId();
+      reviewStore.set(reviewId, {
+        id: reviewId,
+        fileName: f.name,
+        sheet: sheetName,
+        rows: j.rows,
+        result: null,
+      });
+      const ids = [
+        ...new Set(j.rows.filter((r) => r.client && r.selectable).map((r) => r.client!.client_id)),
+      ];
+      patchMsg(convoId, uid, (m) => ({
+        ...m,
+        content: reviewSummaryText(sheetName, j.rows!),
+        review: { id: reviewId },
+      }));
+      if (ids.length)
+        update(convoId, (c) => ({ ...c, workingSet: { ids, label: `list ${sheetName}` } }));
+    } catch (e) {
+      failMsg(convoId, uid, e);
+    }
+  }
+
+  async function onFile(file: File) {
+    if (busy) return;
+    const convo = active ?? newConvo();
+    const id = convo.id;
+    const uid = newId();
+    appendMsg(id, { role: "user", content: `Attached ${file.name}` });
+    appendMsg(id, { role: "assistant", content: "Reading the file…", uid });
+    try {
+      const parsed = await parseListFile(file);
+      fileStore.set(parsed.id, parsed);
+      const usable = parsed.sheets.filter((s) => s.rows.length);
+      if (!usable.length) {
+        patchMsg(id, uid, (m) => ({
+          ...m,
+          content:
+            `I could not find customer names in ${file.name}. ${parsed.sheets[0]?.note ?? ""}`.trim(),
+        }));
+        return;
+      }
+      if (usable.length === 1) {
+        await matchSheet(id, uid, parsed.id, usable[0]!.name);
+        return;
+      }
+      patchMsg(id, uid, (m) => ({
+        ...m,
+        content: `${file.name} has ${usable.length} sheets with customers. Which one do you want to review?`,
+        sheetPick: { fileId: parsed.id },
+      }));
+    } catch (e) {
+      failMsg(id, uid, e);
+    }
+  }
+
+  const pickSheet = (fileId: string, sheetName: string) => {
+    if (!active || busy) return;
+    const uid = newId();
+    appendMsg(active.id, { role: "assistant", content: "", uid });
+    void matchSheet(active.id, uid, fileId, sheetName);
+  };
 
   const decide = (msgIndex: number, ok: boolean) => {
     if (!active) return;
@@ -440,6 +553,15 @@ export function Assistant() {
                     )}
                   </div>
                 ) : null}
+                {m.sheetPick ? (
+                  <SheetPicker
+                    fileId={m.sheetPick.fileId}
+                    onPick={(name) => pickSheet(m.sheetPick!.fileId, name)}
+                  />
+                ) : null}
+                {m.review && active ? (
+                  <ListReview reviewId={m.review.id} sessionId={active.id} getUserName={userName} />
+                ) : null}
               </div>
             </div>
           ))}
@@ -472,6 +594,27 @@ export function Assistant() {
         }}
         className="flex items-end gap-2 border-t border-border p-3"
       >
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".xlsx,.csv"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) void onFile(f);
+          }}
+        />
+        <button
+          type="button"
+          title="Attach an Excel or CSV list of customers"
+          aria-label="Attach a customer list"
+          disabled={busy}
+          onClick={() => fileInput.current?.click()}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40"
+        >
+          <Paperclip className="h-4 w-4" />
+        </button>
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}

@@ -33,16 +33,21 @@ export async function approveClients(
   return { ok: true, saved: Number(out.saved ?? items.length) };
 }
 
-/** Runs the contact process for these client names (max 20 per call); returns the plan text. */
+/**
+ * Runs the contact process for these client names; returns the plan text. The n8n command accepts up to 300
+ * names and runs lists over 20 in batches of 20 by itself (one AR report for the whole list). Calls from the
+ * dashboard buttons and the assistant tool keep the default of 20; the contact-list flow passes a higher limit.
+ */
 export async function contactClients(
   requestedBy: string,
   names: string[],
   force = false,
+  max = 20,
 ): Promise<{ reply: string }> {
   const list = names
     .map((n) => String(n || "").trim())
     .filter(Boolean)
-    .slice(0, 20);
+    .slice(0, Math.min(Math.max(1, max), 300));
   if (!list.length) throw new Error("No client names");
   const res = await fetch(`${N8N}/cliq-call-command`, {
     method: "POST",
