@@ -1,4 +1,5 @@
 import { nextWeeklyRunLabel } from "@/lib/retry-schedule";
+import { CallAgainButton } from "@/components/collections/CallAgainButton";
 import { useEffect, useState } from "react";
 import { escalationAgeHours, escalationType } from "@/lib/escalation-type";
 import { createFileRoute, redirect } from "@tanstack/react-router";
@@ -324,6 +325,11 @@ export function WorklistContent() {
                       Check the phone number or reach the client on another channel, then mark it
                       done. The next automatic contact is the weekly run on {nextWeeklyRunLabel()}.
                     </p>
+                  ) : null}
+                  {i.automatic && i.client_id ? (
+                    <div className="mt-1">
+                      <CallAgainButton clientId={i.client_id} clientName={i.client_name} compact />
+                    </div>
                   ) : null}
                   {i.message && i.message !== i.reason ? (
                     <details className="mt-1">

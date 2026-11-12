@@ -1,3 +1,4 @@
+import { ContactClientButton } from "@/components/collections/ContactClientDialog";
 import { useState } from "react";
 import { DeliveryBadge } from "@/components/collections/DeliveryBadge";
 import { isFailed } from "@/lib/delivery";
@@ -276,6 +277,15 @@ function ClientDetail() {
       subtitle={`${client.parent_name ?? "Direct account"} · live`}
       actions={
         <div className="flex items-center gap-2">
+          <ContactClientButton
+            client={{
+              client_id: client.client_id,
+              client_name: client.client_name,
+              contact_person: client.contact_person,
+              email: client.email,
+              phone: client.phone,
+            }}
+          />
           <Link
             to="/clients"
             className="rounded-lg border border-input bg-card px-3 py-2 text-sm font-medium hover:bg-muted"

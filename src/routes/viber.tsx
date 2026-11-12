@@ -1,3 +1,4 @@
+import { useOpenFromLink } from "@/components/collections/open-from-link";
 import type React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -215,6 +216,11 @@ function SmsInbox() {
     [data],
   );
 
+  // ?open=<phone> (from the Contact button on Clients): open that client's conversation.
+  useOpenFromLink(!!data, (phone) => {
+    const hit = conversations.find((c) => last10(c.client_id) === last10(phone));
+    if (hit) setActive(hit.client_id);
+  });
   const activeItem = conversations.find((c) => c.client_id === active) ?? null;
   // WhatsApp-style: open at the latest message, follow new ones, 'Latest' button when scrolled up.
   const chat = useChatScroll(active, activeItem ? activeItem.messages.length : 0);

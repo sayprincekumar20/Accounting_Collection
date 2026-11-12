@@ -71,3 +71,29 @@ export async function contactClients(
   if (!res.ok) throw new Error(`Starting the contact failed (${res.status})`);
   return { reply: String(out.reply || "") };
 }
+
+/**
+ * "Call again": ONE call with Grace to this client right now, no text (n8n 23_Call_Now -> 13 voice workflow).
+ * n8n re-checks the client (exists, active, valid PH mobile number). Same key as the contact command.
+ */
+export async function callNow(
+  requestedBy: string,
+  clientId: string,
+  dryRun = false,
+): Promise<{ ok: boolean; reply: string }> {
+  const res = await fetch(`${N8N}/call-now`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-cliq-secret": await requireSecret("N8N_CONTACT_SECRET"),
+    },
+    body: JSON.stringify({
+      client_id: clientId,
+      requested_by: requestedBy.slice(0, 80) + " (dashboard)",
+      dry_run: dryRun,
+    }),
+  });
+  const out = (await res.json().catch(() => ({}))) as { ok?: boolean; reply?: string };
+  if (!res.ok) throw new Error(`Starting the call failed (${res.status})`);
+  return { ok: out.ok === true, reply: String(out.reply || "") };
+}

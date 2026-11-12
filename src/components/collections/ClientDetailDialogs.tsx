@@ -1,4 +1,5 @@
 import { nextAttemptLabel, nextWeeklyRunLabel } from "@/lib/retry-schedule";
+import { CallAgainButton } from "./CallAgainButton";
 import { SkeletonBlock } from "@/components/collections/Skeleton";
 import { useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -235,6 +236,11 @@ function ClientContext({ snap }: { snap: Snapshot }) {
           Next attempt: {nextAttemptLabel(lc.next_retry_at)}
           {lc.retry_reason ? ` (last call: ${lc.retry_reason})` : ""}
         </p>
+      ) : null}
+      {snap.client_id ? (
+        <div className="mt-2">
+          <CallAgainButton clientId={snap.client_id} clientName={snap.client_name} />
+        </div>
       ) : null}
       {snap.invoices.length ? (
         <div className="mt-2 overflow-x-auto">

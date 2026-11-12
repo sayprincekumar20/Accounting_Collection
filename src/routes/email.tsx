@@ -1,3 +1,4 @@
+import { useOpenFromLink } from "@/components/collections/open-from-link";
 import type React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -304,6 +305,10 @@ function EmailInbox() {
     [threadsData],
   );
 
+  // ?open=<thread id> (from the Contact button on Clients): open that email thread.
+  useOpenFromLink(!!threadsData, (threadId) => {
+    if (threads.some((t) => t.thread_id === threadId)) setActive(threadId);
+  });
   const activeItem = threads.find((t) => t.thread_id === active) ?? null;
   const {
     data: detail,

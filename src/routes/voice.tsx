@@ -1,3 +1,5 @@
+import { nextAttemptLabel } from "@/lib/retry-schedule";
+import { CallAgainButton } from "@/components/collections/CallAgainButton";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -246,6 +248,8 @@ interface ClientRow {
   contact_person: string;
   email: string;
   phone: string;
+  next_retry_at?: string;
+  retry_reason?: string;
 }
 
 function satisfactionTone(score: number | null | undefined) {
@@ -346,6 +350,12 @@ function VoiceLogs() {
     };
   };
   const visible = calls.filter((c) => matchesLogFilters(rowFor(c), filters));
+  // The next attempt and "Call again" are shown on the LATEST call of each client only.
+  const latestCallId = new Map<string, string>();
+  for (const c of calls
+    .slice()
+    .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime()))
+    if (c.client_id) latestCallId.set(c.client_id, c.call_id);
   const toggleStatus = (st: "reached" | "not_reached" | "promised") =>
     setFilters({ status: filters.status === st ? "all" : st });
 
@@ -449,6 +459,22 @@ function VoiceLogs() {
                       >
                         {endedReasonLabel(c.endedReason, c.status)}
                       </span>
+                      {latestCallId.get(c.client_id) === c.call_id ? (
+                        <span className="mt-1 block space-y-1">
+                          {client?.next_retry_at ? (
+                            <span className="block text-[11px] font-semibold text-warning">
+                              Next attempt {nextAttemptLabel(client.next_retry_at)}
+                            </span>
+                          ) : null}
+                          {c.client_id ? (
+                            <CallAgainButton
+                              clientId={c.client_id}
+                              clientName={client?.client_name || c.client_name}
+                              compact
+                            />
+                          ) : null}
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <SummaryCell ourText={c.callSummary || c.preview} />

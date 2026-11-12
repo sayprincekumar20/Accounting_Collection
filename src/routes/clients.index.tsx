@@ -1,3 +1,4 @@
+import { ContactClientButton } from "@/components/collections/ContactClientDialog";
 import { nextAttemptLabel } from "@/lib/retry-schedule";
 import { Pager } from "@/components/collections/Pager";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -300,7 +301,20 @@ function ClientsPage() {
                       </p>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {channels.length ? channels.join(" · ") : "No contact channel"}
+                      <span className="block">
+                        {channels.length ? channels.join(" · ") : "No contact channel"}
+                      </span>
+                      <span className="mt-1 block">
+                        <ContactClientButton
+                          client={{
+                            client_id: c.client_id,
+                            client_name: c.parent_name || c.client_name,
+                            contact_person: c.contact_person,
+                            email: c.email,
+                            phone: c.phone,
+                          }}
+                        />
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-right font-semibold tabular-nums">
                       {peso(c.collection_amount)}

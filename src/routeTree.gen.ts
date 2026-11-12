@@ -25,6 +25,7 @@ import { Route as ViberRouteImport } from './routes/viber'
 import { Route as VoiceRouteImport } from './routes/voice'
 import { Route as WhatsappRouteImport } from './routes/whatsapp'
 import { Route as WorklistRouteImport } from './routes/worklist'
+import { Route as ApiCallNowRouteImport } from './routes/api/call-now'
 import { Route as ApiCallReportsRouteImport } from './routes/api/call-reports'
 import { Route as ApiChannelCountersRouteImport } from './routes/api/channel-counters'
 import { Route as ApiClientSnapshotRouteImport } from './routes/api/client-snapshot'
@@ -151,6 +152,11 @@ const WhatsappRoute = WhatsappRouteImport.update({
 const WorklistRoute = WorklistRouteImport.update({
   id: '/worklist',
   path: '/worklist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCallNowRoute = ApiCallNowRouteImport.update({
+  id: '/api/call-now',
+  path: '/api/call-now',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCallReportsRoute = ApiCallReportsRouteImport.update({
@@ -410,6 +416,7 @@ export interface FileRoutesByFullPath {
   '/voice': typeof VoiceRoute
   '/whatsapp': typeof WhatsappRoute
   '/worklist': typeof WorklistRoute
+  '/api/call-now': typeof ApiCallNowRoute
   '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
   '/api/client-snapshot': typeof ApiClientSnapshotRoute
@@ -475,6 +482,7 @@ export interface FileRoutesByTo {
   '/voice': typeof VoiceRoute
   '/whatsapp': typeof WhatsappRoute
   '/worklist': typeof WorklistRoute
+  '/api/call-now': typeof ApiCallNowRoute
   '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
   '/api/client-snapshot': typeof ApiClientSnapshotRoute
@@ -541,6 +549,7 @@ export interface FileRoutesById {
   '/voice': typeof VoiceRoute
   '/whatsapp': typeof WhatsappRoute
   '/worklist': typeof WorklistRoute
+  '/api/call-now': typeof ApiCallNowRoute
   '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
   '/api/client-snapshot': typeof ApiClientSnapshotRoute
@@ -608,6 +617,7 @@ export interface FileRouteTypes {
     | '/voice'
     | '/whatsapp'
     | '/worklist'
+    | '/api/call-now'
     | '/api/call-reports'
     | '/api/channel-counters'
     | '/api/client-snapshot'
@@ -673,6 +683,7 @@ export interface FileRouteTypes {
     | '/voice'
     | '/whatsapp'
     | '/worklist'
+    | '/api/call-now'
     | '/api/call-reports'
     | '/api/channel-counters'
     | '/api/client-snapshot'
@@ -738,6 +749,7 @@ export interface FileRouteTypes {
     | '/voice'
     | '/whatsapp'
     | '/worklist'
+    | '/api/call-now'
     | '/api/call-reports'
     | '/api/channel-counters'
     | '/api/client-snapshot'
@@ -804,6 +816,7 @@ export interface RootRouteChildren {
   VoiceRoute: typeof VoiceRoute
   WhatsappRoute: typeof WhatsappRoute
   WorklistRoute: typeof WorklistRoute
+  ApiCallNowRoute: typeof ApiCallNowRoute
   ApiCallReportsRoute: typeof ApiCallReportsRoute
   ApiChannelCountersRoute: typeof ApiChannelCountersRoute
   ApiClientSnapshotRoute: typeof ApiClientSnapshotRoute
@@ -961,6 +974,13 @@ declare module '@tanstack/react-router' {
       path: '/worklist'
       fullPath: '/worklist'
       preLoaderRoute: typeof WorklistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/call-now': {
+      id: '/api/call-now'
+      path: '/api/call-now'
+      fullPath: '/api/call-now'
+      preLoaderRoute: typeof ApiCallNowRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/call-reports': {
@@ -1339,6 +1359,7 @@ const rootRouteChildren: RootRouteChildren = {
   VoiceRoute: VoiceRoute,
   WhatsappRoute: WhatsappRoute,
   WorklistRoute: WorklistRoute,
+  ApiCallNowRoute: ApiCallNowRoute,
   ApiCallReportsRoute: ApiCallReportsRoute,
   ApiChannelCountersRoute: ApiChannelCountersRoute,
   ApiClientSnapshotRoute: ApiClientSnapshotRoute,
