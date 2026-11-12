@@ -20,7 +20,7 @@ import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
 // then matched by that client's client_id — same identity-based approach
 // used for SMS/WhatsApp, not timestamp proximity.
 
-const CHUNK_SIZE = 15;
+const THREAD_METADATA_CONCURRENCY = 15;
 const MAX_RETRIES = 2;
 const RETRY_DELAYS_MS = [500, 1000];
 
@@ -33,6 +33,13 @@ interface ClientRow {
 interface HistoryEntry {
   client_id: string;
   channel: string;
+}
+interface GmailThreadMetadata {
+  id: string;
+  messages: {
+    snippet?: string;
+    payload?: { headers?: { name: string; value: string }[] };
+  }[];
 }
 
 /** Run `fn` over `items` with at most `limit` running at once; results keep the input order. */
@@ -57,15 +64,18 @@ async function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function fetchThreadMetadata(threadId: string, accessToken: string) {
+async function fetchThreadMetadata(
+  threadId: string,
+  accessToken: string,
+): Promise<GmailThreadMetadata | null> {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      return await gmailFetch<any>(
+      return await gmailFetch<GmailThreadMetadata>(
         `/threads/${threadId}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Date`,
         accessToken,
       );
-    } catch (err: any) {
-      const is429 = String(err.message).includes("(429)");
+    } catch (err) {
+      const is429 = err instanceof Error && err.message.includes("(429)");
       if (is429 && attempt < MAX_RETRIES) {
         await sleep(RETRY_DELAYS_MS[attempt] ?? 500);
         continue;
@@ -224,20 +234,18 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
             truncated = true;
             threadIds = threadIds.slice(0, MAX_THREADS);
           }
-          const rawThreads: any[] = [];
-          for (let i = 0; i < threadIds.length; i += CHUNK_SIZE) {
-            const chunk = threadIds.slice(i, i + CHUNK_SIZE);
-            const chunkResults = await Promise.all(
-              chunk.map((id) => fetchThreadMetadata(id, accessToken)),
-            );
-            rawThreads.push(...chunkResults.filter(Boolean));
-          }
+          const rawThreads = (
+            await mapWithLimit(threadIds, THREAD_METADATA_CONCURRENCY, (id) =>
+              fetchThreadMetadata(id, accessToken),
+            )
+          ).filter((thread): thread is GmailThreadMetadata => thread !== null);
 
           const businessEmail = (await getGmailBusinessEmail()).toLowerCase();
 
           const threads = rawThreads
             .map((thread) => {
               const lastMessage = thread.messages[thread.messages.length - 1];
+              if (!lastMessage) return null;
               const headers = lastMessage.payload?.headers;
               const fromRaw = getHeader(headers, "From");
               const toRaw = getHeader(headers, "To");

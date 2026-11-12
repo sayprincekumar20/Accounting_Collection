@@ -17,15 +17,18 @@ const s = (v: unknown) => (v == null ? "" : String(v));
 export const Route = createFileRoute("/api/channel-counters")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
         try {
-          const rows = await fetchAllDataTableRows<CounterRow>(CHANNEL_COUNTERS_TABLE_ID);
+          const fresh = new URL(request.url).searchParams.get("fresh") === "1";
           // The stored daily counters undercount when several sends run at once (read-then-write race),
           // so "sent today" is counted from the message log since 00:00 Manila instead.
-          const logs = await fetchAllDataTableRows<Record<string, unknown>>(
-            "a32Z5oGcNi0xzefb",
-            RECENT_60_DAYS,
-          ).catch(() => []);
+          const [rows, logs] = await Promise.all([
+            fetchAllDataTableRows<CounterRow>(CHANNEL_COUNTERS_TABLE_ID, { fresh }),
+            fetchAllDataTableRows<Record<string, unknown>>("a32Z5oGcNi0xzefb", {
+              ...RECENT_60_DAYS,
+              fresh,
+            }).catch(() => []),
+          ]);
           const now = new Date();
           const manilaMidnight = new Date(
             new Date(now.getTime() + 8 * 3600000).toISOString().slice(0, 10) + "T00:00:00+08:00",

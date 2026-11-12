@@ -47,11 +47,13 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 // Login gate (single shared ID + password). Off until DASHBOARD_PASSWORD is set in Cloudflare.
 
-// Shared 2-minute cache for the slow list APIs that call outside services (Gmail, Vapi, Telerivet,
-// Twilio). Cloudflare's Cache API is shared by all servers in a location, unlike in-memory caches.
-// Only reached after the login check; '?fresh=1' bypasses it; only successful responses are stored.
+// Shared 2-minute cache for slow list APIs. Cloudflare's Cache API is shared by all servers in a
+// location, unlike in-memory caches. Only reached after the login check; '?fresh=1' bypasses it;
+// only successful responses are stored.
 const SHARED_CACHE_PATHS = new Set([
   "/api/gmail-threads-list",
+  "/api/reminder-queue-list",
+  "/api/channel-counters",
   "/api/vapi-calls-list",
   "/api/sms-conversations",
   "/api/whatsapp-conversations",
@@ -92,7 +94,11 @@ async function writeSharedCache(request: Request, response: Response): Promise<v
 }
 
 export default {
-  async fetch(request: Request, env: unknown, ctx: unknown) {
+  async fetch(
+    request: Request,
+    env: unknown,
+    ctx: { waitUntil?: (promise: Promise<unknown>) => void },
+  ) {
     try {
       const authResponse = await handleAuth(request);
       if (authResponse) return authResponse;
@@ -100,7 +106,9 @@ export default {
       const cached = await readSharedCache(request);
       if (cached) return cached;
       const response = await handler.fetch(request, env, ctx);
-      await writeSharedCache(request, response);
+      const cacheWrite = writeSharedCache(request, response);
+      if (ctx.waitUntil) ctx.waitUntil(cacheWrite);
+      else await cacheWrite;
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
       console.error(error);

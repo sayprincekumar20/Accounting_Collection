@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SkeletonCards } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
+import { useRef } from "react";
 import {
   LogFilterBar,
   matchesLogFilters,
@@ -75,26 +76,39 @@ function reasonLabel(reason: string) {
 
 // Fast core data (n8n tables): shown as soon as it arrives.
 function useOverviewData() {
-  return useQuery({
+  const freshRequest = useRef(false);
+  const query = useQuery({
     queryKey: ["overview-core"],
     queryFn: async () => {
-      const [clientsRes, queueRes, countersRes, runsRes, promisesRes] = await Promise.all([
-        fetch("/api/clients-list").then((r) => r.json()),
-        fetch("/api/reminder-queue-list").then((r) => r.json()),
-        fetch("/api/channel-counters").then((r) => r.json()),
-        fetch("/api/daily-run-logs").then((r) => r.json()),
-        fetch("/api/promise-history").then((r) => r.json()),
-      ]);
-      return {
-        clients: clientsRes.clients || [],
-        queue: queueRes.queue || [],
-        counters: countersRes.counters || [],
-        latestRun: (runsRes.runs || [])[0],
-        promises: promisesRes.promises || [],
-      };
+      const suffix = freshRequest.current ? "?fresh=1" : "";
+      try {
+        const [clientsRes, queueRes, countersRes, runsRes, promisesRes] = await Promise.all([
+          fetch("/api/clients-list").then((r) => r.json()),
+          fetch(`/api/reminder-queue-list${suffix}`).then((r) => r.json()),
+          fetch(`/api/channel-counters${suffix}`).then((r) => r.json()),
+          fetch("/api/daily-run-logs").then((r) => r.json()),
+          fetch("/api/promise-history").then((r) => r.json()),
+        ]);
+        return {
+          clients: clientsRes.clients || [],
+          queue: queueRes.queue || [],
+          counters: countersRes.counters || [],
+          latestRun: (runsRes.runs || [])[0],
+          promises: promisesRes.promises || [],
+        };
+      } finally {
+        freshRequest.current = false;
+      }
     },
     refetchInterval: 14400000, // 4 hours -- see hard-refresh button for on-demand updates
   });
+  return {
+    ...query,
+    refetchFresh: () => {
+      freshRequest.current = true;
+      return query.refetch();
+    },
+  };
 }
 
 interface RecentItem {
@@ -165,7 +179,7 @@ function useRecentActivity() {
 }
 
 function Overview() {
-  const { data, isLoading, isFetching, error, refetch } = useOverviewData();
+  const { data, isLoading, isFetching, error, refetchFresh } = useOverviewData();
   const recentQ = useRecentActivity();
   const clients = data?.clients ?? [];
   const queue = data?.queue ?? [];
@@ -272,7 +286,7 @@ function Overview() {
         <RefreshButton
           isFetching={isFetching || recentQ.isFetching}
           onRefresh={() => {
-            refetch();
+            refetchFresh();
             recentQ.refetch();
           }}
         />
