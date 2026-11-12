@@ -480,6 +480,39 @@ describe("GET /api/reminder-queue-list", () => {
   });
 });
 
+describe("GET /api/channel-counters", () => {
+  it("counts successful sends from today's message log", async () => {
+    tables["2PaJlounpgxHtv6J"] = [
+      { channel: "SMS", sent_count: 2, daily_limit: 50, date: "2026-11-12" },
+    ];
+    tables["a32Z5oGcNi0xzefb"] = [
+      {
+        channel: "SMS",
+        event_type: "SEND_SUCCESS",
+        timestamp: new Date(Date.now() - 60_000).toISOString(),
+      },
+    ];
+
+    const response = await call("channel-counters", "GET", "/api/channel-counters");
+    const counters = (await response.json()).counters as {
+      channel: string;
+      sent_count: number;
+      counter_sent_count: number;
+    }[];
+
+    expect(counters).toEqual([
+      {
+        channel: "sms",
+        date: "2026-11-12",
+        counter_sent_count: 2,
+        sent_count: 1,
+        daily_limit: 50,
+        last_updated: "",
+      },
+    ]);
+  });
+});
+
 describe("Sales Team rule on Contact Approvals", () => {
   it("returns sales_team true / false / null (not yet refreshed)", async () => {
     tables["rJpqXxmxhqJnlLrJ"] = [
