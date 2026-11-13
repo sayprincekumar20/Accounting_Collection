@@ -193,6 +193,7 @@ export type FlagCode =
   | "no_overdue"
   | "promise"
   | "no_contact"
+  | "bad_phone"
   | "short_name"
   | "ambiguous_name"
   | "unsendable_name"
@@ -213,6 +214,14 @@ export interface Flag {
 }
 
 const ms = (v: string) => new Date(v).getTime() || 0;
+
+/** A Philippine mobile number: 63 + 9XX XXX XXXX (12 digits), also written 09…, +63 9…, or 9… (10 digits). */
+export function isPhMobile(raw: string): boolean {
+  const d = String(raw || "").replace(/\D/g, "");
+  const f =
+    d.length === 11 && d.startsWith("0") ? "63" + d.slice(1) : d.length === 10 ? "63" + d : d;
+  return /^639\d{9}$/.test(f);
+}
 const day = (v: string) => v.slice(0, 10);
 const peso = (n: number) =>
   "PHP " +
@@ -251,8 +260,21 @@ export function assessClient(c: MatchClient, a: AssessInput): Assessment {
   if (!(c.overdue > 0)) add("no_overdue", "block", "No overdue balance");
   if (ms(c.promise_until) > now)
     add("promise", "block", `Payment promise until ${day(c.promise_until)}`);
-  if (!c.email.trim() && !c.phone.trim())
-    add("no_contact", "block", "No email or phone number on file");
+  const phoneOk = isPhMobile(c.phone);
+  if (!c.email.trim() && !phoneOk)
+    add(
+      "no_contact",
+      "block",
+      c.phone.trim()
+        ? `No email, and the phone number ${c.phone.trim()} is not a valid PH mobile (fix it in Zoho)`
+        : "No email or phone number on file",
+    );
+  else if (c.phone.trim() && !phoneOk)
+    add(
+      "bad_phone",
+      "warn",
+      `Phone ${c.phone.trim()} is not a valid PH mobile: the call will fail (fix it in Zoho); email still works`,
+    );
   if (!survivesNameSplit(c.client_name))
     add(
       "unsendable_name",

@@ -8,6 +8,7 @@ import {
   similarity,
   summarize,
   survivesNameSplit,
+  isPhMobile,
   type FileRow,
   type MatchClient,
 } from "../src/lib/assistant/list-match";
@@ -406,5 +407,31 @@ describe("structured summary of a reviewed sheet", () => {
     expect(ctx).toContain('Attached list "list.xlsx", sheet "GRACE" (6 rows)');
     expect(ctx).toContain("Called Twice | blocked | overdue PHP 1,000.00");
     expect(ctx).toContain("Unknown Place | no match");
+  });
+});
+
+describe("phone numbers that cannot work", () => {
+  const ok = {
+    match: "exact" as const,
+    sameNameCount: 1,
+    groupSize: 1,
+    fileAmount: null,
+    now: NOW,
+  };
+  it("a phone one digit short with no email: blocked (nothing can reach the client)", () => {
+    const a = assessClient(client({ email: "", phone: "63962051595" }), ok);
+    expect(a.selectable).toBe(false);
+    expect(a.flags[0]!.label).toContain("63962051595 is not a valid PH mobile");
+  });
+  it("a bad phone but a valid email: warned and not pre-selected (the call would fail)", () => {
+    const a = assessClient(client({ phone: "63915453708" }), ok);
+    expect(a.selectable).toBe(true);
+    expect(a.defaultSelected).toBe(false);
+    expect(a.flags.map((f) => f.code)).toContain("bad_phone");
+  });
+  it("valid formats are accepted", () => {
+    for (const p of ["639171234567", "09171234567", "+63 917 123 4567", "9171234567"])
+      expect(isPhMobile(p)).toBe(true);
+    for (const p of ["63962051595", "028123456", ""]) expect(isPhMobile(p)).toBe(false);
   });
 });
