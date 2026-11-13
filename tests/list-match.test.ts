@@ -360,3 +360,51 @@ describe("normalizeReviewRows (the browser never trusts the server's exact shape
     expect(normalizeReviewRows("not a list")).toEqual([]);
   });
 });
+
+import { reviewContextText, reviewSummaryText } from "../src/lib/assistant/list-match";
+
+describe("structured summary of a reviewed sheet", () => {
+  const NOW2 = Date.UTC(2026, 10, 13, 2, 0, 0);
+  const cl = (id: string, name: string, o: Partial<MatchClient> = {}) =>
+    client({ client_id: id, client_name: name, invoices: [], ...o });
+  const rows = matchRows(
+    [
+      row("Ready Co", null, 4),
+      row("Approve Me Inc", null, 5),
+      row("Called Twice", null, 6),
+      row("Called Again", null, 7),
+      row("Promised Co", null, 8),
+      row("Unknown Place", null, 9),
+    ],
+    [
+      cl("R___1", "Ready Co", { approved: true }),
+      cl("A___1", "Approve Me Inc"),
+      cl("C1___1", "Called Twice", { text_this_cycle: true, call_this_cycle: true }),
+      cl("C2___1", "Called Again", { text_this_cycle: true, call_this_cycle: true }),
+      cl("P___1", "Promised Co", { promise_until: "2026-11-16T00:00:00Z" }),
+    ],
+    NOW2,
+  );
+  const text = reviewSummaryText("GRACE", rows);
+  it("has short sections instead of one paragraph", () => {
+    expect(text).toContain('**Sheet "GRACE": 6 customers**');
+    expect(text).toContain("1 approved · 1 needs approval · 3 blocked · 1 not found");
+    expect(text).toContain(
+      "**Can be contacted (2)**\n- Ready Co: PHP 1,000.00 overdue\n- Approve Me Inc: PHP 1,000.00 overdue (needs approval)",
+    );
+    expect(text).toContain("**Not found (1)**\n- Unknown Place");
+  });
+  it("groups blocked clients by reason, with the 'force' hint once and promise dates per client", () => {
+    expect(text).toContain(
+      '- Already texted and called this cycle (ask me to "force" a repeat): Called Twice, Called Again',
+    );
+    expect(text).toContain("- Payment promise: Promised Co (until 2026-11-16)");
+    expect(text.match(/force/g)?.length).toBe(1);
+  });
+  it("the hidden context lists every row with its status for the chat AI", () => {
+    const ctx = reviewContextText("list.xlsx", "GRACE", rows);
+    expect(ctx).toContain('Attached list "list.xlsx", sheet "GRACE" (6 rows)');
+    expect(ctx).toContain("Called Twice | blocked | overdue PHP 1,000.00");
+    expect(ctx).toContain("Unknown Place | no match");
+  });
+});

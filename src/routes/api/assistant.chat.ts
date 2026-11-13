@@ -28,6 +28,7 @@ function systemPrompt(ctx: ActionContext, workingLabel: string, extra: string): 
     "- Present lists as concise markdown tables (amounts as PHP 1,234.56); totals first, then the table; max ~25 rows, then say how many more.",
     "- When the user asks to open / show / go to a page or a client, call navigate.",
     "- For questions about system or workflow problems (SMS phone, credit, stuck queues, failing runs) call workflow_health.",
+    "- An attached contact list appears in the conversation as [LIST CONTEXT]. Answer questions about that list (names, sheets, statuses, who is blocked or not found) directly from it, as a short table; never search the clients for the file name. To review a sheet, the user picks it (or types its name).",
     "- Actions that send messages, call clients or change data need the user's confirmation; the dashboard asks them. Do not claim an action ran unless the tool result says so.",
     "- The reminder cycle runs Wednesday to Tuesday; approvals are valid for the current cycle only.",
     "- Be brief and businesslike. Answer in the user's language.",

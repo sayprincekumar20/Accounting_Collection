@@ -22,8 +22,13 @@ import { ListBoundary } from "./AssistantBoundary";
 import { CONVERSATIONS_KEY } from "./store-key";
 import { installGlobalErrorReporting } from "./client-error";
 import { fileStore, reviewStore } from "./list-store";
-import { parseListFile } from "@/lib/assistant/list-file";
-import { normalizeReviewRows, reviewSummaryText, type ReviewRow } from "@/lib/assistant/list-match";
+import { parseListFile, sheetsContextText } from "@/lib/assistant/list-file";
+import {
+  normalizeReviewRows,
+  reviewContextText,
+  reviewSummaryText,
+  type ReviewRow,
+} from "@/lib/assistant/list-match";
 import { EXAMPLE_COMMANDS, fetchAssistantHome } from "./home-data";
 
 // AI operations assistant: floating button -> side panel / full screen. Conversations are kept in this
@@ -51,6 +56,8 @@ interface Msg {
   sheetPick?: { fileId: string };
   /** Contact lists: the review table of one sheet (data lives in list-store, in memory). */
   review?: { id: string };
+  /** Contact lists: what the file / sheet contains, sent to the chat AI with the conversation (not shown). */
+  context?: string;
 }
 interface Convo {
   id: string;
@@ -175,6 +182,26 @@ export function Assistant() {
 
   async function ask(text: string, confirm?: { id: string; args: unknown }) {
     if (busy) return;
+    // Typing a sheet name ("GRACE", "sheet dave") after attaching a file opens that sheet, like clicking it.
+    if (text && active && !confirm) {
+      const wanted = text
+        .trim()
+        .toLowerCase()
+        .replace(/^(sheet|review|open)\s+/, "");
+      const pick = [...active.messages]
+        .reverse()
+        .find((m) => m.sheetPick && fileStore.has(m.sheetPick.fileId));
+      const sheet = pick
+        ? fileStore
+            .get(pick.sheetPick!.fileId)!
+            .sheets.find((s) => s.rows.length && s.name.toLowerCase() === wanted)
+        : undefined;
+      if (pick && sheet) {
+        appendMsg(active.id, { role: "user", content: text });
+        pickSheet(pick.sheetPick!.fileId, sheet.name);
+        return;
+      }
+    }
     const convo = active ?? newConvo();
     const id = convo.id;
     const userMsgs: Msg[] = text
@@ -182,7 +209,12 @@ export function Assistant() {
       : convo.messages;
     const history = userMsgs
       .filter((m) => m.content)
-      .map((m) => ({ role: m.role, content: m.content }));
+      .map((m) => ({
+        role: m.role,
+        content: m.context
+          ? `${m.content}\n\n[LIST CONTEXT, not shown to the user]\n${m.context}`
+          : m.content,
+      }));
     update(id, (c) => ({
       ...c,
       title: c.messages.length || !text ? c.title : text.slice(0, 60),
@@ -329,7 +361,12 @@ export function Assistant() {
       const ids = [
         ...new Set(rows.filter((r) => r.client && r.selectable).map((r) => r.client!.client_id)),
       ];
-      patchMsg(convoId, uid, (m) => ({ ...m, content: summary, review: { id: reviewId } }));
+      patchMsg(convoId, uid, (m) => ({
+        ...m,
+        content: summary,
+        review: { id: reviewId },
+        context: reviewContextText(f.name, sheetName, rows),
+      }));
       if (ids.length)
         update(convoId, (c) => ({ ...c, workingSet: { ids, label: `list ${sheetName}` } }));
     } catch (e) {
@@ -362,8 +399,9 @@ export function Assistant() {
       }
       patchMsg(id, uid, (m) => ({
         ...m,
-        content: `${file.name} has ${usable.length} sheets with customers. Which one do you want to review?`,
+        content: `${file.name} has ${usable.length} sheets with customers. Pick one below (or type its name) to review it.`,
         sheetPick: { fileId: parsed.id },
+        context: sheetsContextText(parsed),
       }));
     } catch (e) {
       failMsg(id, uid, e);

@@ -80,3 +80,13 @@ export async function parseListFile(file: File): Promise<ParsedFile> {
   }
   throw new Error("Attach an Excel (.xlsx) or CSV file with a Customer column.");
 }
+
+/** Context for the chat AI (not shown on screen): the sheets of an attached file and their customer names. */
+export function sheetsContextText(f: ParsedFile): string {
+  const parts = f.sheets.map((s) =>
+    s.rows.length
+      ? `Sheet "${s.name}" (${s.rows.length} customers): ${s.rows.map((r) => r.name + (r.owner ? ` [${r.owner}]` : "")).join(", ")}`
+      : `Sheet "${s.name}": no customer column`,
+  );
+  return (`Attached file "${f.name}":\n` + parts.join("\n")).slice(0, 5000);
+}

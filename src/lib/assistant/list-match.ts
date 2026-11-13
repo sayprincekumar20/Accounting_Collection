@@ -476,34 +476,106 @@ export interface ContactListResult {
   error?: string;
 }
 
-/** Text the assistant keeps in the conversation, so follow-up questions about the list can be answered. */
+const pesoShort = (n: number) =>
+  "PHP " +
+  (Number.isFinite(n) ? n : 0).toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+const FORCE_NOTE = / \(ask the assistant to "force" a repeat\)$/;
+
+/** Visible summary of a reviewed sheet, in short structured sections (markdown). */
 export function reviewSummaryText(sheet: string, rows: ReviewRow[]): string {
   const s = summarize(rows);
   const customers = new Set(rows.map((r) => r.file.row)).size;
-  const parts = [
-    `I read sheet "${sheet}": ${customers} customer${customers === 1 ? "" : "s"}.`,
-    `${s.ready} ready, ${s.needs_approval} need approval, ${s.blocked} blocked, ${s.no_match} not found.`,
+  const name = (r: ReviewRow) => r.client?.client_name ?? r.file.name;
+  const out: string[] = [
+    `**Sheet "${sheet}": ${customers} customer${customers === 1 ? "" : "s"}**`,
+    `${s.ready} approved · ${s.needs_approval} need${s.needs_approval === 1 ? "s" : ""} approval · ${s.blocked} blocked · ${s.no_match} not found`,
   ];
-  const blocked = rows
-    .filter((r) => r.status === "blocked")
-    .slice(0, 12)
-    .map(
-      (r) =>
-        `${r.client?.client_name ?? r.file.name} (${r.flags
-          .filter((f) => f.level === "block")
-          .map((f) => f.label)
-          .join("; ")})`,
+  const ready = rows.filter((r) => r.status === "ready" || r.status === "needs_approval");
+  if (ready.length) {
+    out.push(
+      `**Can be contacted (${ready.length})**\n` +
+        ready
+          .slice(0, 15)
+          .map(
+            (r) =>
+              `- ${name(r)}: ${pesoShort(r.client?.overdue ?? 0)} overdue${r.status === "needs_approval" ? " (needs approval)" : ""}`,
+          )
+          .join("\n") +
+        (ready.length > 15 ? `\n- …and ${ready.length - 15} more in the table below` : ""),
     );
-  if (blocked.length) parts.push("Blocked: " + blocked.join(" · "));
-  const none = rows
-    .filter((r) => r.status === "no_match")
-    .slice(0, 12)
-    .map((r) => r.file.name + (r.suggestions.length ? ` (did you mean ${r.suggestions[0]}?)` : ""));
-  if (none.length) parts.push("Not found: " + none.join(" · "));
-  parts.push(
-    'Tick the clients you want below, then press "Approve + contact". Nothing is sent before you confirm.',
+  }
+  const blocked = rows.filter((r) => r.status === "blocked");
+  if (blocked.length) {
+    // Group by reason: "Already texted and called this cycle: A, B, C".
+    const groups = new Map<string, { force: boolean; names: string[] }>();
+    for (const r of blocked) {
+      for (const f of r.flags.filter((x) => x.level === "block")) {
+        const force = FORCE_NOTE.test(f.label);
+        const date = f.label.match(/ until (\d{4}-\d{2}-\d{2})/)?.[1];
+        const key = f.label.replace(FORCE_NOTE, "").replace(/ until \d{4}-\d{2}-\d{2}/, "");
+        const g = groups.get(key) ?? { force, names: [] };
+        g.names.push(name(r) + (date ? ` (until ${date})` : ""));
+        groups.set(key, g);
+      }
+    }
+    out.push(
+      `**Blocked (${blocked.length})**\n` +
+        [...groups]
+          .map(
+            ([k, g]) =>
+              `- ${k}${g.force ? ' (ask me to "force" a repeat)' : ""}: ${g.names.join(", ")}`,
+          )
+          .join("\n"),
+    );
+  }
+  const none = rows.filter((r) => r.status === "no_match");
+  if (none.length) {
+    out.push(
+      `**Not found (${none.length})**\n` +
+        none
+          .slice(0, 15)
+          .map(
+            (r) =>
+              `- ${r.file.name}${r.suggestions.length ? ` (did you mean ${r.suggestions[0]}?)` : ""}`,
+          )
+          .join("\n"),
+    );
+  }
+  out.push(
+    'Tick the clients in the table below, then press "Approve + contact". Nothing is sent before you confirm.',
   );
-  return parts.join("\n\n");
+  return out.join("\n\n");
+}
+
+/**
+ * Context for the chat AI (not shown on screen): every reviewed row with its status, so questions like "show me
+ * the names" or "which ones are blocked" are answered from the list.
+ */
+export function reviewContextText(fileName: string, sheet: string, rows: ReviewRow[]): string {
+  const lines = rows.map((r) => {
+    const c = r.client;
+    const flags = r.flags.map((f) => f.label.replace(FORCE_NOTE, "")).join("; ");
+    return [
+      r.file.name,
+      c && c.client_name.toLowerCase() !== r.file.name.toLowerCase()
+        ? `matched to ${c.client_name}`
+        : "",
+      r.status.replace("_", " "),
+      c
+        ? `overdue ${pesoShort(c.overdue)}, current ${pesoShort(c.current)}, ${c.invoices.length} invoices`
+        : "",
+      r.file.owner ? `owner in sheet: ${r.file.owner}` : "",
+      flags,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+  });
+  return (
+    `Attached list "${fileName}", sheet "${sheet}" (${rows.length} rows):\n` + lines.join("\n")
+  ).slice(0, 5000);
 }
 
 /** Outside Monday to Friday, 9 AM to 6 PM Manila time (a manual contact ignores office hours, so people are warned). */

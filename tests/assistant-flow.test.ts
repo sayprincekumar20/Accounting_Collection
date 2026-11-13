@@ -138,7 +138,7 @@ describe("Assistant: contact list flow", () => {
     await waitFor(() => expect(container.textContent).toContain("sheets with customers"));
     expect(screen.getByRole("button", { name: /^NOTES/ })).toHaveProperty("disabled", true);
     fireEvent.click(screen.getByRole("button", { name: /^ALL/ }));
-    await waitFor(() => expect(container.textContent).toContain('I read sheet "ALL"'));
+    await waitFor(() => expect(container.textContent).toContain('Sheet "ALL"'));
     expect(container.textContent).toContain("Sample Foods Inc.");
     expect(container.textContent).toContain("Payment promise until 2099-01-01"); // Test Hotel is blocked
     // Sample Foods needs approval, Demo Meats is approved: both pre-selected
@@ -158,8 +158,8 @@ describe("Assistant: contact list flow", () => {
   it("a list of wrong names shows 'not found' and the page stays alive", async () => {
     const { container } = mount();
     await attach(container, "wrong.xlsx", fixture("wrong-names.xlsx"));
-    await waitFor(() => expect(container.textContent).toContain('I read sheet "ALL"'));
-    expect(container.textContent).toContain("3 not found");
+    await waitFor(() => expect(container.textContent).toContain('Sheet "ALL"'));
+    expect(container.textContent).toContain("Not found (3)");
     expect(container.textContent).toMatch(/Did you mean:[^]*Alphalat Balesin Island Club Inc\./);
     expect(screen.getByRole("button", { name: /^Contact 0/ })).toHaveProperty("disabled", true);
     expect(screen.queryByRole("alert")).toBeNull();
@@ -189,6 +189,35 @@ describe("Assistant: contact list flow", () => {
     for (const o of screen.getAllByText("Overview")) fireEvent.click(o);
     expect(container.textContent).toContain("No invoice details on file");
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("typing a sheet name opens that sheet, like clicking it", async () => {
+    const { container } = mount();
+    await attach(container, "lists.xlsx", fixture("lists.xlsx"));
+    await waitFor(() => expect(container.textContent).toContain("sheets with customers"));
+    const box = container.querySelector("textarea") as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "dave" } });
+    fireEvent.submit(box.closest("form")!);
+    await waitFor(() => expect(container.textContent).toContain('Sheet "DAVE"'));
+    expect(calls.some((c) => c.url.includes("/api/assistant/chat"))).toBe(false);
+  });
+
+  it("the file's sheets and names go to the chat AI with the next question (hidden context)", async () => {
+    const { container } = mount();
+    await attach(container, "lists.xlsx", fixture("lists.xlsx"));
+    await waitFor(() => expect(container.textContent).toContain("sheets with customers"));
+    expect(container.textContent).not.toContain("LIST CONTEXT"); // not shown on screen
+    const box = container.querySelector("textarea") as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "can you show me the names of those clients" } });
+    fireEvent.submit(box.closest("form")!);
+    await waitFor(() =>
+      expect(calls.some((c) => c.url.includes("/api/assistant/chat"))).toBe(true),
+    );
+    const chat = calls.find((c) => c.url.includes("/api/assistant/chat"))!;
+    const sent = JSON.stringify(chat.body["messages"]);
+    expect(sent).toContain("[LIST CONTEXT, not shown to the user]");
+    expect(sent).toContain('Sheet \\"DAVE\\" (2 customers)');
+    expect(sent).toContain("Demo Meats Corp");
   });
 
   it("explains a file that is not Excel or CSV", async () => {
