@@ -8,7 +8,12 @@ import type {
   ReviewInvoice,
   ReviewRow,
 } from "@/lib/assistant/list-match";
-import { outsideOfficeHours, summarize } from "@/lib/assistant/list-match";
+import {
+  LIST_ACTIONS,
+  outsideOfficeHours,
+  summarize,
+  type ListAction,
+} from "@/lib/assistant/list-match";
 import { fileStore, reviewStore } from "./list-store";
 
 // Review table of an uploaded contact list: every customer of the sheet matched to our clients, with its overdue
@@ -508,6 +513,37 @@ export function SheetPicker({
           <span className="block text-[11px] text-muted-foreground">
             {s.rows.length ? `${s.rows.length} customers` : "no Customer column"}
           </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** "What do you want to do?" right after a file is attached. */
+export function ActionPicker({
+  fileId,
+  onPick,
+}: {
+  fileId: string;
+  onPick: (action: ListAction) => void;
+}) {
+  if (!fileStore.get(fileId))
+    return (
+      <p className="mt-2 text-xs text-muted-foreground">
+        This file is no longer loaded (the page was reloaded). Attach it again.
+      </p>
+    );
+  return (
+    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+      {LIST_ACTIONS.map((a) => (
+        <button
+          key={a.action}
+          type="button"
+          onClick={() => onPick(a.action)}
+          className="rounded-lg border border-border px-3 py-2 text-left text-xs hover:bg-muted"
+        >
+          <span className="font-semibold">{a.label}</span>
+          <span className="block text-[11px] text-muted-foreground">{a.hint}</span>
         </button>
       ))}
     </div>

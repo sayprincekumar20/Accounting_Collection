@@ -17,16 +17,21 @@ import {
 } from "lucide-react";
 import { setLogFilters } from "@/components/collections/LogFilters";
 import { AssistantHome } from "./AssistantHome";
-import { ListReview, SheetPicker } from "./ListReview";
+import { ActionPicker, ListReview, SheetPicker } from "./ListReview";
 import { ListBoundary } from "./AssistantBoundary";
 import { CONVERSATIONS_KEY } from "./store-key";
 import { installGlobalErrorReporting } from "./client-error";
 import { fileStore, reviewStore } from "./list-store";
 import { parseListFile, sheetsContextText } from "@/lib/assistant/list-file";
 import {
+  LIST_ACTIONS,
+  compareText,
+  contactabilityText,
+  customerListText,
   normalizeReviewRows,
   reviewContextText,
   reviewSummaryText,
+  type ListAction,
   type ReviewRow,
 } from "@/lib/assistant/list-match";
 import { EXAMPLE_COMMANDS, fetchAssistantHome } from "./home-data";
@@ -53,7 +58,9 @@ interface Msg {
   /** Contact lists: identifies this message when it is updated later. */
   uid?: string;
   /** Contact lists: the attached file whose sheets the user can pick (data lives in list-store, in memory). */
-  sheetPick?: { fileId: string };
+  sheetPick?: { fileId: string; action?: ListAction };
+  /** Contact lists: "What do you want to do?" after a file is attached. */
+  actionPick?: { fileId: string };
   /** Contact lists: the review table of one sheet (data lives in list-store, in memory). */
   review?: { id: string };
   /** Contact lists: what the file / sheet contains, sent to the chat AI with the conversation (not shown). */
@@ -198,7 +205,7 @@ export function Assistant() {
         : undefined;
       if (pick && sheet) {
         appendMsg(active.id, { role: "user", content: text });
-        pickSheet(pick.sheetPick!.fileId, sheet.name);
+        pickSheet(pick.sheetPick!.fileId, sheet.name, pick.sheetPick!.action ?? "review");
         return;
       }
     }
@@ -326,11 +333,26 @@ export function Assistant() {
       content: `I could not do that: ${e instanceof Error ? e.message : "something went wrong"}`,
     }));
 
-  async function matchSheet(convoId: string, uid: string, fileId: string, sheetName: string) {
+  async function matchSheet(
+    convoId: string,
+    uid: string,
+    fileId: string,
+    sheetName: string,
+    action: ListAction = "review",
+  ) {
     const f = fileStore.get(fileId);
     const sheet = f?.sheets.find((s) => s.name === sheetName);
     if (!f || !sheet) {
       failMsg(convoId, uid, new Error("the file is no longer loaded, please attach it again"));
+      return;
+    }
+    if (action === "list") {
+      // The sheet as it is in the file: no lookup needed.
+      patchMsg(convoId, uid, (m) => ({
+        ...m,
+        content: customerListText(sheetName, sheet.rows),
+        context: sheetsContextText({ ...f, sheets: [sheet] }),
+      }));
       return;
     }
     patchMsg(convoId, uid, (m) => ({
@@ -349,6 +371,22 @@ export function Assistant() {
       // Never trust the exact shape of the server's answer: rebuild every row with safe types.
       const rows: ReviewRow[] = normalizeReviewRows(j.rows);
       if (!rows.length) throw new Error("The matching returned no rows to review.");
+      const ids = [
+        ...new Set(rows.filter((r) => r.client && r.selectable).map((r) => r.client!.client_id)),
+      ];
+      if (ids.length)
+        update(convoId, (c) => ({ ...c, workingSet: { ids, label: `list ${sheetName}` } }));
+      if (action === "compare" || action === "contact") {
+        patchMsg(convoId, uid, (m) => ({
+          ...m,
+          content:
+            action === "compare"
+              ? compareText(sheetName, rows)
+              : contactabilityText(sheetName, rows),
+          context: reviewContextText(f.name, sheetName, rows),
+        }));
+        return;
+      }
       const summary = reviewSummaryText(sheetName, rows);
       const reviewId = newId();
       reviewStore.set(reviewId, {
@@ -358,17 +396,12 @@ export function Assistant() {
         rows,
         result: null,
       });
-      const ids = [
-        ...new Set(rows.filter((r) => r.client && r.selectable).map((r) => r.client!.client_id)),
-      ];
       patchMsg(convoId, uid, (m) => ({
         ...m,
         content: summary,
         review: { id: reviewId },
         context: reviewContextText(f.name, sheetName, rows),
       }));
-      if (ids.length)
-        update(convoId, (c) => ({ ...c, workingSet: { ids, label: `list ${sheetName}` } }));
     } catch (e) {
       failMsg(convoId, uid, e);
     }
@@ -393,14 +426,13 @@ export function Assistant() {
         }));
         return;
       }
-      if (usable.length === 1) {
-        await matchSheet(id, uid, parsed.id, usable[0]!.name);
-        return;
-      }
+      // First ask what to do with the file; the sheet is asked after the choice.
       patchMsg(id, uid, (m) => ({
         ...m,
-        content: `${file.name} has ${usable.length} sheets with customers. Pick one below (or type its name) to review it.`,
-        sheetPick: { fileId: parsed.id },
+        content: `**${file.name}**: ${usable.length} sheet${usable.length === 1 ? "" : "s"} with customers (${usable
+          .map((s) => `${s.name} ${s.rows.length}`)
+          .join(" · ")}). What do you want to do?`,
+        actionPick: { fileId: parsed.id },
         context: sheetsContextText(parsed),
       }));
     } catch (e) {
@@ -408,11 +440,31 @@ export function Assistant() {
     }
   }
 
-  const pickSheet = (fileId: string, sheetName: string) => {
+  const pickSheet = (fileId: string, sheetName: string, action: ListAction = "review") => {
     if (!active || busy) return;
     const uid = newId();
     appendMsg(active.id, { role: "assistant", content: "", uid });
-    void matchSheet(active.id, uid, fileId, sheetName);
+    void matchSheet(active.id, uid, fileId, sheetName, action);
+  };
+
+  // "What do you want to do?" -> then the sheet (asked only when the file has more than one).
+  const chooseAction = (fileId: string, action: ListAction) => {
+    if (!active || busy) return;
+    const f = fileStore.get(fileId);
+    if (!f) return;
+    const label = LIST_ACTIONS.find((a) => a.action === action)?.label ?? action;
+    appendMsg(active.id, { role: "user", content: label });
+    const usable = f.sheets.filter((s) => s.rows.length);
+    if (usable.length === 1) {
+      pickSheet(fileId, usable[0]!.name, action);
+      return;
+    }
+    appendMsg(active.id, {
+      role: "assistant",
+      content: `${label}: which sheet? Pick one below (or type its name).`,
+      sheetPick: { fileId, action },
+      context: sheetsContextText(f),
+    });
   };
 
   const decide = (msgIndex: number, ok: boolean) => {
@@ -599,11 +651,21 @@ export function Assistant() {
                     )}
                   </div>
                 ) : null}
+                {m.actionPick ? (
+                  <ListBoundary>
+                    <ActionPicker
+                      fileId={m.actionPick.fileId}
+                      onPick={(a) => chooseAction(m.actionPick!.fileId, a)}
+                    />
+                  </ListBoundary>
+                ) : null}
                 {m.sheetPick ? (
                   <ListBoundary>
                     <SheetPicker
                       fileId={m.sheetPick.fileId}
-                      onPick={(name) => pickSheet(m.sheetPick!.fileId, name)}
+                      onPick={(name) =>
+                        pickSheet(m.sheetPick!.fileId, name, m.sheetPick!.action ?? "review")
+                      }
                     />
                   </ListBoundary>
                 ) : null}

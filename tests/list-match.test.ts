@@ -435,3 +435,47 @@ describe("phone numbers that cannot work", () => {
     for (const p of ["63962051595", "028123456", ""]) expect(isPhMobile(p)).toBe(false);
   });
 });
+
+import { compareText, contactabilityText, customerListText } from "../src/lib/assistant/list-match";
+
+describe("list actions", () => {
+  const N = Date.UTC(2026, 10, 13, 2, 0, 0);
+  const cl = (id: string, name: string, o: Partial<MatchClient> = {}) =>
+    client({ client_id: id, client_name: name, invoices: [], ...o });
+  const rows = matchRows(
+    [
+      row("Paid Part", 5000, 4),
+      row("Grew Co", 1000, 5),
+      row("Paid All", 800, 6),
+      row("Same Co", 1000, 7),
+      row("Nobody Here", 10, 8),
+    ],
+    [
+      cl("A___1", "Paid Part", { overdue: 3000 }),
+      cl("B___1", "Grew Co", { overdue: 2500 }),
+      cl("C___1", "Paid All", { overdue: 0 }),
+      cl("D___1", "Same Co", { overdue: 1000.4 }),
+    ],
+    N,
+  );
+  it("compare: differences first (largest first), with a plain-words note", () => {
+    const t = compareText("S", rows);
+    expect(t).toContain("3 different · 1 the same · 1 not found");
+    expect(t.indexOf("Paid Part")).toBeLessThan(t.indexOf("Grew Co"));
+    expect(t).toContain(
+      "| Paid Part | PHP 5,000.00 | PHP 3,000.00 | −PHP 2,000.00 | Lower in Zoho: part paid since the sheet |",
+    );
+    expect(t).toContain("Higher in Zoho: more became overdue");
+    expect(t).toContain("No overdue in Zoho now (paid or not yet due)");
+    expect(t).toContain("**The same (1):** Same Co");
+  });
+  it("contactability: only real contact problems", () => {
+    const t = contactabilityText("S", rows);
+    expect(t).toContain("Nobody Here");
+    expect(t).not.toContain("Paid Part");
+  });
+  it("customer list: the sheet as it is, as a table", () => {
+    const t = customerListText("S", [row("A | B", 10, 4)]);
+    expect(t).toContain("| 1 | A / B | Dave | PHP 10.00 |");
+  });
+});

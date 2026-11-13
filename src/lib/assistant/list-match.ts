@@ -720,3 +720,128 @@ export function normalizeReviewRows(input: unknown): ReviewRow[] {
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------------------------- list actions
+export type ListAction = "review" | "list" | "compare" | "contact";
+
+export const LIST_ACTIONS: { action: ListAction; label: string; hint: string }[] = [
+  { action: "review", label: "Review and contact", hint: "Approve + contact: text and call" },
+  { action: "list", label: "Show the customer list", hint: "Names, owners, sheet amounts" },
+  {
+    action: "compare",
+    label: "Compare amounts with Zoho",
+    hint: "Who is different or already paid",
+  },
+  {
+    action: "contact",
+    label: "Who cannot be contacted",
+    hint: "Not found, no email, invalid phone",
+  },
+];
+
+const md = (v: unknown) =>
+  String(v ?? "")
+    .replace(/\|/g, "/")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** "Show the customer list": the sheet as it is in the file (no lookup). */
+export function customerListText(sheet: string, rows: FileRow[]): string {
+  const total = rows.reduce((t, r) => t + (r.amount ?? 0), 0);
+  const lines = rows.map(
+    (r, i) =>
+      `| ${i + 1} | ${md(r.name)} | ${md(r.owner) || "—"} | ${r.amount != null ? pesoShort(r.amount) : "—"} | ${md(r.remarks) || ""} |`,
+  );
+  return [
+    `**Sheet "${sheet}": ${rows.length} customer${rows.length === 1 ? "" : "s"}** · total in the sheet ${pesoShort(total)}`,
+    "| # | Customer | Owner | Sheet amount | Remarks |\n|---|---|---|---|---|\n" + lines.join("\n"),
+    "These are the amounts written in the file. Choose **Compare amounts with Zoho** to check them against the current balances.",
+  ].join("\n\n");
+}
+
+/** "Compare amounts with Zoho": sheet amount vs the current overdue balance, differences first. */
+export function compareText(sheet: string, rows: ReviewRow[]): string {
+  const matched = rows.filter((r) => r.client);
+  const diff = matched
+    .filter((r) => r.file.amount != null && Math.abs((r.file.amount ?? 0) - r.client!.overdue) > 1)
+    .sort(
+      (a, b) =>
+        Math.abs((b.file.amount ?? 0) - b.client!.overdue) -
+        Math.abs((a.file.amount ?? 0) - a.client!.overdue),
+    );
+  const same = matched.filter(
+    (r) => r.file.amount != null && Math.abs((r.file.amount ?? 0) - r.client!.overdue) <= 1,
+  );
+  const noAmount = matched.filter((r) => r.file.amount == null);
+  const none = rows.filter((r) => r.status === "no_match");
+  const note = (r: ReviewRow) => {
+    const z = r.client!.overdue;
+    const f = r.file.amount ?? 0;
+    if (z <= 0) return "No overdue in Zoho now (paid or not yet due)";
+    return z < f
+      ? "Lower in Zoho: part paid since the sheet"
+      : "Higher in Zoho: more became overdue";
+  };
+  const out = [
+    `**Sheet "${sheet}": sheet amounts vs Zoho overdue**`,
+    `${diff.length} different · ${same.length} the same · ${none.length} not found${noAmount.length ? ` · ${noAmount.length} without an amount in the sheet` : ""}`,
+  ];
+  if (diff.length)
+    out.push(
+      "| Customer | Sheet | Zoho overdue | Difference | Note |\n|---|---|---|---|---|\n" +
+        diff
+          .map((r) => {
+            const d = r.client!.overdue - (r.file.amount ?? 0);
+            return `| ${md(r.client!.client_name)} | ${pesoShort(r.file.amount ?? 0)} | ${pesoShort(r.client!.overdue)} | ${d > 0 ? "+" : "−"}${pesoShort(Math.abs(d))} | ${note(r)} |`;
+          })
+          .join("\n"),
+    );
+  if (same.length)
+    out.push(`**The same (${same.length}):** ${same.map((r) => r.client!.client_name).join(", ")}`);
+  if (none.length)
+    out.push(
+      `**Not found (${none.length}):** ` +
+        none
+          .map(
+            (r) =>
+              r.file.name + (r.suggestions.length ? ` (did you mean ${r.suggestions[0]}?)` : ""),
+          )
+          .join(", "),
+    );
+  return out.join("\n\n");
+}
+
+/** "Who cannot be contacted": not found, no valid email/phone, a phone that will fail, names that cannot be sent. */
+export function contactabilityText(sheet: string, rows: ReviewRow[]): string {
+  const problems: [string, string, string][] = [];
+  for (const r of rows) {
+    const name = r.client?.client_name ?? r.file.name;
+    if (r.status === "no_match") {
+      problems.push([
+        name,
+        "Not found among clients with an open balance",
+        r.suggestions.length
+          ? `Check the name (did you mean ${r.suggestions[0]}?)`
+          : "Check the name in the sheet / Zoho",
+      ]);
+      continue;
+    }
+    for (const f of r.flags) {
+      if (f.code === "no_contact")
+        problems.push([name, f.label, "Add a valid email or mobile in Zoho"]);
+      else if (f.code === "bad_phone")
+        problems.push([name, f.label, "Fix the mobile number in Zoho"]);
+      else if (f.code === "ambiguous_name" || f.code === "unsendable_name")
+        problems.push([name, f.label, "Contact it from its own client page"]);
+    }
+  }
+  const ok = new Set(rows.map((r) => r.file.row)).size - new Set(problems.map((p) => p[0])).size;
+  if (!problems.length)
+    return `**Sheet "${sheet}": every customer can be contacted** (all found, with a valid email or mobile).`;
+  return [
+    `**Sheet "${sheet}": ${new Set(problems.map((p) => p[0])).size} cannot be contacted as they are** · ${Math.max(0, ok)} OK`,
+    "| Customer | Problem | What to do |\n|---|---|---|\n" +
+      problems.map((p) => `| ${md(p[0])} | ${md(p[1])} | ${md(p[2])} |`).join("\n"),
+    "Payment promises, AR hand-offs and clients already contacted this cycle are not problems with the contact details: choose **Review and contact** to see them.",
+  ].join("\n\n");
+}

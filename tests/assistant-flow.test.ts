@@ -136,6 +136,7 @@ describe("Assistant: contact list flow", () => {
     const { container } = mount();
     await attach(container, "lists.xlsx", fixture("lists.xlsx"));
     await waitFor(() => expect(container.textContent).toContain("sheets with customers"));
+    fireEvent.click(screen.getByRole("button", { name: /Review and contact/ }));
     expect(screen.getByRole("button", { name: /^NOTES/ })).toHaveProperty("disabled", true);
     fireEvent.click(screen.getByRole("button", { name: /^ALL/ }));
     await waitFor(() => expect(container.textContent).toContain('Sheet "ALL"'));
@@ -158,6 +159,8 @@ describe("Assistant: contact list flow", () => {
   it("a list of wrong names shows 'not found' and the page stays alive", async () => {
     const { container } = mount();
     await attach(container, "wrong.xlsx", fixture("wrong-names.xlsx"));
+    await waitFor(() => expect(container.textContent).toContain("What do you want to do?"));
+    fireEvent.click(screen.getByRole("button", { name: /Review and contact/ }));
     await waitFor(() => expect(container.textContent).toContain('Sheet "ALL"'));
     expect(container.textContent).toContain("Not found (3)");
     expect(container.textContent).toMatch(/Did you mean:[^]*Alphalat Balesin Island Club Inc\./);
@@ -184,6 +187,7 @@ describe("Assistant: contact list flow", () => {
     const { container } = mount();
     await attach(container, "lists.xlsx", fixture("lists.xlsx"));
     await waitFor(() => expect(container.textContent).toContain("sheets with customers"));
+    fireEvent.click(screen.getByRole("button", { name: /Review and contact/ }));
     fireEvent.click(screen.getByRole("button", { name: /^ALL/ }));
     await waitFor(() => expect(container.textContent).toContain("Sample Foods Inc."));
     for (const o of screen.getAllByText("Overview")) fireEvent.click(o);
@@ -195,6 +199,7 @@ describe("Assistant: contact list flow", () => {
     const { container } = mount();
     await attach(container, "lists.xlsx", fixture("lists.xlsx"));
     await waitFor(() => expect(container.textContent).toContain("sheets with customers"));
+    fireEvent.click(screen.getByRole("button", { name: /Review and contact/ }));
     const box = container.querySelector("textarea") as HTMLTextAreaElement;
     fireEvent.change(box, { target: { value: "dave" } });
     fireEvent.submit(box.closest("form")!);
@@ -218,6 +223,44 @@ describe("Assistant: contact list flow", () => {
     expect(sent).toContain("[LIST CONTEXT, not shown to the user]");
     expect(sent).toContain('Sheet \\"DAVE\\" (2 customers)');
     expect(sent).toContain("Demo Meats Corp");
+  });
+
+  it("after upload it asks what to do, then the sheet: Show the customer list (no lookup)", async () => {
+    const { container } = mount();
+    await attach(container, "lists.xlsx", fixture("lists.xlsx"));
+    await waitFor(() => expect(container.textContent).toContain("What do you want to do?"));
+    for (const label of [
+      "Review and contact",
+      "Show the customer list",
+      "Compare amounts with Zoho",
+      "Who cannot be contacted",
+    ])
+      expect(screen.getByRole("button", { name: new RegExp(label) })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Show the customer list/ }));
+    await waitFor(() => expect(container.textContent).toContain("which sheet?"));
+    fireEvent.click(screen.getByRole("button", { name: /^DAVE/ }));
+    await waitFor(() => expect(container.textContent).toContain('Sheet "DAVE": 2 customers'));
+    expect(container.querySelector("table")?.textContent).toContain("Demo Meats Corp");
+    expect(calls.some((c) => c.url.includes("list-match"))).toBe(false);
+  });
+
+  it("Compare amounts with Zoho shows the differences", async () => {
+    const { container } = mount();
+    await attach(container, "lists.xlsx", fixture("lists.xlsx"));
+    await waitFor(() => expect(container.textContent).toContain("What do you want to do?"));
+    fireEvent.click(screen.getByRole("button", { name: /Compare amounts with Zoho/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /^ALL/ }));
+    await waitFor(() => expect(container.textContent).toContain("sheet amounts vs Zoho overdue"));
+    expect(container.textContent).toContain("Sample Foods Inc.");
+  });
+
+  it("Who cannot be contacted lists the not-found names", async () => {
+    const { container } = mount();
+    await attach(container, "wrong.xlsx", fixture("wrong-names.xlsx"));
+    await waitFor(() => expect(container.textContent).toContain("What do you want to do?"));
+    fireEvent.click(screen.getByRole("button", { name: /Who cannot be contacted/ }));
+    await waitFor(() => expect(container.textContent).toContain("cannot be contacted as they are"));
+    expect(container.textContent).toContain("Not found among clients with an open balance");
   });
 
   it("explains a file that is not Excel or CSV", async () => {
