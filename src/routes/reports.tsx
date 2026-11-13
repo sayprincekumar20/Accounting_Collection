@@ -4,6 +4,7 @@ import { SkeletonBlock } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { downloadCsv } from "@/lib/csv";
 import { AppShell } from "@/components/AppShell";
+import { BatchReports } from "@/components/reports/BatchReports";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 import { LogFilterBar, useLogFilters } from "@/components/collections/LogFilters";
 
@@ -278,6 +279,10 @@ function ReportsPage() {
           ) : null}
         </>
       ) : null}
+
+      <div className="mt-5">
+        <BatchReports />
+      </div>
 
       <div className="mt-5">
         <Panel

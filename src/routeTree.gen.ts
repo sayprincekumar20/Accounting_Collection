@@ -25,6 +25,8 @@ import { Route as ViberRouteImport } from './routes/viber'
 import { Route as VoiceRouteImport } from './routes/voice'
 import { Route as WhatsappRouteImport } from './routes/whatsapp'
 import { Route as WorklistRouteImport } from './routes/worklist'
+import { Route as ApiApprovalBatchReportRouteImport } from './routes/api/approval-batch-report'
+import { Route as ApiApprovalBatchesRouteImport } from './routes/api/approval-batches'
 import { Route as ApiCallNowRouteImport } from './routes/api/call-now'
 import { Route as ApiCallReportsRouteImport } from './routes/api/call-reports'
 import { Route as ApiChannelCountersRouteImport } from './routes/api/channel-counters'
@@ -152,6 +154,16 @@ const WhatsappRoute = WhatsappRouteImport.update({
 const WorklistRoute = WorklistRouteImport.update({
   id: '/worklist',
   path: '/worklist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiApprovalBatchReportRoute = ApiApprovalBatchReportRouteImport.update({
+  id: '/api/approval-batch-report',
+  path: '/api/approval-batch-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiApprovalBatchesRoute = ApiApprovalBatchesRouteImport.update({
+  id: '/api/approval-batches',
+  path: '/api/approval-batches',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCallNowRoute = ApiCallNowRouteImport.update({
@@ -416,6 +428,8 @@ export interface FileRoutesByFullPath {
   '/voice': typeof VoiceRoute
   '/whatsapp': typeof WhatsappRoute
   '/worklist': typeof WorklistRoute
+  '/api/approval-batch-report': typeof ApiApprovalBatchReportRoute
+  '/api/approval-batches': typeof ApiApprovalBatchesRoute
   '/api/call-now': typeof ApiCallNowRoute
   '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
@@ -482,6 +496,8 @@ export interface FileRoutesByTo {
   '/voice': typeof VoiceRoute
   '/whatsapp': typeof WhatsappRoute
   '/worklist': typeof WorklistRoute
+  '/api/approval-batch-report': typeof ApiApprovalBatchReportRoute
+  '/api/approval-batches': typeof ApiApprovalBatchesRoute
   '/api/call-now': typeof ApiCallNowRoute
   '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
@@ -549,6 +565,8 @@ export interface FileRoutesById {
   '/voice': typeof VoiceRoute
   '/whatsapp': typeof WhatsappRoute
   '/worklist': typeof WorklistRoute
+  '/api/approval-batch-report': typeof ApiApprovalBatchReportRoute
+  '/api/approval-batches': typeof ApiApprovalBatchesRoute
   '/api/call-now': typeof ApiCallNowRoute
   '/api/call-reports': typeof ApiCallReportsRoute
   '/api/channel-counters': typeof ApiChannelCountersRoute
@@ -617,6 +635,8 @@ export interface FileRouteTypes {
     | '/voice'
     | '/whatsapp'
     | '/worklist'
+    | '/api/approval-batch-report'
+    | '/api/approval-batches'
     | '/api/call-now'
     | '/api/call-reports'
     | '/api/channel-counters'
@@ -683,6 +703,8 @@ export interface FileRouteTypes {
     | '/voice'
     | '/whatsapp'
     | '/worklist'
+    | '/api/approval-batch-report'
+    | '/api/approval-batches'
     | '/api/call-now'
     | '/api/call-reports'
     | '/api/channel-counters'
@@ -749,6 +771,8 @@ export interface FileRouteTypes {
     | '/voice'
     | '/whatsapp'
     | '/worklist'
+    | '/api/approval-batch-report'
+    | '/api/approval-batches'
     | '/api/call-now'
     | '/api/call-reports'
     | '/api/channel-counters'
@@ -816,6 +840,8 @@ export interface RootRouteChildren {
   VoiceRoute: typeof VoiceRoute
   WhatsappRoute: typeof WhatsappRoute
   WorklistRoute: typeof WorklistRoute
+  ApiApprovalBatchReportRoute: typeof ApiApprovalBatchReportRoute
+  ApiApprovalBatchesRoute: typeof ApiApprovalBatchesRoute
   ApiCallNowRoute: typeof ApiCallNowRoute
   ApiCallReportsRoute: typeof ApiCallReportsRoute
   ApiChannelCountersRoute: typeof ApiChannelCountersRoute
@@ -974,6 +1000,20 @@ declare module '@tanstack/react-router' {
       path: '/worklist'
       fullPath: '/worklist'
       preLoaderRoute: typeof WorklistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/approval-batch-report': {
+      id: '/api/approval-batch-report'
+      path: '/api/approval-batch-report'
+      fullPath: '/api/approval-batch-report'
+      preLoaderRoute: typeof ApiApprovalBatchReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/approval-batches': {
+      id: '/api/approval-batches'
+      path: '/api/approval-batches'
+      fullPath: '/api/approval-batches'
+      preLoaderRoute: typeof ApiApprovalBatchesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/call-now': {
@@ -1359,6 +1399,8 @@ const rootRouteChildren: RootRouteChildren = {
   VoiceRoute: VoiceRoute,
   WhatsappRoute: WhatsappRoute,
   WorklistRoute: WorklistRoute,
+  ApiApprovalBatchReportRoute: ApiApprovalBatchReportRoute,
+  ApiApprovalBatchesRoute: ApiApprovalBatchesRoute,
   ApiCallNowRoute: ApiCallNowRoute,
   ApiCallReportsRoute: ApiCallReportsRoute,
   ApiChannelCountersRoute: ApiChannelCountersRoute,
