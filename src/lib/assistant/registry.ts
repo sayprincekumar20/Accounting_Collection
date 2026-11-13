@@ -3,6 +3,7 @@
 // (read = data only, write = changes data / contacts clients, ui = navigation in the dashboard), a
 // permission level (for future roles; one shared login today), a confirmation flag (write actions run
 // only after the user confirms in the chat) and an execute function. Every execution is audit-logged.
+import { requireSecret } from "@/lib/env";
 import { z } from "zod";
 import { insertDataTableRows } from "@/lib/n8n-datatable";
 
@@ -102,6 +103,7 @@ export function toolDefinitions(): {
 }
 
 const AUDIT_TABLE = "n5ryqNbBAlp69rWV";
+const DASHBOARD_LOG_WEBHOOK = "https://rareglobalfood.app.n8n.cloud/webhook/dashboard-log";
 
 export async function audit(
   ctx: ActionContext,
@@ -111,20 +113,36 @@ export async function audit(
   status: string,
   summary: string,
 ): Promise<void> {
+  const row = {
+    timestamp: new Date().toISOString(),
+    user_name: ctx.userName.slice(0, 80),
+    session_id: ctx.sessionId.slice(0, 80),
+    page: ctx.page.slice(0, 200),
+    action_id: actionId,
+    kind,
+    args: JSON.stringify(args ?? {}).slice(0, 2000),
+    status,
+    result_summary: summary.slice(0, 500),
+  };
+  // Through the n8n workflow 24_Dashboard_Log (same key as the contact command): the dashboard's n8n API key can
+  // read the data tables but direct writes were silently refused, so the log stayed empty. Direct insert is kept
+  // as a fallback.
   try {
-    await insertDataTableRows(AUDIT_TABLE, [
-      {
-        timestamp: new Date().toISOString(),
-        user_name: ctx.userName.slice(0, 80),
-        session_id: ctx.sessionId.slice(0, 80),
-        page: ctx.page.slice(0, 200),
-        action_id: actionId,
-        kind,
-        args: JSON.stringify(args ?? {}).slice(0, 2000),
-        status,
-        result_summary: summary.slice(0, 500),
+    const res = await fetch(DASHBOARD_LOG_WEBHOOK, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-cliq-secret": await requireSecret("N8N_CONTACT_SECRET"),
       },
-    ]);
+      body: JSON.stringify(row),
+    });
+    if (res.ok) return;
+    console.error("[assistant] audit log webhook failed:", res.status);
+  } catch (e) {
+    console.error("[assistant] audit log webhook failed:", e);
+  }
+  try {
+    await insertDataTableRows(AUDIT_TABLE, [row]);
   } catch (e) {
     console.error("[assistant] audit log failed:", e);
   }

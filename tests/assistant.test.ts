@@ -180,6 +180,13 @@ describe("navigate (UI action)", () => {
   });
 });
 
+/** Backend ACTION calls only (the audit log goes through its own webhook and is not an action). */
+const actionCalls = (m: { mock: { calls: unknown[][] } }) =>
+  m.mock.calls.filter((c) => !String(c[0]).includes("/webhook/dashboard-log")) as unknown as [
+    string,
+    RequestInit,
+  ][];
+
 describe("Phase 2 write actions (confirmation required, real backend calls mocked)", () => {
   it("approve_clients: needs confirmation; then approves Sales Team clients only", async () => {
     tables["rJpqXxmxhqJnlLrJ"] = [
@@ -196,7 +203,7 @@ describe("Phase 2 write actions (confirmation required, real backend calls mocke
       ctx(),
     );
     expect(pending.needsConfirmation).toBeTruthy();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(actionCalls(fetchMock)).toHaveLength(0); // nothing is sent before Confirm
     const r = await runAction(
       "approve_clients",
       { clients: ["Team Co", "Other Co"], approve: true },
@@ -204,11 +211,15 @@ describe("Phase 2 write actions (confirmation required, real backend calls mocke
       true,
     );
     expect(r.ok).toBe(true);
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const [url, init] = actionCalls(fetchMock)[0]!;
     expect(url).toContain("/webhook/contact-approval-update");
     const body = JSON.parse(String(init.body));
     expect(body.items.map((i: { client_id: string }) => i.client_id)).toEqual(["Team Co___a@x.co"]);
     expect((r.result?.data as { not_sales_team: string[] }).not_sales_team).toEqual(["Other Co"]);
+    // the action is recorded in the assistant audit log (through the n8n log webhook)
+    expect(fetchMock.mock.calls.some((c) => String(c[0]).includes("/webhook/dashboard-log"))).toBe(
+      true,
+    );
     vi.unstubAllGlobals();
   });
   it("contact_clients: needs confirmation; then starts the contact process for the working set", async () => {
@@ -229,7 +240,7 @@ describe("Phase 2 write actions (confirmation required, real backend calls mocke
         )
       ).needsConfirmation,
     ).toBeTruthy();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(actionCalls(fetchMock)).toHaveLength(0); // nothing is sent before Confirm
     const r = await runAction(
       "contact_clients",
       { use_working_set: true },
@@ -237,7 +248,7 @@ describe("Phase 2 write actions (confirmation required, real backend calls mocke
       true,
     );
     expect((r.result?.data as { plan: string }).plan).toBe("Running now (2)");
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const [url, init] = actionCalls(fetchMock)[0]!;
     expect(url).toContain("/webhook/cliq-call-command");
     expect(String(JSON.parse(String(init.body)).text).split("\n")).toEqual(["Team Co", "Mid Co"]);
     vi.unstubAllGlobals();

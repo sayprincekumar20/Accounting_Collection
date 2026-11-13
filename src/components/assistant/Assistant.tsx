@@ -20,6 +20,7 @@ import { AssistantHome } from "./AssistantHome";
 import { ListReview, SheetPicker } from "./ListReview";
 import { ListBoundary } from "./AssistantBoundary";
 import { CONVERSATIONS_KEY } from "./store-key";
+import { installGlobalErrorReporting } from "./client-error";
 import { fileStore, reviewStore } from "./list-store";
 import { parseListFile } from "@/lib/assistant/list-file";
 import { normalizeReviewRows, reviewSummaryText, type ReviewRow } from "@/lib/assistant/list-match";
@@ -103,6 +104,7 @@ export function Assistant() {
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  useEffect(() => installGlobalErrorReporting(), []);
   const navigate = useNavigate();
   const qc = useQueryClient();
   const path = useRouterState({ select: (s) => s.location.pathname });

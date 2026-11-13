@@ -30,3 +30,20 @@ export function reportClientError(
     // reporting must never cause another error
   }
 }
+
+let globalInstalled = false;
+/**
+ * Also report errors that happen OUTSIDE drawing the page (event handlers, background steps, failed promises):
+ * the error screens only catch errors while the page is being drawn. Installed once per browser tab.
+ */
+export function installGlobalErrorReporting(): void {
+  if (globalInstalled || typeof window === "undefined") return;
+  globalInstalled = true;
+  window.addEventListener("error", (e) => {
+    reportClientError("window", e.error ?? new Error(String(e.message || "unknown error")));
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    const r = e.reason;
+    reportClientError("promise", r instanceof Error ? r : new Error(String(r)));
+  });
+}
