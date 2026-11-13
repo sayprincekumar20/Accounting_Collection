@@ -263,6 +263,22 @@ describe("Assistant: contact list flow", () => {
     expect(container.textContent).toContain("Not found among clients with an open balance");
   });
 
+  it("Prince's file with 3 hidden sheets: only the visible sheet ALL (3 customers) is used", async () => {
+    const { container } = mount();
+    await attach(
+      container,
+      "LIST OF CUSTOMERS - AI FOLLOW UP 1test wrong.xlsx",
+      fixture("hidden-sheets.xlsx"),
+    );
+    await waitFor(() => expect(container.textContent).toContain("What do you want to do?"));
+    expect(container.textContent).toContain("1 sheet with customers (ALL 3)");
+    expect(container.textContent).toContain("3 hidden sheets were left out (JOANNA, DAVE, GRACE)");
+    // one visible sheet: the choice goes straight to it
+    fireEvent.click(screen.getByRole("button", { name: /Show the customer list/ }));
+    await waitFor(() => expect(container.textContent).toContain('Sheet "ALL": 3 customers'));
+    expect(container.textContent).toContain("SHyams ALPHAD");
+  });
+
   it("explains a file that is not Excel or CSV", async () => {
     const { container } = mount();
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;

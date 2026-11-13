@@ -58,3 +58,22 @@ describe("parseListFile (Excel, same layout as the AR follow-up workbook)", () =
     await expect(parseListFile(file("l.pdf", "x"))).rejects.toThrow("Excel (.xlsx) or CSV");
   });
 });
+
+import { dropHiddenSheets, hiddenSheetNames } from "../src/lib/assistant/list-file";
+
+describe("hidden sheets are left out", () => {
+  it("reads the hidden / very hidden flags from workbook.xml (names unescaped)", () => {
+    const xml =
+      '<sheets><sheet name="ALL" sheetId="1" r:id="rId1"/><sheet name="JOANNA" sheetId="3" state="hidden" r:id="rId2"/>' +
+      '<sheet name="R&amp;D" sheetId="4" state="veryHidden" r:id="rId3"/></sheets>';
+    expect(hiddenSheetNames(xml)).toEqual(["JOANNA", "R&D"]);
+  });
+  it("keeps the visible sheets; if every sheet is hidden, keeps them all", () => {
+    const s = [
+      { sheet: "ALL", data: [] },
+      { sheet: "JOANNA", data: [] },
+    ];
+    expect(dropHiddenSheets(s, ["JOANNA"])).toEqual({ sheets: [s[0]], dropped: ["JOANNA"] });
+    expect(dropHiddenSheets(s, ["ALL", "JOANNA"])).toEqual({ sheets: s, dropped: [] });
+  });
+});

@@ -431,7 +431,11 @@ export function Assistant() {
         ...m,
         content: `**${file.name}**: ${usable.length} sheet${usable.length === 1 ? "" : "s"} with customers (${usable
           .map((s) => `${s.name} ${s.rows.length}`)
-          .join(" · ")}). What do you want to do?`,
+          .join(" · ")}).${
+          parsed.hiddenSheets?.length
+            ? ` ${parsed.hiddenSheets.length} hidden sheet${parsed.hiddenSheets.length === 1 ? " was" : "s were"} left out (${parsed.hiddenSheets.join(", ")}): unhide ${parsed.hiddenSheets.length === 1 ? "it" : "them"} in Excel to include ${parsed.hiddenSheets.length === 1 ? "it" : "them"}.`
+            : ""
+        } What do you want to do?`,
         actionPick: { fileId: parsed.id },
         context: sheetsContextText(parsed),
       }));

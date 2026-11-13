@@ -10,6 +10,52 @@ export interface ParsedFile {
   id: string;
   name: string;
   sheets: ParsedSheet[];
+  /** Sheets hidden in Excel: not used (only the sheets the person can see count). */
+  hiddenSheets?: string[];
+}
+
+const unXml = (s: string) =>
+  s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+
+/** Names of the sheets marked hidden (or "very hidden") in an xlsx workbook.xml. */
+export function hiddenSheetNames(workbookXml: string): string[] {
+  const out: string[] = [];
+  for (const m of workbookXml.matchAll(/<sheet\b[^>]*>/g)) {
+    const tag = m[0];
+    const state = tag.match(/\bstate="([^"]*)"/)?.[1] ?? "visible";
+    const name = tag.match(/\bname="([^"]*)"/)?.[1];
+    if (name != null && state !== "visible") out.push(unXml(name));
+  }
+  return out;
+}
+
+/** Keep only the sheets the person can see; if every sheet is hidden, keep them all. */
+export function dropHiddenSheets(
+  sheets: { sheet: string; data: unknown[][] }[],
+  hidden: string[],
+): { sheets: { sheet: string; data: unknown[][] }[]; dropped: string[] } {
+  const h = new Set(hidden);
+  const visible = sheets.filter((s) => !h.has(s.sheet));
+  if (!visible.length) return { sheets, dropped: [] };
+  return { sheets: visible, dropped: sheets.filter((s) => h.has(s.sheet)).map((s) => s.sheet) };
+}
+
+async function readHiddenSheets(file: File): Promise<string[]> {
+  try {
+    const { unzipSync, strFromU8 } = await import("fflate");
+    const files = unzipSync(new Uint8Array(await file.arrayBuffer()), {
+      filter: (f) => f.name === "xl/workbook.xml",
+    });
+    const xml = files["xl/workbook.xml"];
+    return xml ? hiddenSheetNames(strFromU8(xml)) : [];
+  } catch {
+    return []; // cannot tell: use every sheet, as before
+  }
 }
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -76,7 +122,13 @@ export async function parseListFile(file: File): Promise<ParsedFile> {
     } catch {
       throw new Error("That Excel file could not be read. Try saving it again as .xlsx.");
     }
-    return { id, name: file.name, sheets: sheetsFromData(sheets) };
+    const kept = dropHiddenSheets(sheets, await readHiddenSheets(file));
+    return {
+      id,
+      name: file.name,
+      sheets: sheetsFromData(kept.sheets),
+      hiddenSheets: kept.dropped,
+    };
   }
   throw new Error("Attach an Excel (.xlsx) or CSV file with a Customer column.");
 }
