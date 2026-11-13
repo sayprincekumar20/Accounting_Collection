@@ -104,7 +104,9 @@ export function Assistant() {
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  useEffect(() => installGlobalErrorReporting(), []);
+  useEffect(() => {
+    installGlobalErrorReporting();
+  }, []);
   const navigate = useNavigate();
   const qc = useQueryClient();
   const path = useRouterState({ select: (s) => s.location.pathname });
@@ -123,10 +125,11 @@ export function Assistant() {
     if (c[0]) setActiveId(c[0].id);
   }, []);
   const active = useMemo(() => convos.find((c) => c.id === activeId), [convos, activeId]);
-  useEffect(
-    () => endRef.current?.scrollIntoView({ behavior: "smooth" }),
-    [active?.messages.length, active?.messages.at(-1)?.content],
-  );
+  useEffect(() => {
+    // Block body on purpose: in Chrome 157+ scrollIntoView() returns a Promise, and an effect that
+    // RETURNS it hands React a non-function as its clean-up ("TypeError: l is not a function").
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [active?.messages.length, active?.messages.at(-1)?.content]);
 
   const update = (id: string, fn: (c: Convo) => Convo) =>
     setConvos((prev) => {

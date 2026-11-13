@@ -41,7 +41,9 @@ function ErrorComponent({ error: thrown, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
   // Saved in the assistant audit log (action client_error) so the exact message can be read afterwards.
-  useEffect(() => reportClientError("page", thrown), [thrown]);
+  useEffect(() => {
+    reportClientError("page", thrown);
+  }, [thrown]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">

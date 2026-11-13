@@ -129,7 +129,9 @@ function QueuePage() {
   const pageCount = Math.max(1, Math.ceil(visible.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
   const paged = visible.slice(safePage * pageSize, (safePage + 1) * pageSize);
-  useEffect(() => setPage(0), [visible.length, pageSize]);
+  useEffect(() => {
+    setPage(0);
+  }, [visible.length, pageSize]);
   const toggle = (st: string) => setFilters({ status: filters.status === st ? "all" : st });
 
   return (

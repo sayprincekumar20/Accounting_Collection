@@ -145,7 +145,9 @@ function ApprovalsPage() {
   // Other accounts: CRM owner not in the Sales Team group, and internal Rare accounts (never contacted).
   const otherCount = (data ?? []).filter((i) => i.sales_team === false).length;
   const paged = visible.slice(page * pageSize, (page + 1) * pageSize);
-  useEffect(() => setPage(0), [kind, status, q, overdueOnly, pageSize]);
+  useEffect(() => {
+    setPage(0);
+  }, [kind, status, q, overdueOnly, pageSize]);
   // Data cycle: the weekly refresh is the earliest 'Data from Zoho' time; later ones were refreshed since
   // (contact now / pre-send on the client's collection day).
   const refreshTimes = all.map((i) => new Date(i.refreshed_at).getTime()).filter((t) => t > 0);

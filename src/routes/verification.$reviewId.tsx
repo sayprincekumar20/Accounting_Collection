@@ -54,7 +54,9 @@ function ReviewPage() {
   const [name, setName] = useState("");
   const [dialog, setDialog] = useState<null | "approve" | "reject" | "request-documents">(null);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
-  useEffect(() => setName(getReviewerName()), []);
+  useEffect(() => {
+    setName(getReviewerName());
+  }, []);
 
   const refresh = async () => {
     await qc.invalidateQueries({ queryKey: ["dv-review", reviewId] });

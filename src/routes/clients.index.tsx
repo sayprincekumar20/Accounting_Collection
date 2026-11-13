@@ -180,7 +180,9 @@ function ClientsPage() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount - 1);
   const paged = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
-  useEffect(() => setPage(0), [filtered.length, pageSize]);
+  useEffect(() => {
+    setPage(0);
+  }, [filtered.length, pageSize]);
   return (
     <AppShell
       title="Clients"

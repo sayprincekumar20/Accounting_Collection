@@ -68,7 +68,9 @@ import { Assistant } from "../src/components/assistant/Assistant";
 import { reviewStore } from "../src/components/assistant/list-store";
 import { buildReview, sanitizeRows } from "../src/lib/assistant/list-server";
 
-Element.prototype.scrollIntoView = () => {};
+// Like Chrome 157+: scroll methods return a Promise (React must never receive it as an effect clean-up).
+Element.prototype.scrollIntoView = (() =>
+  Promise.resolve()) as unknown as typeof Element.prototype.scrollIntoView;
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const fixture = (n: string) => readFileSync(resolve(process.cwd(), "tests/fixtures", n));
 
