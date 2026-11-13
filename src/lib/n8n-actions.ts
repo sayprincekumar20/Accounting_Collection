@@ -5,7 +5,7 @@
 //    Cliq no longer knows this key.
 import { requireSecret } from "@/lib/env";
 
-// Keys are Cloudflare secrets (N8N_APPROVAL_SECRET, N8N_CONTACT_SECRET), never in the code.
+// Keys are server secrets (N8N_APPROVAL_SECRET, N8N_CONTACT_SECRET), never in the code.
 const N8N = "https://rareglobalfood.app.n8n.cloud/webhook";
 
 export interface ApprovalItem {

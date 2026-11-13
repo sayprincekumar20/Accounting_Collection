@@ -1,0 +1,16 @@
+node_modules
+.git
+.output
+.wrangler
+.vinxi
+.tanstack
+.env
+.env.*
+!.env.example
+.dev.vars
+*.log
+logs
+coverage
+tests
+docs
+images

@@ -28,8 +28,7 @@ function isProviderMediaFetch(request: Request, path: string) {
 }
 
 export async function handleAuth(request: Request): Promise<Response | null> {
-  // Read the login settings the same way as every other secret (cloudflare:workers env binding):
-  // the framework runtime does not pass Cloudflare's env to this fetch handler.
+  // Read the login settings the same way as every other secret (getEnv: the server environment).
   const cfg = authConfig({
     DASHBOARD_USER: await getEnv("DASHBOARD_USER"),
     DASHBOARD_PASSWORD: await getEnv("DASHBOARD_PASSWORD"),

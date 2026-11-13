@@ -1,4 +1,4 @@
-// Single shared login for the dashboard (one ID + password, set as Cloudflare secrets:
+// Single shared login for the dashboard (one ID + password, set in the server environment:
 // DASHBOARD_USER, DASHBOARD_PASSWORD, optional DASHBOARD_SESSION_SECRET).
 // Sessions are a signed cookie (HMAC-SHA256), so no database is needed.
 

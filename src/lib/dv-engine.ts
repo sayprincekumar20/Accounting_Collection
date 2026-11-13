@@ -1,9 +1,8 @@
 // src/lib/dv-engine.ts
 // SERVER-ONLY. Calls the document verification engine (FastAPI) for the Document Verification
-// tab. Settings (Cloudflare -> Workers & Pages -> accounting-collection -> Variables and
-// Secrets; locally in .env):
+// tab. Settings (Dokploy -> the service -> Environment; locally in .env):
 //   DV_ENGINE_URL  e.g. https://dv.rareglobalfood.com
-//   DV_API_KEY     the engine's API_KEY (mark as "Encrypt")
+//   DV_API_KEY     the engine's API_KEY
 // The key never reaches the browser: the page calls /api/dv-reviews..., these routes add it.
 import { getEnv } from "@/lib/env";
 

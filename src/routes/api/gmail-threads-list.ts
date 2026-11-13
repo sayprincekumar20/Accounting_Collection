@@ -227,7 +227,7 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
             for (const id of r.ids) seenThreadIds.add(id);
             if (r.chunkTruncated) truncated = true;
           }
-          // Each thread is one Gmail request; stay well inside Cloudflare's per-request subrequest limit.
+          // Each thread is one Gmail request: fetched a few at a time to stay inside Gmail's rate limits.
           const MAX_THREADS = 350;
           let threadIds = Array.from(seenThreadIds);
           if (threadIds.length > MAX_THREADS) {

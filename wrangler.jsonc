@@ -1,3 +1,7 @@
+// NO LONGER USED (Nov 2026): the dashboard now runs as a Node.js server in Docker on Dokploy (AWS Lightsail).
+// The build no longer targets Cloudflare (vite.config.ts preset "node-server") and nothing reads this file.
+// Kept for reference only: the KV namespace, the 6-hour cron (now a timer in plugins/reply-media-cleanup.ts)
+// and the vars below (now set in Dokploy > Environment).
 {
   "name": "accounting-collection",
   "main": "./.output/server/index.mjs",

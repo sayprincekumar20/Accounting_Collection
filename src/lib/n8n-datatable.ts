@@ -1,4 +1,4 @@
-import { getCloudflareBinding, getEnv } from "@/lib/env";
+import { getEnv } from "@/lib/env";
 
 // Direct calls to n8n's Data Table REST API (/api/v1/data-tables/{id}/rows),
 // authenticated with a dedicated read-only N8N_API_KEY. This is a genuine
@@ -6,16 +6,15 @@ import { getCloudflareBinding, getEnv } from "@/lib/env";
 // execution, so it does not count against the n8n Cloud execution quota.
 //
 // Hardening for production volume (500+ clients):
-//  1. Short in-memory cache (per Worker isolate). The same tables (clients,
+//  1. Short in-memory cache (per server process). The same tables (clients,
 //     promise_history, escalations) are read by 4-5 routes on every page load;
 //     caching them for CACHE_TTL_MS turns ~20 sequential n8n calls per page into
-//     a handful, and keeps us well inside Cloudflare's per-request subrequest
-//     limit. Concurrent requests for the same table share one in-flight fetch.
+//     a handful. Concurrent requests for the same table share one in-flight fetch.
 //  2. One retry on transient n8n errors (429 / 5xx / network), so a single
 //     hiccup no longer turns the whole route into a 500.
 //  3. Truncation is never silent: if a table is larger than MAX_PAGES pages,
 //     the result is flagged `truncated: true` and a warning is logged (visible
-//     in Cloudflare Workers observability). The monthly n8n archive workflow
+//     in the server logs). The monthly n8n archive workflow
 //     (24_Monthly_Data_Archive) keeps the append-only tables far below this.
 
 const N8N_BASE = "https://rareglobalfood.app.n8n.cloud";
@@ -140,62 +139,8 @@ async function loadTable<T>(dataTableId: string, q: TableQuery = {}): Promise<Da
   return { rows, truncated };
 }
 
-// ---- Shared cache (Cloudflare Workers KV, binding DATA_CACHE): one copy for ALL server instances, so a table
-// read by one page or user is instant for every other page and user. Optional: without the binding the
-// in-memory cache above is used alone. Entries expire after 10 minutes.
-interface KvLike {
-  get(key: string, type: "json"): Promise<unknown>;
-  put(key: string, value: string, opts?: { expirationTtl?: number }): Promise<void>;
-  delete(key: string): Promise<void>;
-}
-// HOTFIX (Nov 10): the shared KV cache is switched OFF. Writing whole tables to KV (large JSON, awaited
-// before answering) is suspected of exceeding the Worker's time / memory limits so pages did not load.
-// The in-memory cache (fresh 2 min, stale-while-revalidate) and 'recent rows' stay active.
-const KV_ENABLED = false;
-async function kvStore(): Promise<KvLike | null> {
-  if (!KV_ENABLED) return null;
-  try {
-    const kv = (await getCloudflareBinding("DATA_CACHE")) as KvLike | undefined;
-    return kv && typeof kv.get === "function" ? kv : null;
-  } catch {
-    return null;
-  }
-}
-const kvKey = (key: string) => `dt:${key}`;
-async function kvRead(key: string): Promise<CacheEntry | null> {
-  const kv = await kvStore();
-  if (!kv) return null;
-  try {
-    const e = (await kv.get(kvKey(key), "json")) as CacheEntry | null;
-    return e && typeof e.at === "number" ? e : null;
-  } catch {
-    return null;
-  }
-}
-// KV writes are limited on Cloudflare's free plan (1,000 per day): a table is written to KV at most once
-// every KV_WRITE_MIN_MS (reads are not limited this way, so all instances still share the copy).
-const KV_WRITE_MIN_MS = 10 * 60_000;
-async function kvWrite(key: string, entry: CacheEntry): Promise<void> {
-  const kv = await kvStore();
-  if (!kv) return;
-  try {
-    const existing = await kvRead(key);
-    if (existing && entry.at - existing.at < KV_WRITE_MIN_MS) return;
-    await kv.put(kvKey(key), JSON.stringify(entry), { expirationTtl: 600 });
-  } catch (err) {
-    console.error(`[n8n-datatable] KV write for ${key} failed:`, err);
-  }
-}
-async function kvDeleteTable(dataTableId: string): Promise<void> {
-  const kv = await kvStore();
-  if (!kv) return;
-  // the plain key plus the 'recent rows' variants used by the dashboard
-  const keys = [dataTableId, ...RECENT_VARIANTS.map((v) => keyOf(dataTableId, v))];
-  await Promise.all(keys.map((k) => kv.delete(kvKey(k)).catch(() => undefined)));
-}
-/** 'Recent rows' variants used in the code (so writes can clear them from KV too). */
+/** The 'recent rows' query used by the dashboard (last 60 days by timestamp). */
 export const RECENT_60_DAYS: TableQuery = { sinceDays: 60, dateColumn: "timestamp" };
-const RECENT_VARIANTS: TableQuery[] = [RECENT_60_DAYS, { sinceDays: 90, dateColumn: "timestamp" }];
 
 function startLoad<T>(dataTableId: string, q: TableQuery): Promise<DataTableResult<T>> {
   const key = keyOf(dataTableId, q);
@@ -203,7 +148,6 @@ function startLoad<T>(dataTableId: string, q: TableQuery): Promise<DataTableResu
     .then(async (value) => {
       const entry = { at: Date.now(), value };
       cache.set(key, entry);
-      void kvWrite(key, entry); // never make a page wait for the shared cache
       return value;
     })
     .finally(() => inFlight.delete(key));
@@ -212,7 +156,7 @@ function startLoad<T>(dataTableId: string, q: TableQuery): Promise<DataTableResu
 }
 
 /**
- * Rows plus a `truncated` flag. Order: this instance's memory -> shared KV -> n8n. Fresh for CACHE_TTL_MS;
+ * Rows plus a `truncated` flag. Order: this server's memory -> n8n. Fresh for CACHE_TTL_MS;
  * up to STALE_MAX_MS old the cached copy is returned at once and refreshed in the background.
  * Pass fresh=true to bypass all caches.
  */
@@ -225,14 +169,7 @@ export async function fetchDataTable<T = Record<string, unknown>>(
   const now = Date.now();
   const pending = inFlight.get(key) as Promise<DataTableResult<T>> | undefined;
   if (!opts.fresh) {
-    let hit = cache.get(key);
-    if (!hit || now - hit.at >= CACHE_TTL_MS) {
-      const shared = await kvRead(key);
-      if (shared && (!hit || shared.at > hit.at)) {
-        cache.set(key, shared);
-        hit = shared;
-      }
-    }
+    const hit = cache.get(key);
     if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value as DataTableResult<T>;
     if (hit && Date.now() - hit.at < STALE_MAX_MS) {
       if (!inFlight.get(key))
@@ -296,13 +233,11 @@ export async function updateDataTableRows(
     throw new Error(`n8n data table update failed (${res.status}): ${text.slice(0, 300)}`);
   }
   for (const key of [...cache.keys()]) if (key.includes(dataTableId)) cache.delete(key);
-  await kvDeleteTable(dataTableId);
 }
 
 /** Forget the cached rows of one table, so the next read shows a change made elsewhere. */
 export function clearDataTableCache(dataTableId: string): void {
   for (const key of [...cache.keys()]) if (key.includes(dataTableId)) cache.delete(key);
-  void kvDeleteTable(dataTableId);
 }
 
 /** Insert rows into an n8n data table (used by the assistant's audit log). */
@@ -323,5 +258,4 @@ export async function insertDataTableRows(
     throw new Error(`n8n data table insert failed (${res.status}): ${text.slice(0, 300)}`);
   }
   for (const key of [...cache.keys()]) if (key.includes(dataTableId)) cache.delete(key);
-  await kvDeleteTable(dataTableId);
 }

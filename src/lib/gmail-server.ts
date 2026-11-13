@@ -17,16 +17,11 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1";
 
 /**
- * IMPORTANT: this must be a function, not a module-level constant - AND it
- * must read through getEnv() (the cloudflare:workers env binding), not
- * plain process.env directly. On Cloudflare Workers, process.env is not
- * reliably populated from the Worker's own "Variables and Secrets" unless
- * something explicitly bridges Cloudflare's env into it, which this project
- * doesn't have configured - this was a real, confirmed bug (every route
- * failed with things like `Invalid URL: undefined/clients-list`).
+ * IMPORTANT: this must be a function, not a module-level constant, and it reads through getEnv() (the server
+ * environment) at request time, like every other secret.
  */
 export async function getGmailBusinessEmail(): Promise<string> {
-  // Trimmed: a space or line break pasted along with a Cloudflare secret breaks the match.
+  // Trimmed: a space or line break pasted along with a secret breaks the match.
   return ((await getEnv("GMAIL_BUSINESS_EMAIL")) || "").trim();
 }
 
