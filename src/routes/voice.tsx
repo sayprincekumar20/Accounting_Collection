@@ -361,7 +361,7 @@ function VoiceLogs() {
     };
   };
   const visible = calls.filter((c) => matchesLogFilters(rowFor(c), filters));
-  // The next attempt and "Call again" are shown on the LATEST call of each client only.
+  // "Call again" is on every call row; the next attempt only on the LATEST call of each client.
   const latestCallId = new Map<string, string>();
   for (const c of calls
     .slice()
@@ -471,22 +471,20 @@ function VoiceLogs() {
                       >
                         {endedReasonLabel(c.endedReason, c.status)}
                       </span>
-                      {latestCallId.get(c.client_id) === c.call_id ? (
-                        <span className="mt-1 block space-y-1">
-                          {client?.next_retry_at ? (
-                            <span className="block text-[11px] font-semibold text-warning">
-                              Next attempt {nextAttemptLabel(client.next_retry_at)}
-                            </span>
-                          ) : null}
-                          {c.client_id ? (
-                            <CallAgainButton
-                              clientId={c.client_id}
-                              clientName={client?.client_name || c.client_name}
-                              compact
-                            />
-                          ) : null}
-                        </span>
-                      ) : null}
+                      <span className="mt-1 block space-y-1">
+                        {latestCallId.get(c.client_id) === c.call_id && client?.next_retry_at ? (
+                          <span className="block text-[11px] font-semibold text-warning">
+                            Next attempt {nextAttemptLabel(client.next_retry_at)}
+                          </span>
+                        ) : null}
+                        {c.client_id ? (
+                          <CallAgainButton
+                            clientId={c.client_id}
+                            clientName={client?.client_name || c.client_name}
+                            compact
+                          />
+                        ) : null}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <SummaryCell ourText={c.callSummary || c.preview} />
