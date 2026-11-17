@@ -14,3 +14,5 @@ coverage
 tests
 docs
 images
+# the verification engine is built separately (engine/Dockerfile)
+engine
