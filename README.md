@@ -112,11 +112,21 @@ Production runs as a Docker container on a self-hosted **Dokploy** server (AWS L
 - Data is cached in the server's memory for about 2 minutes, so a change made in n8n can take up to 2 minutes to show.
 - Expired reply attachments (Supabase storage) are cleaned up by the server itself: 1 minute after start, then every 6 hours.
 
+## Document verification engine (`engine/`)
+
+The Document Verification tab reviews results from the verification engine, a separate Python service
+in [`engine/`](engine/README.md) (FastAPI, Celery, Postgres, Redis, Tesseract OCR, OpenAI). It reads the
+documents attached to a Zoho CRM Account when the sales team clicks **Verify Account**, checks them,
+updates fields at confidence >= 0.95, and creates a review for this tab.
+
+It runs on the same Dokploy server as a **Compose** service (`engine/docker-compose.dokploy.yml`), at
+`https://accounting.rareglobalfood.com/dv-engine`. Setup: [`engine/docs/deployment-dokploy.md`](engine/docs/deployment-dokploy.md).
+The dashboard connects with `DV_ENGINE_URL` and `DV_API_KEY`.
+
 ## History
 
-The dashboard was first built with [Lovable](https://lovable.dev) and was hosted on Cloudflare Workers until November 2026. `wrangler.jsonc` is kept for reference only and is no longer used.
+The dashboard was hosted on Cloudflare Workers until November 2026. `wrangler.jsonc` is kept for reference only and is no longer used.
 
-The repository is still connected to Lovable: changes made in the [Lovable editor](https://lovable.dev/projects/87e31d93-4fa3-41e6-9c48-dafabd0ec72c) are committed to this repository, and pushes to `main` sync back into Lovable.
 
 ## Project structure
 
@@ -128,6 +138,7 @@ src/
   server.ts          server entry: health check, login gate, error page
 plugins/             Nitro plugins (reply attachment cleanup timer)
 tests/               Vitest tests
+engine/              document verification engine (Python, own Dockerfile and tests)
 Dockerfile           production image (Dokploy)
 .env.example         every environment variable, without values
 ```

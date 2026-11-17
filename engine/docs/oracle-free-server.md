@@ -1,3 +1,6 @@
+> **Superseded (Nov 2026):** the engine runs on the dashboard's Dokploy server instead, see
+> [deployment-dokploy.md](deployment-dokploy.md). Kept for reference only.
+
 # Free server on Oracle Cloud ("Always Free") for the engine
 
 Result: the engine runs 24/7 at `https://dv-dev.rareglobalfood.com` (sandbox) and later

@@ -1,3 +1,6 @@
+> This engine now lives in the `engine/` folder of **Accounting_Collection**, next to the dashboard.
+> Deployment: [`docs/deployment-dokploy.md`](docs/deployment-dokploy.md).
+
 # Document Verification Engine (Option E)
 
 FastAPI engine that reads customer documents from Zoho CRM. Reviewers approve its results inside

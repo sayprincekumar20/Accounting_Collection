@@ -19,7 +19,7 @@ with the texts, activation checks, proposed changes and copies of the page image
 | `Failed`; or -> `Rejected` / `Waiting for Documents`. `No Action` = nothing to decide.
 Closed reviews cannot change. A new verification of the Account creates a new review.
 
-## Endpoints (base: https://dv.rareglobalfood.com)
+## Endpoints (base: http://dv-engine-api:8000 inside Dokploy, https://accounting.rareglobalfood.com/dv-engine publicly)
 | Method | Path | Body | Use |
 | --- | --- | --- | --- |
 | GET | `/v1/reviews?status=open` | | Tab list: open reviews (`status=` also exact, `account_id=`, `limit`, `offset`) |
@@ -62,7 +62,7 @@ value, approve without `values_compared`, empty notes) with `detail` text to sho
 
 ## Cloudflare Worker proxy (sketch)
 ```js
-// env.DV_ENGINE_URL = "https://dv.rareglobalfood.com", env.DV_API_KEY = secret
+// DV_ENGINE_URL = "http://dv-engine-api:8000", DV_API_KEY = secret (the dashboard implements this in src/lib/dv-engine.ts)
 export async function onRequest({ request, env, data }) {      // Pages Function: /api/dv/*
   const user = data.user;                                       // from your dashboard login
   if (!user) return new Response("Unauthorized", { status: 401 });

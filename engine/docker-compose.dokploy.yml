@@ -1,0 +1,98 @@
+# Document verification engine on Dokploy (same server as the dashboard).
+# Dokploy > Create Service > Compose: repository Accounting_Collection, branch main,
+# Compose Path ./engine/docker-compose.dokploy.yml. Settings: Dokploy > Environment (written to .env
+# next to this file). Public address: https://<DV_PUBLIC_HOST>/dv-engine (Traefik, path stripped),
+# used by the Zoho Verify Account button; the dashboard can use the internal http://dv-engine-api:8000.
+# Full guide: engine/docs/deployment-dokploy.md
+
+x-engine: &engine
+  build: .
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    DATABASE_URL: postgresql+psycopg://dv:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/dv
+    REDIS_URL: redis://redis:6379/0
+    STORAGE_BACKEND: local
+    STORAGE_LOCAL_DIR: /data/files
+  volumes:
+    - files:/data/files
+  restart: unless-stopped
+  networks: [default]
+
+services:
+  migrate:
+    <<: *engine
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    volumes: []
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    <<: *engine
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000",
+              "--proxy-headers", "--forwarded-allow-ips", "*"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_started }
+    networks:
+      default: {}
+      dokploy-network:
+        aliases: [dv-engine-api]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      - traefik.http.routers.dv-engine.rule=Host(`${DV_PUBLIC_HOST:-accounting.rareglobalfood.com}`) && PathPrefix(`/dv-engine`)
+      - traefik.http.routers.dv-engine.entrypoints=websecure
+      - traefik.http.routers.dv-engine.tls.certresolver=letsencrypt
+      - traefik.http.routers.dv-engine.middlewares=dv-engine-strip
+      - traefik.http.middlewares.dv-engine-strip.stripprefix.prefixes=/dv-engine
+      - traefik.http.services.dv-engine.loadbalancer.server.port=8000
+
+  worker:
+    <<: *engine
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "-Q", "verification",
+              "--concurrency", "2", "--loglevel", "INFO"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_started }
+
+  scheduler:
+    <<: *engine
+    command: ["python", "-m", "app.tools.scheduler"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_started }
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dv
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: dv
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dv -d dv"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  files:
+
+networks:
+  dokploy-network:
+    external: true
