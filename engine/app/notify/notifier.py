@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Notification
 from app.notify.cliq import CliqClient
+from app.notify.gmail import GmailClient
 from app.notify.sheets import SheetsClient
 
 log = logging.getLogger(__name__)
@@ -31,8 +32,10 @@ def manila_now() -> str:
 
 
 class Notifier:
-    def __init__(self, cliq: CliqClient | None, sheets: SheetsClient | None):
-        self.cliq, self.sheets = cliq, sheets
+    def __init__(self, cliq: CliqClient | None, sheets: SheetsClient | None,
+                 mailer: GmailClient | None = None, settings=None):
+        self.cliq, self.sheets, self.mailer = cliq, sheets, mailer
+        self.settings = settings
         self._tabs_ready = False
 
     @classmethod
@@ -44,11 +47,26 @@ class Notifier:
         except (OSError, ValueError) as exc:
             log.warning("Google Sheets log disabled: %s", exc)
             sheets = None
-        return cls(cliq, sheets)
+        mailer = GmailClient.from_settings(settings) if settings.notify_emails else None
+        return cls(cliq, sheets, mailer, settings)
 
     @property
     def enabled(self) -> bool:
-        return bool(self.cliq or self.sheets)
+        return bool(self.cliq or self.sheets or self.mailer)
+
+    def email(self, to: list[str], cc: list[str], subject: str, text: str) -> None:
+        if self.mailer:
+            self.mailer.send(to, cc, subject, text)
+
+    def links(self, account_id: str, review_id: str | None = None) -> str:
+        """Footer with links to the Account in Zoho and the review in the dashboard."""
+        s, lines = self.settings, []
+        if s is not None and s.zoho_crm_web_url:
+            lines.append(f"Account in Zoho CRM: {s.zoho_crm_web_url.rstrip('/')}"
+                         f"/tab/Accounts/{account_id}")
+        if s is not None and s.dashboard_url and review_id:
+            lines.append(f"Review: {s.dashboard_url.rstrip('/')}/verification/{review_id}")
+        return "\n".join(lines)
 
     def message(self, text: str) -> None:
         if self.cliq:

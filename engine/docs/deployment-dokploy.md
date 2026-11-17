@@ -32,6 +32,15 @@ CREATE_REVIEW_RECORDS=false
 AUTO_APPLY_MODE=shadow
 KEEP_DOCUMENT_FILES=false
 ```
+Emails (to the person who clicked Verify Account, CC the Account owner; expiry reminders to the owner):
+```
+GMAIL_BUSINESS_EMAIL=<same as the dashboard>
+GMAIL_CLIENT_ID=<same as the dashboard>
+GMAIL_CLIENT_SECRET=<same as the dashboard>
+GMAIL_REFRESH_TOKEN=<same as the dashboard; needs the gmail.send scope>
+ZOHO_CRM_WEB_URL=https://crm.zoho.com/crm/org824163551
+DASHBOARD_URL=https://accounting.rareglobalfood.com
+```
 Optional: `DV_PUBLIC_HOST` (default `accounting.rareglobalfood.com`), Cliq / Google Sheets
 (`CLIQ_MESSAGE_URL`, `CLIQ_WEBHOOK_TOKEN`, `GOOGLE_SHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_JSON` = the whole
 key file on one line), `EXPIRY_CHECK_HOUR`, `REVIEW_IMAGE_DAYS`. `DATABASE_URL`, `REDIS_URL` and storage

@@ -1,4 +1,23 @@
-# Notifications: Zoho Cliq channel + Google Sheets log
+# Notifications: emails, Zoho Cliq channel, Google Sheets log
+
+## Emails (company Gmail, the dashboard's mailbox)
+To the person who clicked **Verify Account**, CC the **Account owner**:
+| Event | Subject |
+| --- | --- |
+| Activated automatically | Account activated: <account> |
+| Needs a review (reasons listed) | Verification in review: <account> |
+| Approved by a reviewer (fields, activation) | Verification approved: <account> |
+| Waiting for documents (reviewer's note) | Documents needed: <account> |
+| Rejected (reason) | Verification not approved: <account> |
+| Write-back failed | Verification could not be completed: <account> |
+
+Expiry reminders (30 / 7 / 0 days, expired): to the **Account owner**, CC the person who last
+verified it; by email only (`EXPIRY_CLIQ=false`; set true to also post them in Cliq).
+Settings: `GMAIL_BUSINESS_EMAIL`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`
+(same values as the dashboard), `ZOHO_CRM_WEB_URL`, `DASHBOARD_URL` (links), `NOTIFY_EMAILS=true`.
+Each email is sent once (same sent-once table as Cliq). A failed email is logged, never fatal.
+
+## Cliq and Google Sheets
 
 The engine announces in a Cliq channel and logs in one Google Sheet:
 
