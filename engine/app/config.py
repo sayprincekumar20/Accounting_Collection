@@ -1,0 +1,127 @@
+"""Application settings, loaded from environment variables (or a .env file)."""
+
+from functools import lru_cache
+
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Account fileupload fields that may hold customer documents (api names from Zoho field metadata).
+DEFAULT_FILE_FIELDS = [
+    "BIR_Registration_COR",
+    "Business_registration",
+    "Business_Permit",
+    "General_Information_Sheet",
+]
+
+
+# Account fields saved in each job's snapshot. Later phases compare documents against these, and
+# the write-back step uses them to detect CRM edits made during review.
+DEFAULT_SNAPSHOT_FIELDS = [
+    "id", "Account_Name", "Invoice_Company_Name", "Inventory_Customer_Number",
+    "Customer_Status", "Lead_Category", "Credit_Terms", "Owner",
+    "Owner_Name", "Owner_Position", "Owner_Address",
+    "Type_of_Business_Organization", "Business_Style",
+    "Tax_Identification_Number_TIN", "Corp_Tax_Cert_No",
+    "Billing_Street", "Billing_Barangay", "Billing_City", "Billing_City1",
+    "Billing_Province", "Billing_State", "Billing_Code", "Billing_Country",
+    "Shipping_Street", "Shipping_Barangay", "Shipping_City", "Shipping_Province",
+    "Shipping_State", "Shipping_Code",
+    "Email", "Phone", "Phone_Number", "Contact_Number", "Contact_Person", "Employees",
+    "Delivery_Permit", "Special_Permit",
+    "BIR_Registration_COR", "Business_registration", "Business_Permit",
+    "General_Information_Sheet",
+    "Created_Time", "Modified_Time", "Modified_By",
+]
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    app_env: str = "dev"
+    log_level: str = "INFO"
+    api_key: SecretStr
+
+    database_url: str = "postgresql+psycopg://dv:dv@localhost:5432/dv"
+    redis_url: str = "redis://localhost:6379/0"
+
+    zoho_accounts_url: str = "https://accounts.zoho.com"
+    zoho_api_domain: str = "https://www.zohoapis.com"
+    zoho_api_version: str = "v8"
+    zoho_client_id: str
+    zoho_client_secret: SecretStr
+    zoho_refresh_token: SecretStr
+    zoho_max_retries: int = 5
+    zoho_timeout_seconds: float = 60.0
+    zoho_file_fields: list[str] = DEFAULT_FILE_FIELDS
+    zoho_snapshot_fields: list[str] = DEFAULT_SNAPSHOT_FIELDS
+
+    storage_backend: str = "local"  # "local" | "s3"
+    storage_local_dir: str = "/data/files"
+    s3_endpoint_url: str | None = None
+    s3_region: str = "ap-southeast-1"
+    s3_bucket: str = "dv-documents"
+    s3_access_key_id: SecretStr | None = None
+    s3_secret_access_key: SecretStr | None = None
+
+    max_file_bytes: int = 25 * 1024 * 1024
+    # false = no document copies kept: after each job the downloaded files, page images and
+    # page OCR text are deleted; only fingerprints and verification results remain (Zoho keeps
+    # the documents). Re-checks download again from Zoho and reuse cached AI results by hash.
+    keep_document_files: bool = False
+
+    # Pull mode: the Verify Account button only marks the Account in Zoho; the engine polls for
+    # marked Accounts (no inbound connection to the engine needed: works behind any router).
+    # ---- Reviews in the Accounts dashboard (engine review API) ----
+    engine_reviews: bool = False             # create a review in the engine for the dashboard
+    review_image_days: int = 30              # keep review page images N days after closing
+    dashboard_origins: str = ""              # comma list for browser calls (CORS); empty = off
+
+    # ---- Notifications: Zoho Cliq channel + Google Sheets log (both optional) ----
+    # Cliq: channel message endpoint + webhook token (Cliq > Bots & Tools > Webhook Tokens)
+    cliq_message_url: str = ""      # https://cliq.zoho.com/company/<id>/api/v2/channelsbyname/<channel>/message
+    cliq_webhook_token: str = ""
+    # Google Sheets: spreadsheet id + service-account key (file path or the JSON itself)
+    google_sheet_id: str = ""
+    google_service_account_file: str = ""
+    google_service_account_json: str = ""
+    notify_verifications: bool = True        # Cliq message + row for every verification
+    notify_reviews: bool = True              # approved / applied reviews (checked by the scheduler)
+    expiry_alert_days: str = "30,7,0"        # reminder levels (days before expiry)
+    expiry_check_hour: int = 8               # daily expiry check, Manila time
+    zoho_crm_web_url: str = ""               # e.g. https://crm.zoho.com/crm/org824163551 (links)
+
+    request_polling: bool = False                      # pull mode off unless switched on
+    poll_interval_seconds: int = 60
+    # Approved reviews in Zoho are applied to their Accounts by the scheduler every N seconds.
+    apply_approved_reviews: bool = True
+    review_apply_interval_seconds: int = 120
+    request_flag_field: str = "DV_Requested"            # Checkbox on Accounts
+    request_reason_field: str = "DV_Request_Reason"     # Multi-line
+    request_by_field: str = "DV_Requested_By"           # Single line (email)
+    request_at_field: str = "DV_Requested_At"           # Date/Time
+
+    # Phase 1C: vision-model extraction. "none" stops jobs after reading.
+    extraction_provider: str = "none"          # anthropic | openai | none
+    extraction_model: str | None = None        # default for anthropic: claude-sonnet-5-5
+    anthropic_api_key: SecretStr | None = None
+    openai_api_key: SecretStr | None = None
+    extraction_reasoning_effort: str = "low"   # OpenAI only: none | low | medium | high
+
+    # Automatic Zoho updates for high-confidence proposals (app/assessment/policy.py rules).
+    auto_apply_mode: str = "off"               # off | shadow (record only) | on (write)
+    auto_apply_threshold: float = 0.95
+    zoho_update_triggers: list[str] = []       # [] = our updates start no Zoho workflows
+    # Alerts (same mode): a Note on the Account + a Task for the Account owner.
+    alert_tasks: bool = True
+    alert_task_due_days: int = 3
+    alert_repeat_after_days: int = 7           # same issues -> no new task within this window
+    # Phase 3: create a "Document Verifications" review record in Zoho for every assessed job
+    create_review_records: bool = False
+    review_max_images: int = 10
+
+    sentry_dsn: str | None = None
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()  # type: ignore[call-arg]
