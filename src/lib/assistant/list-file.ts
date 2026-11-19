@@ -12,6 +12,9 @@ export interface ParsedFile {
   sheets: ParsedSheet[];
   /** Sheets hidden in Excel: not used (only the sheets the person can see count). */
   hiddenSheets?: string[];
+  /** Filled by the assistant: file size and how long reading it took (progress steps). */
+  size?: number;
+  parseMs?: number;
 }
 
 const unXml = (s: string) =>

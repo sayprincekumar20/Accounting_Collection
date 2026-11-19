@@ -75,6 +75,7 @@ const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 const fixture = (n: string) => readFileSync(resolve(process.cwd(), "tests/fixtures", n));
 
 let calls: { url: string; body: Record<string, unknown> }[] = [];
+let matchFails = false;
 let tamper: ((rows: unknown[]) => unknown[]) | null = null;
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } });
@@ -96,6 +97,7 @@ beforeEach(() => {
   reviewStore.clear();
   calls = [];
   tamper = null;
+  matchFails = false;
   window.prompt = () => "Tester";
   vi.spyOn(console, "error").mockImplementation(() => {});
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
@@ -111,7 +113,9 @@ beforeEach(() => {
         health_events: [],
         errors: [],
       });
+    if (u.includes("/api/assistant/list-warm")) return json({ ok: true, ms: 5 });
     if (u.includes("/api/assistant/list-match")) {
+      if (matchFails) return json({ error: "Failed to match the list" }, 500);
       const r = await buildReview(sanitizeRows(body["rows"]));
       return json({ ...r, rows: tamper ? tamper(r.rows) : r.rows });
     }
@@ -277,6 +281,52 @@ describe("Assistant: contact list flow", () => {
     fireEvent.click(screen.getByRole("button", { name: /Show the customer list/ }));
     await waitFor(() => expect(container.textContent).toContain('Sheet "ALL": 3 customers'));
     expect(container.textContent).toContain("SHyams ALPHAD");
+  });
+
+  it("shows the real processing stages: uploaded, processing, then analysis, results, completed", async () => {
+    const { container } = mount();
+    await attach(container, "lists.xlsx", fixture("lists.xlsx"));
+    await waitFor(() => expect(container.textContent).toContain("What do you want to do?"));
+    const steps = container.textContent!;
+    expect(steps).toContain("File uploaded");
+    expect(steps).toContain("File processing");
+    expect(steps).toMatch(/\d+ sheet\(s\), \d+ customers/);
+    // the client data starts loading as soon as the file is attached
+    expect(calls.some((c) => c.url.includes("/api/assistant/list-warm"))).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /Review and contact/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^ALL/ }));
+    await waitFor(() =>
+      expect(container.textContent).toMatch(/Completed( in [\d.]+ (s|min))? · show steps/),
+    );
+    fireEvent.click(screen.getAllByRole("button", { name: /show steps/ }).at(-1)!);
+    const list = container.querySelectorAll('ol[aria-label="Processing steps"]');
+    const last = list[list.length - 1]!.textContent!;
+    for (const s of [
+      "File uploaded",
+      "File processing",
+      "Data analysis",
+      "Results being prepared",
+      "Completed",
+    ])
+      expect(last).toContain(s);
+    expect(last).toMatch(/\d+ of \d+ matched/);
+  });
+
+  it("a failed analysis shows 'Failed' with the reason (no endless spinner)", async () => {
+    matchFails = true;
+    const { container } = mount();
+    await attach(container, "lists.xlsx", fixture("lists.xlsx"));
+    await waitFor(() => expect(container.textContent).toContain("What do you want to do?"));
+    fireEvent.click(screen.getByRole("button", { name: /Review and contact/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^ALL/ }));
+    await waitFor(() =>
+      expect(container.textContent).toContain("Failed · Failed to match the list"),
+    );
+    const failed = container.querySelectorAll('li[data-state="failed"]');
+    expect([...failed].map((li) => li.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("Data analysis")]),
+    );
+    expect(container.querySelector('li[data-state="active"]')).toBeNull();
   });
 
   it("explains a file that is not Excel or CSV", async () => {

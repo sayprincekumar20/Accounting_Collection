@@ -149,7 +149,10 @@ function ContactsPage() {
         </button>
       </div>
       <div className="mt-5">
-        <Panel title="Clients" description={`${visible.length} shown`}>
+        <Panel
+          title="Wrong contacts"
+          description={`Clients whose contact details are missing or incorrect · ${visible.length} shown`}
+        >
           {isLoading ? <SkeletonRows /> : null}
           {error ? <p className="px-4 py-6 text-sm text-destructive">Could not load.</p> : null}
           <ul className="divide-y divide-border">

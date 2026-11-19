@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
+import { isSystemRow } from "@/lib/escalation-alerts";
 
 // System notifications that used to be posted to Zoho Cliq #sales (error alerts, /call run results,
 // Friday close-out, client callbacks, ...): saved by the n8n 'Log Escalation' workflow in the
-// escalations table with channel SYSTEM / VOICE_CALLBACK and the full message text.
+// escalations table that are system notifications (isSystemRow: workflow failures, run results, alerts).
 type Row = Record<string, unknown>;
 const ESCALATIONS = "ANfkZZDIrDuC4RjK";
 const s = (v: unknown) => (v == null ? "" : String(v));
@@ -30,14 +31,8 @@ export const Route = createFileRoute("/api/notifications")({
         try {
           const rows = await fetchAllDataTableRows<Row>(ESCALATIONS);
           const items = rows
-            .filter((r) => {
-              const ch = s(r["channel"]).toUpperCase();
-              return (
-                ch === "SYSTEM" ||
-                ch === "VOICE_CALLBACK" ||
-                s(r["client_id"]).toUpperCase().startsWith("SYSTEM")
-              );
-            })
+            // Only system rows; client callback requests are customer escalations (Escalations page).
+            .filter((r) => isSystemRow(r))
             .map((r) => ({
               id: s(r["entry_id"]) || s(r["id"]),
               at: s(r["timestamp"]) || s(r["createdAt"]),

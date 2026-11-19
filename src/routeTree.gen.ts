@@ -70,6 +70,7 @@ import { Route as ApiAssistantClientErrorRouteImport } from './routes/api/assist
 import { Route as ApiAssistantContactListRouteImport } from './routes/api/assistant.contact-list'
 import { Route as ApiAssistantHomeRouteImport } from './routes/api/assistant.home'
 import { Route as ApiAssistantListMatchRouteImport } from './routes/api/assistant.list-match'
+import { Route as ApiAssistantListWarmRouteImport } from './routes/api/assistant.list-warm'
 import { Route as ApiDvReviewsReviewIdRouteImport } from './routes/api/dv-reviews.$reviewId'
 import { Route as ApiOutboundMediaTokenRouteImport } from './routes/api/outbound-media.$token'
 import { Route as ApiDvReviewsReviewIdActionRouteImport } from './routes/api/dv-reviews.$reviewId.$action'
@@ -382,6 +383,11 @@ const ApiAssistantListMatchRoute = ApiAssistantListMatchRouteImport.update({
   path: '/api/assistant/list-match',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAssistantListWarmRoute = ApiAssistantListWarmRouteImport.update({
+  id: '/api/assistant/list-warm',
+  path: '/api/assistant/list-warm',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDvReviewsReviewIdRoute = ApiDvReviewsReviewIdRouteImport.update({
   id: '/$reviewId',
   path: '/$reviewId',
@@ -473,6 +479,7 @@ export interface FileRoutesByFullPath {
   '/api/assistant/contact-list': typeof ApiAssistantContactListRoute
   '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/assistant/list-match': typeof ApiAssistantListMatchRoute
+  '/api/assistant/list-warm': typeof ApiAssistantListWarmRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
@@ -541,6 +548,7 @@ export interface FileRoutesByTo {
   '/api/assistant/contact-list': typeof ApiAssistantContactListRoute
   '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/assistant/list-match': typeof ApiAssistantListMatchRoute
+  '/api/assistant/list-warm': typeof ApiAssistantListWarmRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
@@ -610,6 +618,7 @@ export interface FileRoutesById {
   '/api/assistant/contact-list': typeof ApiAssistantContactListRoute
   '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/assistant/list-match': typeof ApiAssistantListMatchRoute
+  '/api/assistant/list-warm': typeof ApiAssistantListWarmRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
@@ -680,6 +689,7 @@ export interface FileRouteTypes {
     | '/api/assistant/contact-list'
     | '/api/assistant/home'
     | '/api/assistant/list-match'
+    | '/api/assistant/list-warm'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
     | '/api/dv-reviews/$reviewId/$action'
@@ -748,6 +758,7 @@ export interface FileRouteTypes {
     | '/api/assistant/contact-list'
     | '/api/assistant/home'
     | '/api/assistant/list-match'
+    | '/api/assistant/list-warm'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
     | '/api/dv-reviews/$reviewId/$action'
@@ -816,6 +827,7 @@ export interface FileRouteTypes {
     | '/api/assistant/contact-list'
     | '/api/assistant/home'
     | '/api/assistant/list-match'
+    | '/api/assistant/list-warm'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
     | '/api/dv-reviews/$reviewId/$action'
@@ -885,6 +897,7 @@ export interface RootRouteChildren {
   ApiAssistantContactListRoute: typeof ApiAssistantContactListRoute
   ApiAssistantHomeRoute: typeof ApiAssistantHomeRoute
   ApiAssistantListMatchRoute: typeof ApiAssistantListMatchRoute
+  ApiAssistantListWarmRoute: typeof ApiAssistantListWarmRoute
   ApiOutboundMediaTokenRoute: typeof ApiOutboundMediaTokenRoute
 }
 
@@ -1317,6 +1330,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAssistantListMatchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/assistant/list-warm': {
+      id: '/api/assistant/list-warm'
+      path: '/api/assistant/list-warm'
+      fullPath: '/api/assistant/list-warm'
+      preLoaderRoute: typeof ApiAssistantListWarmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dv-reviews/$reviewId': {
       id: '/api/dv-reviews/$reviewId'
       path: '/$reviewId'
@@ -1444,6 +1464,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAssistantContactListRoute: ApiAssistantContactListRoute,
   ApiAssistantHomeRoute: ApiAssistantHomeRoute,
   ApiAssistantListMatchRoute: ApiAssistantListMatchRoute,
+  ApiAssistantListWarmRoute: ApiAssistantListWarmRoute,
   ApiOutboundMediaTokenRoute: ApiOutboundMediaTokenRoute,
 }
 export const routeTree = rootRouteImport

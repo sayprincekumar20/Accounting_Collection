@@ -1,15 +1,27 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { AppShell } from "@/components/AppShell";
 import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 
+// System Notifications: workflow failures, automation errors, run results, technical alerts. Kept apart from
+// customer escalations (Escalations page); the split is the shared rule isSystemRow (lib/escalation-alerts).
 export const Route = createFileRoute("/notifications")({
-  // Moved: this content now lives on another page (kept as a redirect so old links keep working).
-  beforeLoad: () => {
-    throw redirect({ href: "/escalations?tab=notifications" });
-  },
+  head: () => ({ meta: [{ title: "System Notifications | Rare Global Food Collections" }] }),
+  component: NotificationsPage,
 });
+
+function NotificationsPage() {
+  return (
+    <AppShell
+      title="System Notifications"
+      subtitle="Workflow failures, automation errors, integration issues, run results and technical alerts"
+    >
+      <NotificationsContent />
+    </AppShell>
+  );
+}
 
 interface Item {
   id: string;
@@ -19,7 +31,7 @@ interface Item {
   summary: string;
   message: string;
 }
-const KINDS = ["All", "Error", "/call result", "Cycle close-out", "Callback", "System"];
+const KINDS = ["All", "Error", "/call result", "Cycle close-out", "System"];
 const when = (v: string) =>
   v
     ? new Date(v).toLocaleString("en-PH", {

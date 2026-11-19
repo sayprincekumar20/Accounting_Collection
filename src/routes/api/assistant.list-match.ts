@@ -17,7 +17,11 @@ export const Route = createFileRoute("/api/assistant/list-match")({
           const b = (await request.json()) as { rows?: unknown };
           const rows = sanitizeRows(b.rows);
           if (!rows.length) return json({ error: "No customer names to match." }, 400);
-          return json(await buildReview(rows));
+          const t0 = Date.now();
+          const review = await buildReview(rows);
+          const total_ms = Date.now() - t0;
+          console.log(`[assistant-list-match] ${rows.length} rows matched in ${total_ms} ms`);
+          return json({ ...review, timing: { total_ms } });
         } catch (err) {
           console.error("[assistant-list-match] error:", err);
           return json(

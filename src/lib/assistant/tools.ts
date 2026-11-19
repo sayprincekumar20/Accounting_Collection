@@ -7,6 +7,7 @@ import { registerAction, type ActionContext } from "./registry";
 import { approveClients, contactClients } from "@/lib/n8n-actions";
 import { isOpenEscalation } from "./home-calc";
 import { isNotReachedReason } from "@/lib/escalation-alerts";
+import { isSystemRow } from "@/lib/escalation-alerts";
 
 type Row = Record<string, unknown>;
 const T = {
@@ -350,7 +351,7 @@ registerAction({
           (e) =>
             companyKey(e["client_id"]) === key &&
             s(e["status"]).toUpperCase() !== "DONE" &&
-            s(e["channel"]).toUpperCase() !== "SYSTEM",
+            !isSystemRow(e),
         )
         .slice(0, 10)
         .map((e) => ({
@@ -564,7 +565,7 @@ registerAction({
   execute: async (a) => {
     const list = (await rows(T.escalations)).filter(
       (e) =>
-        s(e["channel"]).toUpperCase() !== "SYSTEM" &&
+        !isSystemRow(e) &&
         !isNotReachedReason(e["reason"]) &&
         (!a.status || (s(e["status"]).toUpperCase() || "OPEN") === a.status),
     );

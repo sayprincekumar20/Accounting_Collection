@@ -5,3 +5,17 @@ const s = (v: unknown) => (v == null ? "" : String(v));
 
 export const isNotReachedReason = (reason: unknown) =>
   /^not reached by phone/i.test(s(reason).trim());
+
+/**
+ * A system notification, not a customer escalation: workflow failures, automation errors, run results,
+ * cycle close-outs, technical alerts. Written with channel SYSTEM / SYSTEM_ERROR / SYSTEM_..., or with a
+ * client id starting with SYSTEM, or worded as a workflow failure. Customer escalations (disputes, payment
+ * issues, unresolved conversations, callback requests) are everything else.
+ */
+const SYSTEM_REASON =
+  /^(workflow failed|\[system\]|system( alert| error)?:|automation error|integration error)/i;
+export function isSystemRow(e: Record<string, unknown>): boolean {
+  if (s(e["channel"]).trim().toUpperCase().startsWith("SYSTEM")) return true;
+  if (s(e["client_id"]).trim().toUpperCase().startsWith("SYSTEM")) return true;
+  return SYSTEM_REASON.test(s(e["reason"]).trim());
+}

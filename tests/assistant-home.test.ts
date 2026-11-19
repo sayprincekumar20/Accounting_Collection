@@ -24,10 +24,13 @@ const client = (o: Partial<HomeClient> = {}): HomeClient => ({
 });
 
 describe("escalations", () => {
-  it("ignores system notifications, callbacks and 'not reached' alerts", () => {
+  it("ignores system notifications and 'not reached' alerts; a client callback request is an escalation", () => {
     expect(isClientEscalation({ channel: "SYSTEM_ERROR", reason: "Workflow failed" })).toBe(false);
     expect(isClientEscalation({ channel: "SYSTEM", reason: "x" })).toBe(false);
-    expect(isClientEscalation({ channel: "VOICE_CALLBACK", reason: "x" })).toBe(false);
+    expect(isClientEscalation({ channel: "VOICE_CALLBACK", reason: "x" })).toBe(true);
+    expect(isClientEscalation({ channel: "EMAIL", reason: "Workflow failed: 31_PreSend" })).toBe(
+      false,
+    );
     expect(isClientEscalation({ channel: "VOICE", client_id: "SYSTEM___x", reason: "x" })).toBe(
       false,
     );

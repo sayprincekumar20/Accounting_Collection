@@ -7,6 +7,7 @@
 //  - client   : the client
 //  - system   : delivery failures (mailer-daemon, postmaster, no-reply)
 import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
+import { isSystemRow } from "@/lib/escalation-alerts";
 
 const CONVERSATIONS_TABLE_ID = "2WtfkEaHiBSzgItW";
 const ESCALATIONS_TABLE_ID = "ANfkZZDIrDuC4RjK";
@@ -110,12 +111,7 @@ export function escalationsFor(
 ): EscalationNote[] {
   const ids = new Set(clientIds);
   return ctx.escalations
-    .filter(
-      (e) =>
-        ids.has(s(e["client_id"])) &&
-        up(e["channel"]) !== "SYSTEM" &&
-        !isNotReachedAlert(e["reason"]),
-    )
+    .filter((e) => ids.has(s(e["client_id"])) && !isSystemRow(e) && !isNotReachedAlert(e["reason"]))
     .filter((e) => !channel || up(e["channel"]) === channel.toUpperCase())
     .map((e) => ({
       reason: s(e["reason"]),

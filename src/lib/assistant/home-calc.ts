@@ -2,6 +2,7 @@
 // The numbers use the same definitions as the dashboard pages (Contact Approvals, Promises, Escalations).
 import { escalationType, type EscalationType } from "@/lib/escalation-type";
 import { isNotReachedReason } from "@/lib/escalation-alerts";
+import { isSystemRow } from "@/lib/escalation-alerts";
 
 type Row = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? "" : String(v));
@@ -24,9 +25,7 @@ export interface HomeClient {
 
 /** A client escalation: raised by the client; not a system notification, not a "not reached by phone" alert. */
 export function isClientEscalation(e: Row): boolean {
-  const ch = s(e["channel"]).toUpperCase();
-  if (ch.startsWith("SYSTEM") || ch === "VOICE_CALLBACK") return false;
-  if (s(e["client_id"]).toUpperCase().startsWith("SYSTEM")) return false;
+  if (isSystemRow(e)) return false; // system notification
   if (isNotReachedReason(e["reason"])) return false; // not an escalation
   return true;
 }

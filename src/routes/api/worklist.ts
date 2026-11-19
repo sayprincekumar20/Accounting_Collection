@@ -3,6 +3,7 @@ import { requireSecret } from "@/lib/env";
 import { escalationType } from "@/lib/escalation-type";
 import { clearDataTableCache, fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { isNotReachedAlert } from "@/lib/authorship";
+import { isSystemRow } from "@/lib/escalation-alerts";
 
 // AR worklist: every escalation raised by a client (not the automatic "Not reached by phone" alert), with its
 // handling status. POST updates status / handled_by / note for one escalation (entry_id).
@@ -36,7 +37,7 @@ export const Route = createFileRoute("/api/worklist")({
           const items = esc
             .filter(
               (e) =>
-                s(e["channel"]).toUpperCase() !== "SYSTEM" &&
+                !isSystemRow(e) &&
                 (includeAlerts || !isNotReachedAlert(e["reason"])) &&
                 (!onlyCompany ||
                   s(e["client_id"]).split("___")[0]!.trim().toLowerCase() === onlyCompany) &&

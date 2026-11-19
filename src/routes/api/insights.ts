@@ -3,6 +3,7 @@ import { fetchAllDataTableRows, RECENT_60_DAYS } from "@/lib/n8n-datatable";
 import { companyKey, cycleStart } from "@/lib/client-activity";
 import { isNotReachedAlert } from "@/lib/authorship";
 import { ESCALATION_TYPES, escalationAgeHours, escalationType } from "@/lib/escalation-type";
+import { isSystemRow } from "@/lib/escalation-alerts";
 
 // AR management summary for the Overview page: aging with the promised part, promise pipeline,
 // escalations by type, this cycle's contact funnel and the top overdue clients.
@@ -148,10 +149,7 @@ export function computeInsights(
 
   // escalations by type
   const esc = escalations.filter(
-    (e) =>
-      s(e["channel"]).toUpperCase() !== "SYSTEM" &&
-      !isNotReachedAlert(e["reason"]) &&
-      s(e["entry_id"]),
+    (e) => !isSystemRow(e) && !isNotReachedAlert(e["reason"]) && s(e["entry_id"]),
   );
   const byType = ESCALATION_TYPES.map((t) => ({
     type: t,

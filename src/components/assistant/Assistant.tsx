@@ -21,6 +21,17 @@ import { ActionPicker, ListReview, SheetPicker } from "./ListReview";
 import { ListBoundary } from "./AssistantBoundary";
 import { CONVERSATIONS_KEY } from "./store-key";
 import { installGlobalErrorReporting } from "./client-error";
+import { ProgressSteps } from "./ProgressSteps";
+import {
+  durationLabel,
+  failActive,
+  fileSize,
+  interruptStale,
+  markStep,
+  newSteps,
+  type ProgressStep,
+  type StepKey,
+} from "@/lib/assistant/progress";
 import { fileStore, reviewStore } from "./list-store";
 import { parseListFile, sheetsContextText } from "@/lib/assistant/list-file";
 import {
@@ -65,6 +76,8 @@ interface Msg {
   review?: { id: string };
   /** Contact lists: what the file / sheet contains, sent to the chat AI with the conversation (not shown). */
   context?: string;
+  /** Contact lists: the real processing stages (uploaded, processing, analysis, results, completed/failed). */
+  progress?: ProgressStep[];
 }
 interface Convo {
   id: string;
@@ -95,7 +108,13 @@ const TOOL_LABEL: Record<string, string> = {
 const newId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 const loadConvos = (): Convo[] => {
   try {
-    return JSON.parse(localStorage.getItem(STORE) || "[]") as Convo[];
+    // A step that was running when the page was closed is shown as interrupted (never spins forever).
+    return (JSON.parse(localStorage.getItem(STORE) || "[]") as Convo[]).map((c) => ({
+      ...c,
+      messages: (c.messages ?? []).map((m) =>
+        m.progress ? { ...m, progress: interruptStale(m.progress) ?? m.progress } : m,
+      ),
+    }));
   } catch {
     return [];
   }
@@ -328,10 +347,14 @@ export function Assistant() {
       messages: c.messages.map((m) => (m.uid === uid ? fn(m) : m)),
     }));
   const failMsg = (convoId: string, uid: string, e: unknown) =>
-    patchMsg(convoId, uid, (m) => ({
-      ...m,
-      content: `I could not do that: ${e instanceof Error ? e.message : "something went wrong"}`,
-    }));
+    patchMsg(convoId, uid, (m) => {
+      const reason = e instanceof Error ? e.message : "something went wrong";
+      return {
+        ...m,
+        content: `I could not do that: ${reason}`,
+        ...(m.progress ? { progress: failActive(m.progress, reason) } : {}),
+      };
+    });
 
   async function matchSheet(
     convoId: string,
@@ -346,45 +369,80 @@ export function Assistant() {
       failMsg(convoId, uid, new Error("the file is no longer loaded, please attach it again"));
       return;
     }
+    // The real stages: the file was already read in the browser; then the server matches the names.
+    const t0 = Date.now();
+    const keys: StepKey[] =
+      action === "list"
+        ? ["uploaded", "processing", "results", "completed"]
+        : ["uploaded", "processing", "analysis", "results", "completed"];
+    let steps = markStep(newSteps(keys), "uploaded", "done", {
+      detail: f.size ? `${f.name} · ${fileSize(f.size)}` : f.name,
+      started: t0,
+      ended: t0,
+    });
+    steps = markStep(steps, "processing", "done", {
+      detail: `sheet "${sheetName}": ${sheet.rows.length} customers`,
+      started: t0 - (f.parseMs ?? 0),
+      ended: t0,
+    });
+    const show = (patch: Partial<Msg> = {}) =>
+      patchMsg(convoId, uid, (m) => ({ ...m, ...patch, progress: steps }));
     if (action === "list") {
       // The sheet as it is in the file: no lookup needed.
-      patchMsg(convoId, uid, (m) => ({
-        ...m,
-        content: customerListText(sheetName, sheet.rows),
-        context: sheetsContextText({ ...f, sheets: [sheet] }),
-      }));
+      steps = markStep(steps, "results", "active");
+      const content = customerListText(sheetName, sheet.rows);
+      steps = markStep(steps, "results", "done");
+      steps = markStep(steps, "completed", "done", { started: t0 });
+      show({ content, context: sheetsContextText({ ...f, sheets: [sheet] }) });
       return;
     }
-    patchMsg(convoId, uid, (m) => ({
-      ...m,
-      content: `Matching ${sheet.rows.length} customers from sheet "${sheetName}" to our clients…`,
-    }));
+    steps = markStep(steps, "analysis", "active", {
+      detail: `matching ${sheet.rows.length} customers to our clients`,
+    });
+    show({ content: `Checking sheet "${sheetName}" against our clients…` });
     try {
       const res = await fetch("/api/assistant/list-match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows: sheet.rows }),
       });
-      const j = (await res.json().catch(() => ({}))) as { rows?: unknown; error?: string };
+      const j = (await res.json().catch(() => ({}))) as {
+        rows?: unknown;
+        error?: string;
+        timing?: { total_ms?: number };
+      };
       if (!res.ok || !Array.isArray(j.rows))
         throw new Error(j.error || `Matching failed (${res.status})`);
       // Never trust the exact shape of the server's answer: rebuild every row with safe types.
       const rows: ReviewRow[] = normalizeReviewRows(j.rows);
       if (!rows.length) throw new Error("The matching returned no rows to review.");
+      steps = markStep(steps, "analysis", "done", {
+        detail: `${rows.filter((r) => r.client).length} of ${rows.length} matched${
+          typeof j.timing?.total_ms === "number"
+            ? ` · server ${durationLabel(j.timing.total_ms)}`
+            : ""
+        }`,
+      });
+      steps = markStep(steps, "results", "active");
+      show();
       const ids = [
         ...new Set(rows.filter((r) => r.client && r.selectable).map((r) => r.client!.client_id)),
       ];
       if (ids.length)
         update(convoId, (c) => ({ ...c, workingSet: { ids, label: `list ${sheetName}` } }));
+      const finish = (patch: Partial<Msg>) => {
+        steps = markStep(steps, "results", "done");
+        steps = markStep(steps, "completed", "done", { started: t0 });
+        show(patch);
+      };
       if (action === "compare" || action === "contact") {
-        patchMsg(convoId, uid, (m) => ({
-          ...m,
+        finish({
           content:
             action === "compare"
               ? compareText(sheetName, rows)
               : contactabilityText(sheetName, rows),
           context: reviewContextText(f.name, sheetName, rows),
-        }));
+        });
         return;
       }
       const summary = reviewSummaryText(sheetName, rows);
@@ -396,12 +454,11 @@ export function Assistant() {
         rows,
         result: null,
       });
-      patchMsg(convoId, uid, (m) => ({
-        ...m,
+      finish({
         content: summary,
         review: { id: reviewId },
         context: reviewContextText(f.name, sheetName, rows),
-      }));
+      });
     } catch (e) {
       failMsg(convoId, uid, e);
     }
@@ -413,10 +470,32 @@ export function Assistant() {
     const id = convo.id;
     const uid = newId();
     appendMsg(id, { role: "user", content: `Attached ${file.name}` });
-    appendMsg(id, { role: "assistant", content: "Reading the file…", uid });
+    const t0 = Date.now();
+    let steps = markStep(newSteps(["uploaded", "processing"]), "uploaded", "done", {
+      detail: `${file.name} · ${fileSize(file.size)}`,
+      started: t0,
+      ended: t0,
+    });
+    steps = markStep(steps, "processing", "active", { detail: "reading the sheets", now: t0 });
+    appendMsg(id, { role: "assistant", content: "Reading the file…", uid, progress: steps });
+    // Start loading the client data now, while the person chooses what to do (the analysis then finds it
+    // ready in the server's cache instead of waiting for n8n).
+    void fetch("/api/assistant/list-warm", { method: "POST" }).catch(() => undefined);
     try {
       const parsed = await parseListFile(file);
+      parsed.size = file.size;
+      parsed.parseMs = Date.now() - t0;
       fileStore.set(parsed.id, parsed);
+      const customers = parsed.sheets.reduce((n, s) => n + s.rows.length, 0);
+      steps = markStep(
+        steps,
+        "processing",
+        parsed.sheets.some((s) => s.rows.length) ? "done" : "failed",
+        {
+          detail: `${parsed.sheets.filter((s) => s.rows.length).length} sheet(s), ${customers} customers`,
+        },
+      );
+      patchMsg(id, uid, (m) => ({ ...m, progress: steps }));
       const usable = parsed.sheets.filter((s) => s.rows.length);
       if (!usable.length) {
         patchMsg(id, uid, (m) => ({
@@ -655,6 +734,7 @@ export function Assistant() {
                     )}
                   </div>
                 ) : null}
+                {m.progress?.length ? <ProgressSteps steps={m.progress} /> : null}
                 {m.actionPick ? (
                   <ListBoundary>
                     <ActionPicker

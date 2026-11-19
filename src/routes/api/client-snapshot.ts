@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { buildActivity, companyKey, cycleStart, loadActivityTables } from "@/lib/client-activity";
+import { isSystemRow } from "@/lib/escalation-alerts";
 
 // One client's full context (escalation card, client header): contact, owner, terms, schedule, amounts,
 // invoices with counter dates, approval, promise, last text / call, open escalations.
@@ -78,7 +79,7 @@ export const Route = createFileRoute("/api/client-snapshot")({
           const openEsc = escalations.filter(
             (e) =>
               companyKey(e["client_id"]) === k &&
-              s(e["channel"]).toUpperCase() !== "SYSTEM" &&
+              !isSystemRow(e) &&
               s(e["status"]).toUpperCase() !== "DONE" &&
               s(e["entry_id"]),
           ).length;

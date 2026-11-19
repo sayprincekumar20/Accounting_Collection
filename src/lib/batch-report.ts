@@ -7,7 +7,7 @@
 //
 // Pure functions (no I/O): unit-tested in tests/batch-report.test.ts.
 import { escalationType } from "./escalation-type";
-import { isNotReachedReason } from "./escalation-alerts";
+import { isNotReachedReason, isSystemRow } from "./escalation-alerts";
 
 type Row = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? "" : String(v));
@@ -293,7 +293,7 @@ export function clientOutcome(a: {
       ? `Call failed to start: ${s(callFails[callFails.length - 1]!["error_message"]).slice(0, 120) || "error"}`
       : "Not called"
     : calls.map((c) => c.result).join(", then ");
-  const escs = mine(a.escalations).filter((e) => s(e["channel"]).toUpperCase() !== "SYSTEM");
+  const escs = mine(a.escalations).filter((e) => !isSystemRow(e));
   const not_reached_alert = escs.some((e) => isNotReachedReason(e["reason"]));
   const realEsc = escs.filter((e) => !isNotReachedReason(e["reason"]));
   const lastEsc = realEsc[realEsc.length - 1];

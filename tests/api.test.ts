@@ -589,7 +589,7 @@ describe("Contact Approvals: collection schedule from CRM", () => {
 });
 
 describe("GET /api/notifications (system messages formerly posted to Cliq)", () => {
-  it("returns SYSTEM / callback rows with their full message, newest first, and not client escalations", async () => {
+  it("returns system rows (SYSTEM, SYSTEM_ERROR, 'Workflow failed'), newest first; never customer escalations or callbacks", async () => {
     tables["ANfkZZDIrDuC4RjK"] = [
       {
         entry_id: "a",
@@ -625,15 +625,31 @@ describe("GET /api/notifications (system messages formerly posted to Cliq)", () 
         reason: "Claims paid",
         timestamp: "2026-11-09T04:00:00Z",
       },
+      {
+        entry_id: "e",
+        client_id: "SYSTEM_ERROR___05_Email",
+        client_name: "System",
+        channel: "SYSTEM_ERROR",
+        reason: "Workflow failed: 05_Email_Channel_Workflow - Forbidden",
+        timestamp: "2026-11-09T05:00:00Z",
+      },
+      {
+        entry_id: "f",
+        client_id: "",
+        client_name: "",
+        channel: "EMAIL",
+        reason: "Workflow failed: 31_PreSend_Refresh_And_PDF",
+        timestamp: "2026-11-09T06:00:00Z",
+      },
     ];
     const items = (await (await call("notifications", "GET")).json()).items as {
       id: string;
       kind: string;
       message: string;
     }[];
-    expect(items.map((i) => i.id)).toEqual(["c", "b", "a"]);
-    expect(items.map((i) => i.kind)).toEqual(["Callback", "Cycle close-out", "/call result"]);
-    expect(items[2]!.message).toContain("MANUAL RUN FINISHED");
+    expect(items.map((i) => i.id)).toEqual(["f", "e", "b", "a"]);
+    expect(items.map((i) => i.kind)).toEqual(["Error", "Error", "Cycle close-out", "/call result"]);
+    expect(items[3]!.message).toContain("MANUAL RUN FINISHED");
   });
 });
 
@@ -720,5 +736,48 @@ describe("GET /api/worklist (automatic 'Not reached' alerts)", () => {
       ["E1", true],
       ["E4", true],
     ]);
+  });
+});
+
+describe("GET /api/worklist: customer escalations only", () => {
+  it("system rows (workflow failures, SYSTEM_ERROR) never appear; client callback requests do", async () => {
+    tables["ANfkZZDIrDuC4RjK"] = [
+      {
+        entry_id: "w1",
+        client_id: "SYSTEM_ERROR___05",
+        channel: "SYSTEM_ERROR",
+        reason: "Workflow failed: 05 - Forbidden",
+        timestamp: "2026-11-09T05:00:00Z",
+      },
+      {
+        entry_id: "w2",
+        client_id: "ACME___x",
+        client_name: "ACME",
+        channel: "EMAIL",
+        reason: "Workflow failed: 31_PreSend",
+        timestamp: "2026-11-09T05:10:00Z",
+      },
+      {
+        entry_id: "w3",
+        client_id: "ACME___x",
+        client_name: "ACME",
+        channel: "VOICE_CALLBACK",
+        reason: "Asked to be called back at 3 PM",
+        timestamp: "2026-11-09T05:20:00Z",
+      },
+      {
+        entry_id: "w4",
+        client_id: "ACME___x",
+        client_name: "ACME",
+        channel: "EMAIL",
+        reason: "Dispute: wrong amount",
+        timestamp: "2026-11-09T05:30:00Z",
+      },
+    ];
+    tables["rJpqXxmxhqJnlLrJ"] = [];
+    const items = (await (await call("worklist", "GET", "/api/worklist")).json()).items as {
+      entry_id: string;
+    }[];
+    expect(items.map((i) => i.entry_id).sort()).toEqual(["w3", "w4"]);
   });
 });
