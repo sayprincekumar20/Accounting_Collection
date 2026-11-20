@@ -24,7 +24,10 @@ const FILTERS = [
   { id: "Applied", label: "Applied", hint: "Approved and written to Zoho" },
   { id: "Waiting for Documents", label: "Waiting for documents", hint: "Customer must send more" },
   { id: "Rejected", label: "Rejected", hint: "Closed without changes" },
+  { id: "ATTENTION", label: "Needs attention", hint: "Failed or conflict: check and verify again" },
 ] as const;
+
+const ATTENTION = ["Failed", "Conflict"];
 
 function VerificationListPage() {
   const { data, isLoading, isFetching, error, refetch } = useQuery({
@@ -37,7 +40,13 @@ function VerificationListPage() {
   const [filter, setFilter] = useState<string>("OPEN");
   const [q, setQ] = useState("");
   const matches = (r: ReviewSummary, f: string) =>
-    f === "OPEN" ? isOpen(r.status) : f === "ALL" ? true : r.status === f;
+    f === "OPEN"
+      ? isOpen(r.status)
+      : f === "ALL"
+        ? true
+        : f === "ATTENTION"
+          ? ATTENTION.includes(r.status)
+          : r.status === f;
   const visible = items.filter(
     (r) =>
       matches(r, filter) &&
@@ -53,7 +62,7 @@ function VerificationListPage() {
       subtitle="Accounts checked with the Verify Account button in Zoho CRM that need a person's decision"
       actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
     >
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {FILTERS.map((f) => (
           <StatCard
             key={f.id}

@@ -158,11 +158,11 @@ string standalone.dv_verify_account(String account_id, String reason, String use
 		if(answer.get("created") == true)
 		{
 			result.put("ok",true);
-			result.put("message","Verification started for " + count + " document(s). The result will appear in Document Verifications (related list below) in 1-3 minutes.");
+			result.put("message","Verification started for " + count + " document(s). The result will appear in the Document Verification tab of the Accounts Dashboard (accounting.rareglobalfood.com/verification) in 1-3 minutes, and you will receive an email.");
 			return result.toString();
 		}
 		result.put("ok",true);
-		result.put("message","A verification for this Account is already in progress. Please check Document Verifications in a few minutes.");
+		result.put("message","A verification for this Account is already in progress. Please check the Document Verification tab of the Accounts Dashboard in a few minutes.");
 		return result.toString();
 	}
 	if(resp_text.contains("Invalid API key"))
@@ -172,7 +172,13 @@ string standalone.dv_verify_account(String account_id, String reason, String use
 		return result.toString();
 	}
 	result.put("ok",false);
-	if(resp_text.length() > 300)
+	if(resp_text.contains("<html") || resp_text.contains("<!DOCTYPE"))
+{
+	result.put("ok",false);
+	result.put("message","The verification engine is restarting or not reachable. Please try again in a minute. If it keeps failing, contact the CRM admin.");
+	return result.toString();
+}
+if(resp_text.length() > 300)
 	{
 		resp_text = resp_text.subString(0,300);
 	}

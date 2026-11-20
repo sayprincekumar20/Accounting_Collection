@@ -89,6 +89,15 @@ class Settings(BaseSettings):
     expiry_alert_days: str = "30,7,0"        # reminder levels (days before expiry)
     expiry_check_hour: int = 8               # daily expiry check, Manila time
     zoho_crm_web_url: str = ""               # e.g. https://crm.zoho.com/crm/org824163551 (links)
+    dashboard_url: str = ""                  # e.g. https://accounting.rareglobalfood.com (links)
+    # Emails (company Gmail, same mailbox as the dashboard): to the person who clicked Verify
+    # Account, CC the Account owner; expiry reminders to the owner, CC the last requester.
+    gmail_business_email: str = ""
+    gmail_client_id: str = ""
+    gmail_client_secret: str = ""
+    gmail_refresh_token: str = ""
+    notify_emails: bool = True
+    expiry_cliq: bool = False                # expiry reminders by email only (decision 2026-11-18)
 
     request_polling: bool = False                      # pull mode off unless switched on
     poll_interval_seconds: int = 60

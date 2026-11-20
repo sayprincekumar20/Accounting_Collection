@@ -19,7 +19,11 @@ TODAY = date(2026, 11, 2)
 
 class Recorder:
     def __init__(self):
-        self.messages, self.rows = [], []
+        self.messages, self.rows, self.emails = [], [], []
+
+    def send(self, to, cc, subject, text):
+        self.emails.append({"to": to, "cc": cc, "subject": subject, "text": text})
+        return True
 
     def post(self, text):
         self.messages.append(text)
@@ -35,14 +39,16 @@ class Recorder:
 
 def notifier():
     rec = Recorder()
-    return Notifier(rec, rec), rec
+    return Notifier(rec, rec, rec), rec
 
 
 def _job(db, until="2026-12-31", status="VALID", created=None):
     job = VerificationJob(account_id=ACC, status=JobStatus.ASSESSED, reason="for activation",
                           requested_by_email="rep@example.com",
                           account_snapshot={"Account_Name": "EXAMPLE CAFE INC.",
-                                            "Inventory_Customer_Number": "RGFC-00001"})
+                                            "Inventory_Customer_Number": "RGFC-00001",
+                                            "Owner": {"name": "Owner Rep",
+                                                      "email": "owner@example.com"}})
     db.add(job)
     db.flush()
     a = {"recommendation": "ACTIVE", "documents": [{}, {}],
@@ -144,11 +150,24 @@ def test_expiry_levels_sent_once(db):
     n, rec = notifier()
     assert check_expiry(db, FakeZoho(), n, S, lambda _: None, TODAY)["alerts"] == 1
     assert check_expiry(db, FakeZoho(), n, S, lambda _: None, TODAY)["alerts"] == 0
-    assert "Mayor's permit of EXAMPLE CAFE INC. (RGFC-00001) expires on" in rec.messages[0]
-    assert "(in 25 days)" in rec.messages[0]
+    assert rec.messages == []                                  # email only (no Cliq)
+    mail = rec.emails[0]
+    assert mail["to"] == ["owner@example.com"] and mail["cc"] == ["rep@example.com"]
+    assert mail["subject"] == "Mayor's permit expiring: EXAMPLE CAFE INC."
+    assert "(in 25 days)" in mail["text"]
     # 6 days left: the 7-day level is a new reminder
     assert check_expiry(db, FakeZoho(), n, S, lambda _: None,
                         TODAY + timedelta(days=19))["alerts"] == 1
+    assert len(rec.emails) == 2
+
+
+def test_expiry_in_cliq_only_when_switched_on(db):
+    class WithCliq(S):
+        expiry_cliq = True
+    _job(db, until=(TODAY + timedelta(days=25)).isoformat())
+    n, rec = notifier()
+    check_expiry(db, FakeZoho(), n, WithCliq, lambda _: None, TODAY)
+    assert "Mayor's permit of EXAMPLE CAFE INC. (RGFC-00001) expires on" in rec.messages[0]
 
 
 def test_new_attachment_triggers_recheck_instead_of_alert(db):
@@ -213,3 +232,104 @@ def test_sheets_client_creates_tabs_and_appends():
     paths = [p for _, p in calls]
     assert "/v4/spreadsheets/SHEET:batchUpdate" in paths
     assert paths[-1] == "/v4/spreadsheets/SHEET/values/'Verifications'!A1:append"
+
+
+def test_verification_emails_requester_cc_owner(db):
+    job = _job(db)
+    db.add(FieldUpdate(job_id=job.id, account_id=ACC, zoho_field="Customer_Status",
+                       action="ACTIVATE", old_value=None, new_value="Active", confidence=None,
+                       grounding=None, sources=[], mode="on", status="APPLIED"))
+    db.commit()
+    n, rec = notifier()
+    notify_verification(db, job, n)
+    mail = rec.emails[0]
+    assert mail["to"] == ["rep@example.com"] and mail["cc"] == ["owner@example.com"]
+    assert mail["subject"] == "Account activated: EXAMPLE CAFE INC."
+
+
+def test_verification_needing_review_lists_reasons(db):
+    job = _job(db)
+    row = db.get(JobAssessment, job.id)
+    row.assessment = {**row.assessment, "recommendation": "MANUAL_REVIEW",
+                      "reasons": ["Required document missing: SEC_CERT"],
+                      "activation_checks": [{"key": "tin", "label": "TIN", "status": "FAIL",
+                                             "detail": "empty in Zoho"}]}
+    db.commit()
+    n, rec = notifier()
+    notify_verification(db, job, n)
+    mail = rec.emails[0]
+    assert mail["subject"] == "Verification in review: EXAMPLE CAFE INC."
+    assert "- SEC certificate missing" in mail["text"] and "- TIN: empty in Zoho" in mail["text"]
+
+
+def _engine_review(db, status, notes="", activated=None):
+    from app.db.models import Review
+    job = _job(db)
+    r = Review(number=7, job_id=job.id, account_id=ACC, account_name="EXAMPLE CAFE INC.",
+               status=status, recommendation="MANUAL_REVIEW", summary={}, pages=[],
+               requested_by="rep@example.com", reviewer="Ana", reviewer_notes=notes,
+               activated=activated,
+               rows=[{"id": "1", "zoho_field": "Owner_Name", "field_label": "Owner Name",
+                      "decision": "Approve", "outcome": "APPLIED", "current_value": "",
+                      "proposed_value": "ANA REYES", "edited_value": None}])
+    db.add(r)
+    db.commit()
+    return r
+
+
+def test_review_decision_emails(db):
+    from app.notify.events import notify_engine_review
+    n, rec = notifier()
+    notify_engine_review(db, _engine_review(db, "Applied", activated=True), n)
+    mail = rec.emails[-1]
+    assert mail["subject"] == "Verification approved: EXAMPLE CAFE INC."
+    assert "approved by Ana" in mail["text"] and "Updated in Zoho CRM: Owner Name." in mail["text"]
+    assert "Customer Status: Active." in mail["text"]
+    assert mail["to"] == ["rep@example.com"] and mail["cc"] == ["owner@example.com"]
+
+
+def test_waiting_for_documents_and_rejected_emails(db):
+    from app.notify.events import notify_engine_review
+    n, rec = notifier()
+    notify_engine_review(db, _engine_review(db, "Waiting for Documents",
+                                            "Please upload the SEC certificate"), n)
+    assert rec.emails[-1]["subject"] == "Documents needed: EXAMPLE CAFE INC."
+    assert "Please upload the SEC certificate" in rec.emails[-1]["text"]
+    assert "click Verify Account again" in rec.emails[-1]["text"]
+
+
+def test_rejected_email(db):
+    from app.notify.events import notify_engine_review
+    n, rec = notifier()
+    notify_engine_review(db, _engine_review(db, "Rejected", "Documents of another company"), n)
+    assert rec.emails[-1]["subject"] == "Verification not approved: EXAMPLE CAFE INC."
+    assert "Reason: Documents of another company" in rec.emails[-1]["text"]
+
+
+def test_recipients_rules():
+    from app.notify.emails import recipients
+    assert recipients("rep@x.com", "owner@x.com") == (["rep@x.com"], ["owner@x.com"])
+    assert recipients("rep@x.com", "REP@x.com") == (["rep@x.com"], [])
+    assert recipients(None, "owner@x.com") == (["owner@x.com"], [])
+    assert recipients("not an email", None) == ([], [])
+
+
+def test_gmail_client_sends_mime_with_to_cc_subject():
+    import base64
+    seen = {}
+
+    def handler(request):
+        if request.url.host == "oauth2.googleapis.com":
+            return httpx.Response(200, json={"access_token": "tok", "expires_in": 3600})
+        seen["auth"] = request.headers["Authorization"]
+        raw = json.loads(request.content)["raw"]
+        seen["mime"] = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode()
+        return httpx.Response(200, json={"id": "1"})
+    from app.notify.gmail import GmailClient
+    g = GmailClient("ar@rareglobalfood.com", "id", "secret", "refresh",
+                    http=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert g.send(["rep@x.com"], ["owner@x.com"], "Account activated: X", "Hello") is True
+    assert seen["auth"] == "Bearer tok"
+    assert "To: rep@x.com" in seen["mime"] and "Cc: owner@x.com" in seen["mime"]
+    assert "Subject: Account activated: X" in seen["mime"]
+    assert "ar@rareglobalfood.com" in seen["mime"]
