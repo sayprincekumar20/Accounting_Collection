@@ -105,6 +105,37 @@ def _copy_pages(db, job, storage, review, max_images) -> list[dict]:
     return pages
 
 
+def create_problem_review(db: Session, job: VerificationJob, status: str,
+                          reason: str) -> Review:
+    """A job that stopped before a result (no downloadable documents, Zoho or reading error)
+    still appears in the dashboard, closed, with the reason - never a silent end."""
+    existing = db.scalar(select(Review).where(Review.job_id == job.id))
+    if existing:
+        return existing
+    snap = job.account_snapshot or {}
+    files = [f"{d.file_name or d.zoho_file_ref}: {d.status.lower().replace('_', ' ')}"
+             + (f" - {d.status_detail}" if d.status_detail else "") for d in job.documents]
+    review = Review(
+        number=(db.scalar(select(func.max(Review.number))) or 0) + 1, job_id=job.id,
+        account_id=job.account_id, account_name=snap.get("Account_Name"),
+        customer_number=snap.get("Inventory_Customer_Number") or job.customer_number,
+        status=status, recommendation="MANUAL_REVIEW",
+        summary={"alerts": f"1. URGENT: {reason}",
+                 "recommendation_reasons": f"NOT VERIFIED because:\n- {reason}",
+                 "required_documents": "\n".join(files) or "No files were found on the Account.",
+                 "documents_found": job.documents_found or 0, "lowest_confidence": None,
+                 "activation_checks": [], "rules_version": None,
+                 "request_reason": job.reason},
+        rows=[], pages=[], requested_by=job.requested_by_email, closed_at=utcnow(),
+        reviewer_notes=reason)
+    db.add(review)
+    db.flush()
+    record_event(db, "ENGINE_REVIEW_CREATED", f"DV-{review.number}: {status} - {reason}",
+                 job.id, {"review_id": str(review.id), "problem": True})
+    db.commit()
+    return review
+
+
 # ---------------------------------------------------------------- reviewer actions
 def _require_open(review: Review) -> None:
     if review.status not in OPEN:

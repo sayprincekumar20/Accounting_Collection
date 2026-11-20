@@ -298,6 +298,25 @@ def _email_engine_review(db, review, notifier: Notifier, applied, skipped) -> No
     notifier.email(to, cc, subject, text)
 
 
+def notify_problem(db: Session, job: VerificationJob, review, notifier: Notifier) -> None:
+    """A job that ended without a result: Cliq message + email to the requester (CC owner)."""
+    ref = f"problem:{job.id}"
+    if not notifier.enabled or already_sent(db, "verification", ref):
+        return
+    name = (job.account_snapshot or {}).get("Account_Name") or job.account_id
+    reason = review.reviewer_notes or job.error or "unknown reason"
+    notifier.message(f"⚠️ DV-{review.number} for {name}: not verified - {reason}")
+    if notifier.mailer:
+        to, cc = emails.recipients(job.requested_by_email,
+                                   emails.owner_email(job.account_snapshot))
+        subject, text = emails.not_completed(name, reason,
+                                             review.status == "Waiting for Documents",
+                                             notifier.links(job.account_id, str(review.id)))
+        notifier.email(to, cc, subject, text)
+    mark_sent(db, "verification", ref, job.account_id, {"status": review.status})
+    db.commit()
+
+
 # ------------------------------------------------------------------ 3. expiry reminders
 def _levels(settings) -> list[int]:
     return sorted({int(x) for x in str(settings.expiry_alert_days).split(",") if x.strip()})

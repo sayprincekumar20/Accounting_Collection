@@ -98,3 +98,14 @@ def expiring(name: str, number: str, document: str, when: str, links: str) -> tu
         f"Please collect the renewed {document} from the customer, attach it to the Account in "
         "Zoho CRM and click Verify Account.",
     ], links))
+
+
+def not_completed(name: str, reason: str, no_documents: bool, links: str) -> tuple[str, str]:
+    lines = ["Hello,", "", f"The verification of {name} could not be completed.",
+             f"Reason: {reason}", ""]
+    lines.append("Please check that the documents (BIR 2303, DTI or SEC certificate, Mayor's "
+                 "permit) are attached to the Account as PDF or image files, then click "
+                 "Verify Account again." if no_documents else
+                 "Please click Verify Account again in a few minutes. If it fails again, "
+                 "contact the CRM admin.")
+    return (f"Verification could not be completed: {name}", _body(lines, links))

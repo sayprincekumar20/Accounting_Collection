@@ -7,7 +7,7 @@ from app.db.models import JobStatus, VerificationJob
 from app.db.session import session_scope
 from app.extraction.providers import TransientExtractionError, build_provider
 from app.logging import setup_logging
-from app.notify.events import notify_verification
+from app.notify.events import notify_problem, notify_verification
 from app.notify.notifier import Notifier
 from app.pipeline.assess import assess_job
 from app.pipeline.auto_apply import auto_apply_job
@@ -16,7 +16,7 @@ from app.pipeline.collect import collect_job
 from app.pipeline.extract import extract_job, extraction_version, manila_today
 from app.pipeline.read import read_job
 from app.pipeline.review_record import create_review_record
-from app.review.engine import create_engine_review
+from app.review.engine import create_engine_review, create_problem_review
 from app.services.audit import record_event
 from app.storage.base import build_storage
 from app.workers.celery_app import celery_app
@@ -48,7 +48,25 @@ def _fail(job_id: uuid.UUID, message: str) -> None:
             job.status, job.error = JobStatus.FAILED, message
             job.completed_at = datetime.now(UTC)
             record_event(db, "JOB_FAILED", message, job.id)
+    _problem_review(job_id, "Failed", message)
     _cleanup(job_id)
+
+
+def _problem_review(job_id: uuid.UUID, status: str, reason: str) -> None:
+    """Show a job that stopped early in the dashboard (and tell the requester)."""
+    s = get_settings()
+    if not s.engine_reviews:
+        return
+    try:
+        with session_scope() as db:
+            job = db.get(VerificationJob, job_id)
+            if job is None:
+                return
+            review = create_problem_review(db, job, status, reason)
+            if s.notify_verifications:
+                notify_problem(db, job, review, Notifier.from_settings(s))
+    except Exception:  # noqa: BLE001 - reporting must never break the job handling
+        log.exception("Problem review failed", extra={"job_id": str(job_id)})
 
 
 @celery_app.task(bind=True, name="collect_documents", max_retries=MAX_RETRIES)
@@ -65,9 +83,15 @@ def collect_documents(self, job_id: str) -> str:
             if job.status not in (JobStatus.QUEUED, JobStatus.COLLECTING):
                 return job.status  # already processed: duplicate delivery is a no-op
             collect_job(db, job, get_zoho_client(), build_storage(settings), settings)
-            status = job.status
+            status, error = job.status, job.error
         if status == JobStatus.COLLECTED:
             read_documents.delay(job_id)  # Phase 1B
+        elif status == JobStatus.NO_DOCUMENTS:
+            _problem_review(jid, "Waiting for Documents",
+                            "No document could be downloaded from the Account in Zoho "
+                            "(attachments, file fields and note files were checked).")
+        elif status == JobStatus.FAILED:
+            _problem_review(jid, "Failed", error or "Collecting the documents failed")
         return status
     except ZohoTransientError as exc:
         if self.request.retries < MAX_RETRIES:
