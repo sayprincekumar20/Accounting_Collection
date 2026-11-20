@@ -43,19 +43,31 @@ class MemoryTokenCache:
         return self._lock
 
 
+def credentials_fingerprint(settings) -> str:
+    """Short hash of who the token belongs to (accounts URL, API domain, client, refresh
+    token). Part of the cache key, so a changed Zoho token or org is used at once instead of
+    an access token cached for the old one (up to an hour)."""
+    import hashlib
+    raw = "|".join(str(getattr(settings, k, "") or "") for k in (
+        "zoho_accounts_url", "zoho_api_domain", "zoho_client_id", "zoho_refresh_token"))
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
 class RedisTokenCache:
-    def __init__(self, redis_client) -> None:
+    def __init__(self, redis_client, fingerprint: str = "") -> None:
         self._r = redis_client
+        suffix = f":{fingerprint}" if fingerprint else ""
+        self._key, self._lock_key = _CACHE_KEY + suffix, _LOCK_KEY + suffix
 
     def get(self) -> str | None:
-        value = self._r.get(_CACHE_KEY)
+        value = self._r.get(self._key)
         return value.decode() if isinstance(value, bytes) else value
 
     def set(self, token: str, ttl_seconds: int) -> None:
-        self._r.set(_CACHE_KEY, token, ex=max(ttl_seconds, 60))
+        self._r.set(self._key, token, ex=max(ttl_seconds, 60))
 
     def lock(self):
-        return self._r.lock(_LOCK_KEY, timeout=30, blocking_timeout=30)
+        return self._r.lock(self._lock_key, timeout=30, blocking_timeout=30)
 
 
 class ZohoTokenProvider:

@@ -101,3 +101,24 @@ def test_recent_running_job_is_still_returned(db, settings, monkeypatch):
     job, created = jobs.create_or_get_active_job(db, JobCreate(account_id=ACC, reason="x",
                                                                document_status="YES"))
     assert not created and job.id == running.id
+
+
+def test_token_cache_key_changes_with_the_zoho_credentials(settings):
+    from app.zoho.auth import RedisTokenCache, credentials_fingerprint
+
+    class FakeRedis:
+        def __init__(self):
+            self.data = {}
+
+        def get(self, k):
+            return self.data.get(k)
+
+        def set(self, k, v, ex=None):
+            self.data[k] = v
+    r = FakeRedis()
+    sandbox = RedisTokenCache(r, credentials_fingerprint(settings))
+    sandbox.set("sandbox-access-token", 3600)
+    settings.zoho_refresh_token = "a-new-production-refresh-token"
+    production = RedisTokenCache(r, credentials_fingerprint(settings))
+    assert production.get() is None                   # the old org's token is not reused
+    assert sandbox.get() == "sandbox-access-token"
