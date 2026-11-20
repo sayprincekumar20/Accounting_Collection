@@ -71,3 +71,33 @@ def test_nothing_when_dashboard_reviews_are_off(db, settings, monkeypatch):
     monkeypatch.setattr(tasks, "get_settings", lambda: settings)
     tasks._problem_review(job.id, "Failed", "x")
     assert db.query(Review).count() == 0
+
+
+def test_stuck_job_is_closed_and_a_new_click_starts_fresh(db, settings, monkeypatch):
+    from datetime import UTC, datetime, timedelta
+
+    from app.schemas import JobCreate
+    from app.services import jobs
+    settings.engine_reviews = True
+    monkeypatch.setattr(jobs, "get_settings", lambda: settings)
+    old = VerificationJob(account_id=ACC, status=JobStatus.QUEUED,
+                          created_at=datetime.now(UTC) - timedelta(hours=2))
+    db.add(old)
+    db.commit()
+    req = JobCreate(account_id=ACC, reason="again", document_status="YES")
+    job, created = jobs.create_or_get_active_job(db, req)
+    assert created and job.id != old.id
+    assert old.status == JobStatus.FAILED and "Timed out" in old.error
+    assert db.query(Review).filter_by(job_id=old.id).one().status == "Failed"
+
+
+def test_recent_running_job_is_still_returned(db, settings, monkeypatch):
+    from app.schemas import JobCreate
+    from app.services import jobs
+    monkeypatch.setattr(jobs, "get_settings", lambda: settings)
+    running = VerificationJob(account_id=ACC, status=JobStatus.READING)
+    db.add(running)
+    db.commit()
+    job, created = jobs.create_or_get_active_job(db, JobCreate(account_id=ACC, reason="x",
+                                                               document_status="YES"))
+    assert not created and job.id == running.id

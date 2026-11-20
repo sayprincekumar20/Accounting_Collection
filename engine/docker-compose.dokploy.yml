@@ -11,8 +11,10 @@ x-engine: &engine
     - path: .env
       required: false
   environment:
-    DATABASE_URL: postgresql+psycopg://dv:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/dv
-    REDIS_URL: redis://redis:6379/0
+    # Unique host names: the api is also on the shared dokploy-network, where another project's
+    # "redis" or "postgres" could answer to the short names and take the jobs.
+    DATABASE_URL: postgresql+psycopg://dv:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@dv-engine-postgres:5432/dv
+    REDIS_URL: redis://dv-engine-redis:6379/0
     STORAGE_BACKEND: local
     STORAGE_LOCAL_DIR: /data/files
   volumes:
@@ -84,10 +86,16 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    networks:
+      default:
+        aliases: [dv-engine-postgres]
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    networks:
+      default:
+        aliases: [dv-engine-redis]
 
 volumes:
   pgdata:
