@@ -22,6 +22,8 @@ import { ListBoundary } from "./AssistantBoundary";
 import { CONVERSATIONS_KEY } from "./store-key";
 import { installGlobalErrorReporting } from "./client-error";
 import { ProgressSteps } from "./ProgressSteps";
+import { ReminderComposer } from "./ReminderComposer";
+import { REMINDER_CHANNELS, type ReminderChannel } from "@/lib/reminder-templates";
 import {
   durationLabel,
   failActive,
@@ -78,6 +80,8 @@ interface Msg {
   context?: string;
   /** Contact lists: the real processing stages (uploaded, processing, analysis, results, completed/failed). */
   progress?: ProgressStep[];
+  /** Reminder composer opened by the assistant (prepare_reminder). */
+  reminder?: { clientId: string; channel?: ReminderChannel };
 }
 interface Convo {
   id: string;
@@ -90,6 +94,7 @@ interface Convo {
 const STORE = CONVERSATIONS_KEY;
 const TOOL_LABEL: Record<string, string> = {
   get_overview: "Reading the overview",
+  prepare_reminder: "Opening the reminder composer",
   find_clients: "Searching clients",
   get_client: "Loading the client",
   list_invoices: "Loading invoices",
@@ -306,6 +311,15 @@ export function Assistant() {
               if (Object.keys(search).length) setLogFilters(search);
               void navigate({ to: String(ev["to"]) as "/" });
             } else if (ev["op"] === "refresh") void qc.invalidateQueries();
+            else if (ev["op"] === "reminder" && ev["client_id"]) {
+              const ch = String(ev["channel"] ?? "").toUpperCase();
+              const reminder: { clientId: string; channel?: ReminderChannel } = {
+                clientId: String(ev["client_id"]),
+              };
+              if ((REMINDER_CHANNELS as string[]).includes(ch))
+                reminder.channel = ch as ReminderChannel;
+              patchLast((m) => ({ ...m, reminder }));
+            }
           } else if (ev["type"] === "confirm")
             patchLast((m) => ({
               ...m,
@@ -735,6 +749,15 @@ export function Assistant() {
                   </div>
                 ) : null}
                 {m.progress?.length ? <ProgressSteps steps={m.progress} /> : null}
+                {m.reminder ? (
+                  <ListBoundary>
+                    <ReminderComposer
+                      clientId={m.reminder.clientId}
+                      initialChannel={m.reminder.channel}
+                      getUserName={userName}
+                    />
+                  </ListBoundary>
+                ) : null}
                 {m.actionPick ? (
                   <ListBoundary>
                     <ActionPicker

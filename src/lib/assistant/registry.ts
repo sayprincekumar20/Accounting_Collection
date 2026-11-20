@@ -25,9 +25,12 @@ export interface ActionResult {
   workingSet?: { ids: string[]; label: string };
   /** Optional UI operation for the dashboard (navigate / refresh). */
   ui?: {
-    op: "navigate" | "refresh";
+    op: "navigate" | "refresh" | "reminder";
     to?: string | undefined;
     search?: Record<string, string> | undefined;
+    /** op "reminder": open the reminder composer for this client (and channel). */
+    client_id?: string | undefined;
+    channel?: string | undefined;
   };
   /** One line for the audit log. */
   summary: string;

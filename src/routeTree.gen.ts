@@ -73,6 +73,8 @@ import { Route as ApiAssistantListMatchRouteImport } from './routes/api/assistan
 import { Route as ApiAssistantListWarmRouteImport } from './routes/api/assistant.list-warm'
 import { Route as ApiDvReviewsReviewIdRouteImport } from './routes/api/dv-reviews.$reviewId'
 import { Route as ApiOutboundMediaTokenRouteImport } from './routes/api/outbound-media.$token'
+import { Route as ApiReminderPreviewRouteImport } from './routes/api/reminder.preview'
+import { Route as ApiReminderSendRouteImport } from './routes/api/reminder.send'
 import { Route as ApiDvReviewsReviewIdActionRouteImport } from './routes/api/dv-reviews.$reviewId.$action'
 import { Route as ApiDvReviewsReviewIdPagesNRouteImport } from './routes/api/dv-reviews.$reviewId.pages.$n'
 import { Route as ApiDvReviewsReviewIdRowsRowIdRouteImport } from './routes/api/dv-reviews.$reviewId.rows.$rowId'
@@ -398,6 +400,16 @@ const ApiOutboundMediaTokenRoute = ApiOutboundMediaTokenRouteImport.update({
   path: '/api/outbound-media/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiReminderPreviewRoute = ApiReminderPreviewRouteImport.update({
+  id: '/api/reminder/preview',
+  path: '/api/reminder/preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiReminderSendRoute = ApiReminderSendRouteImport.update({
+  id: '/api/reminder/send',
+  path: '/api/reminder/send',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDvReviewsReviewIdActionRoute =
   ApiDvReviewsReviewIdActionRouteImport.update({
     id: '/$action',
@@ -482,6 +494,8 @@ export interface FileRoutesByFullPath {
   '/api/assistant/list-warm': typeof ApiAssistantListWarmRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
+  '/api/reminder/preview': typeof ApiReminderPreviewRoute
+  '/api/reminder/send': typeof ApiReminderSendRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
   '/api/dv-reviews/$reviewId/rows/$rowId': typeof ApiDvReviewsReviewIdRowsRowIdRoute
@@ -551,6 +565,8 @@ export interface FileRoutesByTo {
   '/api/assistant/list-warm': typeof ApiAssistantListWarmRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
+  '/api/reminder/preview': typeof ApiReminderPreviewRoute
+  '/api/reminder/send': typeof ApiReminderSendRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
   '/api/dv-reviews/$reviewId/rows/$rowId': typeof ApiDvReviewsReviewIdRowsRowIdRoute
@@ -621,6 +637,8 @@ export interface FileRoutesById {
   '/api/assistant/list-warm': typeof ApiAssistantListWarmRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
+  '/api/reminder/preview': typeof ApiReminderPreviewRoute
+  '/api/reminder/send': typeof ApiReminderSendRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
   '/api/dv-reviews/$reviewId/rows/$rowId': typeof ApiDvReviewsReviewIdRowsRowIdRoute
@@ -692,6 +710,8 @@ export interface FileRouteTypes {
     | '/api/assistant/list-warm'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
+    | '/api/reminder/preview'
+    | '/api/reminder/send'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/dv-reviews/$reviewId/pages/$n'
     | '/api/dv-reviews/$reviewId/rows/$rowId'
@@ -761,6 +781,8 @@ export interface FileRouteTypes {
     | '/api/assistant/list-warm'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
+    | '/api/reminder/preview'
+    | '/api/reminder/send'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/dv-reviews/$reviewId/pages/$n'
     | '/api/dv-reviews/$reviewId/rows/$rowId'
@@ -830,6 +852,8 @@ export interface FileRouteTypes {
     | '/api/assistant/list-warm'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
+    | '/api/reminder/preview'
+    | '/api/reminder/send'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/dv-reviews/$reviewId/pages/$n'
     | '/api/dv-reviews/$reviewId/rows/$rowId'
@@ -899,6 +923,8 @@ export interface RootRouteChildren {
   ApiAssistantListMatchRoute: typeof ApiAssistantListMatchRoute
   ApiAssistantListWarmRoute: typeof ApiAssistantListWarmRoute
   ApiOutboundMediaTokenRoute: typeof ApiOutboundMediaTokenRoute
+  ApiReminderPreviewRoute: typeof ApiReminderPreviewRoute
+  ApiReminderSendRoute: typeof ApiReminderSendRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1351,6 +1377,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOutboundMediaTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/reminder/preview': {
+      id: '/api/reminder/preview'
+      path: '/api/reminder/preview'
+      fullPath: '/api/reminder/preview'
+      preLoaderRoute: typeof ApiReminderPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/reminder/send': {
+      id: '/api/reminder/send'
+      path: '/api/reminder/send'
+      fullPath: '/api/reminder/send'
+      preLoaderRoute: typeof ApiReminderSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dv-reviews/$reviewId/$action': {
       id: '/api/dv-reviews/$reviewId/$action'
       path: '/$action'
@@ -1466,6 +1506,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAssistantListMatchRoute: ApiAssistantListMatchRoute,
   ApiAssistantListWarmRoute: ApiAssistantListWarmRoute,
   ApiOutboundMediaTokenRoute: ApiOutboundMediaTokenRoute,
+  ApiReminderPreviewRoute: ApiReminderPreviewRoute,
+  ApiReminderSendRoute: ApiReminderSendRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

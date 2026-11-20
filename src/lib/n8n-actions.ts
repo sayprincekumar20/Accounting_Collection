@@ -3,6 +3,7 @@
 //  - contactClients: the contact command (21 -> 22 / 26): Zoho refresh, PDF, text, call, with all the usual
 //    checks (approval, Sales Team, promise, 5+ branches, cooldown). Replaces the Zoho Cliq /call command:
 //    Cliq no longer knows this key.
+//  - sendReminderViaN8n: one reminder from the assistant's reminder composer (25_Dashboard_Reminder).
 import { requireSecret } from "@/lib/env";
 
 // Keys are server secrets (N8N_APPROVAL_SECRET, N8N_CONTACT_SECRET), never in the code.
@@ -96,4 +97,37 @@ export async function callNow(
   const out = (await res.json().catch(() => ({}))) as { ok?: boolean; reply?: string };
   if (!res.ok) throw new Error(`Starting the call failed (${res.status})`);
   return { ok: out.ok === true, reply: String(out.reply || "") };
+}
+
+/**
+ * Reminder composer (AI assistant): ONE reminder on one channel to one client, after the AR team edited (or
+ * kept) the approved template and confirmed. n8n workflow 25_Dashboard_Reminder forwards it to the channel
+ * workflow (05 Email / 07 SMS / 04 Viber with the edited text, 06 WhatsApp approved template), which attaches
+ * the statement PDF, logs it and counts it like any reminder. Same key as the contact command.
+ */
+export async function sendReminderViaN8n(input: {
+  requestedBy: string;
+  clientId: string;
+  channel: string;
+  subject: string;
+  body: string;
+  dryRun?: boolean;
+}): Promise<{ ok: boolean; message: string }> {
+  const secret = await requireSecret("N8N_CONTACT_SECRET");
+  const res = await fetch(`${N8N}/dashboard-reminder`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-cliq-secret": secret },
+    body: JSON.stringify({
+      client_id: input.clientId,
+      channel: input.channel,
+      subject: input.subject,
+      body: input.body,
+      requested_by: input.requestedBy,
+      dry_run: !!input.dryRun,
+    }),
+  });
+  const out = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+  if (!res.ok && res.status !== 200)
+    return { ok: false, message: out.message || `n8n answered ${res.status}` };
+  return { ok: !!out.ok, message: String(out.message || (out.ok ? "Sent" : "Not sent")) };
 }

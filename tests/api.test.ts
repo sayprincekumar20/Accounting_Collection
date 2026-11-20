@@ -781,3 +781,102 @@ describe("GET /api/worklist: customer escalations only", () => {
     expect(items.map((i) => i.entry_id).sort()).toEqual(["w3", "w4"]);
   });
 });
+
+describe("Reminder composer: /api/reminder/preview and /api/reminder/send", () => {
+  const ID = "Alpha Corp___a@x.co";
+  const fresh = new Date(Date.now() - 86400000).toISOString();
+  const setClient = (extra: Record<string, unknown> = {}) => {
+    tables[CLIENTS] = [
+      client(ID, { pdf_file_id: "PDF1", pdf_generated_date: fresh, sales_team: true, ...extra }),
+    ];
+  };
+  const n8nCalls = () =>
+    fetchMock.mock.calls.filter((c) => String(c[0]).includes("/webhook/dashboard-reminder"));
+  const send = (body: Record<string, unknown>) =>
+    call("reminder.send", "POST", "/api/reminder/send", {
+      client_id: ID,
+      requested_by: "Tester",
+      acknowledged: true,
+      ...body,
+    });
+
+  it("preview: every channel's approved template, filled with the client's data", async () => {
+    setClient();
+    const p = await (
+      await call(
+        "reminder.preview",
+        "GET",
+        `/api/reminder/preview?client_id=${encodeURIComponent(ID)}`,
+      )
+    ).json();
+    expect(p.blocked).toBe("");
+    expect(p.channels.SMS.template.body).toBe(
+      // 170 and 157 characters are over 155, so the third (shortened) version is used, as n8n does
+      "Hi Ana, you have 1 overdue invoice and 1 current invoice with Rare Global Food totaling PHP 100.00. Please settle or reply with your payment date.",
+    );
+    expect(p.channels.EMAIL.template.subject).toMatch(/^Alpha Corp_SOA \(\d\d\.\d\d\.\d\d\)$/);
+    expect(p.channels.VIBER.template.body).toContain(
+      "Overdue balance: PHP 60.00\nCurrent balance: PHP 40.00\nTotal balance: PHP 100.00",
+    );
+    expect(p.channels.WHATSAPP).toMatchObject({ available: true, editable: false });
+    expect(p.client.pdf_file_id).toBeUndefined(); // internal reference not sent to the browser
+  });
+
+  it("an edited SMS is sent through n8n 25 with the contact key and the edited text", async () => {
+    setClient();
+    const r = await send({
+      channel: "SMS",
+      body: "Hi Ana, friendly reminder: PHP 60.00 is overdue. Please reply with your payment date.",
+    });
+    expect(r.status).toBe(200);
+    const [url, init] = n8nCalls()[0]!;
+    expect(String(url)).toBe("https://rareglobalfood.app.n8n.cloud/webhook/dashboard-reminder");
+    expect((init as RequestInit).headers).toMatchObject({ "x-cliq-secret": "test-contact" });
+    expect(JSON.parse(String((init as RequestInit).body))).toMatchObject({
+      client_id: ID,
+      channel: "SMS",
+      body: "Hi Ana, friendly reminder: PHP 60.00 is overdue. Please reply with your payment date.",
+      requested_by: "Tester",
+    });
+  });
+
+  it("an SMS breaking the channel rules is refused and nothing is sent", async () => {
+    setClient();
+    const r = await send({ channel: "SMS", body: "Please pay ₱60 now 🙏" });
+    expect(r.status).toBe(422);
+    expect((await r.json()).errors[0]).toContain("₱ 🙏");
+    expect(n8nCalls()).toHaveLength(0);
+  });
+
+  it("WhatsApp always sends the approved template, whatever the browser sent", async () => {
+    setClient();
+    await send({ channel: "WHATSAPP", body: "something else entirely" });
+    const sent = JSON.parse(String((n8nCalls()[0]![1] as RequestInit).body));
+    expect(sent.body).toMatch(
+      /^Hello Ana, as of .+ your account statement from Rare Global Food Trading Corp\. shows:/,
+    );
+  });
+
+  it("hard rules: a client outside the Sales Team is never sent; email needs the statement PDF", async () => {
+    setClient({ sales_team: false });
+    const r1 = await send({ channel: "SMS", body: "Hi" });
+    expect(r1.status).toBe(422);
+    expect((await r1.json()).message).toContain("not in the Sales Team");
+    setClient({ pdf_file_id: "" });
+    const r2 = await send({ channel: "EMAIL", subject: "S", body: "B" });
+    expect((await r2.json()).message).toContain("No statement PDF");
+    expect(n8nCalls()).toHaveLength(0);
+  });
+
+  it("warnings (e.g. an active payment promise) must be acknowledged first", async () => {
+    setClient({ promise_suppressed_until: new Date(Date.now() + 5 * 86400000).toISOString() });
+    const r = await send({
+      channel: "SMS",
+      body: "Hi Ana, please reply with your payment date.",
+      acknowledged: false,
+    });
+    expect(r.status).toBe(409);
+    expect((await r.json()).warnings.join(" ")).toContain("Payment promise");
+    expect(n8nCalls()).toHaveLength(0);
+  });
+});

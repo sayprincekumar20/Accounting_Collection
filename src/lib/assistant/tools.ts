@@ -783,6 +783,37 @@ registerAction({
   execute: async () => ({ data: { ok: true }, ui: { op: "refresh" }, summary: "refresh" }),
 });
 
+registerAction({
+  id: "prepare_reminder",
+  description:
+    "Open the reminder composer for ONE client in the chat: the user picks the channel (email, SMS, Viber, WhatsApp), the channel's pre-approved template is loaded, the user can edit it, and the user sends it after confirming. Use it whenever the user wants to send / write / remind a client on a specific channel. You never send it yourself and never write the message text: the composer does.",
+  kind: "ui",
+  permission: "ar",
+  needsConfirmation: false,
+  params: z.object({
+    client: z.string().min(2).max(200).describe("client name or id"),
+    channel: z.enum(["EMAIL", "SMS", "VIBER", "WHATSAPP"]).optional(),
+  }),
+  execute: async (a) => {
+    const { active } = await loadCore();
+    const c = findClient(active, a.client);
+    if (!c)
+      return {
+        data: { ok: false, message: `No client matches "${a.client}".` },
+        summary: "prepare_reminder: client not found",
+      };
+    return {
+      data: {
+        ok: true,
+        opened: s(c["client_name"]),
+        note: "The reminder composer is open in the chat with the approved template; the user edits, confirms and sends it there.",
+      },
+      ui: { op: "reminder", client_id: s(c["client_id"]), channel: a.channel },
+      summary: `prepare_reminder: ${s(c["client_name"])}${a.channel ? " " + a.channel : ""}`,
+    };
+  },
+});
+
 export const ASSISTANT_TOOLS_READY = true;
 
 // ------------------------------------------------------------------ write actions (Phase 2: confirmation required)

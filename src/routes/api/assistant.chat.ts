@@ -30,6 +30,7 @@ function systemPrompt(ctx: ActionContext, workingLabel: string, extra: string): 
     "- For questions about system or workflow problems (SMS phone, credit, stuck queues, failing runs) call workflow_health.",
     "- An attached contact list appears in the conversation as [LIST CONTEXT]. Answer questions about that list (names, sheets, statuses, who is blocked or not found) directly from it, as a short table; never search the clients for the file name. To review a sheet, the user picks it (or types its name).",
     "- Actions that send messages, call clients or change data need the user's confirmation; the dashboard asks them. Do not claim an action ran unless the tool result says so.",
+    "- To send one client a reminder on a chosen channel (email, SMS, Viber, WhatsApp), call prepare_reminder: it opens the composer with the channel's approved template, which the user can edit and then confirms. Never write or send the reminder text yourself.",
     "- The reminder cycle runs Wednesday to Tuesday; approvals are valid for the current cycle only.",
     "- Be brief and businesslike. Answer in the user's language.",
   ].join("\n");

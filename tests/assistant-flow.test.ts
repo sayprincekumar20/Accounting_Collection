@@ -76,6 +76,7 @@ const fixture = (n: string) => readFileSync(resolve(process.cwd(), "tests/fixtur
 
 let calls: { url: string; body: Record<string, unknown> }[] = [];
 let matchFails = false;
+let chatEvents: Record<string, unknown>[] | null = null;
 let tamper: ((rows: unknown[]) => unknown[]) | null = null;
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } });
@@ -98,6 +99,7 @@ beforeEach(() => {
   calls = [];
   tamper = null;
   matchFails = false;
+  chatEvents = null;
   window.prompt = () => "Tester";
   vi.spyOn(console, "error").mockImplementation(() => {});
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
@@ -114,6 +116,42 @@ beforeEach(() => {
         errors: [],
       });
     if (u.includes("/api/assistant/list-warm")) return json({ ok: true, ms: 5 });
+    if (u.includes("/api/assistant/chat") && chatEvents)
+      return new Response(chatEvents.map((e) => `data: ${JSON.stringify(e)}\n\n`).join(""), {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    if (u.startsWith("/api/reminder/preview"))
+      return json({
+        client: {
+          client_id: "C___1",
+          client_name: "Demo Meats Corp",
+          contact_person: "Ana",
+          email: "a@b.co",
+          phone: "639170000000",
+          overdue: 60,
+          current: 0,
+          total: 60,
+          pdf_generated_date: "",
+        },
+        blocked: "",
+        warnings: [],
+        channels: Object.fromEntries(
+          ["EMAIL", "SMS", "VIBER", "WHATSAPP"].map((c) => [
+            c,
+            {
+              available: true,
+              reason: "",
+              attachment: "",
+              editable: c !== "WHATSAPP",
+              template: {
+                subject: c === "EMAIL" ? "Demo_SOA" : "",
+                body: `${c} approved template`,
+              },
+            },
+          ]),
+        ),
+      });
     if (u.includes("/api/assistant/list-match")) {
       if (matchFails) return json({ error: "Failed to match the list" }, 500);
       const r = await buildReview(sanitizeRows(body["rows"]));
@@ -327,6 +365,28 @@ describe("Assistant: contact list flow", () => {
       expect.arrayContaining([expect.stringContaining("Data analysis")]),
     );
     expect(container.querySelector('li[data-state="active"]')).toBeNull();
+  });
+
+  it("when the AI calls prepare_reminder, the reminder composer opens in the chat with the approved template", async () => {
+    chatEvents = [
+      { type: "tool", id: "prepare_reminder", status: "running" },
+      { type: "ui", op: "reminder", client_id: "C___1", channel: "VIBER" },
+      { type: "text", delta: "The reminder composer is open." },
+      { type: "done" },
+    ];
+    const { container } = mount();
+    const box = container.querySelector("textarea") as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "send Demo Meats a Viber reminder" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() =>
+      expect(container.querySelector('[aria-label="Reminder composer"]')).toBeTruthy(),
+    );
+    await waitFor(() =>
+      expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toBe(
+        "VIBER approved template",
+      ),
+    );
+    expect(screen.getByRole("radio", { name: "Viber" }).getAttribute("aria-checked")).toBe("true");
   });
 
   it("explains a file that is not Excel or CSV", async () => {
