@@ -1,21 +1,43 @@
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.db.models import ACTIVE_JOB_STATUSES, VerificationJob
+from app.config import get_settings
+from app.db.models import ACTIVE_JOB_STATUSES, JobStatus, VerificationJob
 from app.schemas import JobCreate
 from app.services.audit import record_event
 
+STALE_AFTER = timedelta(minutes=30)
+
 
 def find_active_job(db: Session, account_id: str) -> VerificationJob | None:
-    return db.scalar(
+    """The Account's running job. One unfinished after 30 minutes (lost message, crashed
+    worker) is closed as timed out, so the next click starts a new verification."""
+    job = db.scalar(
         select(VerificationJob).where(
             VerificationJob.account_id == account_id,
             VerificationJob.status.in_([s.value for s in ACTIVE_JOB_STATUSES]),
         )
     )
+    if job is not None and job.created_at is not None:
+        created = job.created_at if job.created_at.tzinfo else job.created_at.replace(tzinfo=UTC)
+        if datetime.now(UTC) - created > STALE_AFTER:
+            job.status = JobStatus.FAILED
+            job.error = "Timed out: the job did not finish within 30 minutes"
+            job.completed_at = datetime.now(UTC)
+            record_event(db, "JOB_TIMED_OUT", job.error, job.id)
+            db.flush()
+            try:
+                from app.review.engine import create_problem_review
+                if get_settings().engine_reviews:
+                    create_problem_review(db, job, "Failed", job.error)
+            except Exception:  # noqa: BLE001 - never block a new verification
+                pass
+            return None
+    return job
 
 
 def create_or_get_active_job(db: Session, req: JobCreate) -> tuple[VerificationJob, bool]:
