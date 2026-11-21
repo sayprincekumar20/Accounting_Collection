@@ -51,6 +51,32 @@ def _norm(v) -> str:
     return "" if v in (None, "") else " ".join(str(v).split()).upper()
 
 
+def _read_field(client: ZohoClient, account_id: str, field: str):
+    try:
+        return client.get_record("Accounts", account_id).get(field)
+    except ZohoError:
+        return None           # cannot check: keep Zoho's own answer
+
+
+def _verify_written(client: ZohoClient, account_id: str, result: "ApplyResult",
+                    written: dict) -> None:
+    """Zoho answers SUCCESS but silently skips fields the API user may not edit: read the
+    Account back and mark such rows FAILED with the reason."""
+    if not any(r.outcome == "APPLIED" for r in result.rows):
+        return
+    try:
+        now = client.get_record("Accounts", account_id)
+    except ZohoError:
+        return
+    for r in result.rows:
+        if r.outcome == "APPLIED" and _norm(now.get(r.zoho_field)) != _norm(written.get(
+                r.zoho_field)):
+            r.outcome = "FAILED"
+            r.detail = (f"Zoho kept {now.get(r.zoho_field)!r}: the field was not changed (check "
+                        "the field permissions of the API user's profile)")
+            result.error = result.error or "Some fields were not changed by Zoho"
+
+
 def apply_rows(client: ZohoClient, account_id: str | None, rows: list[dict], *,
                dry_run: bool = True, triggers: list[str] | None = None,
                activate: bool = False, review_id: str = "") -> ApplyResult:
@@ -105,6 +131,7 @@ def apply_rows(client: ZohoClient, account_id: str | None, rows: list[dict], *,
                 if r.outcome == "WRITE":
                     r.outcome, r.detail = "FAILED", str(exc)[:300]
             result.error = str(exc)[:500]
+        _verify_written(client, account_id, result, to_write)
     outcomes = {r.outcome for r in result.rows}
     result.status = ("Failed" if "FAILED" in outcomes else
                      "Conflict" if "CONFLICT" in outcomes else "Applied")
@@ -118,8 +145,15 @@ def apply_rows(client: ZohoClient, account_id: str | None, rows: list[dict], *,
             try:
                 client.update_record("Accounts", account_id,
                                      {"Customer_Status": ACTIVE_VALUE}, triggers)
-                result.activated = True
-                result.notes.append("Customer Status set to Active (reviewer decision)")
+                kept = _read_field(client, account_id, "Customer_Status")
+                if kept is not None and _norm(kept) != _norm(ACTIVE_VALUE):
+                    result.activated = False
+                    result.notes.append(
+                        f"Customer Status could not be set: Zoho kept {kept!r} (check the field "
+                        "permissions of the API user's profile)")
+                else:
+                    result.activated = True
+                    result.notes.append("Customer Status set to Active (reviewer decision)")
             except ZohoError as exc:
                 result.activated = False
                 result.notes.append(f"Activation failed: {str(exc)[:300]}")

@@ -51,6 +51,9 @@ export interface ReviewRow {
   comment: string | null;
   outcome: string | null;
   outcome_detail: string | null;
+  /** Whether approving this row writes it to Zoho (from the engine), and why not */
+  writable?: boolean;
+  not_writable_reason?: string | null;
 }
 
 export interface ReviewDetail extends ReviewSummary {

@@ -248,3 +248,16 @@ def test_sole_proprietor_without_owner_on_documents_is_not_activated():
                    facts={"tin": [{"confidence": 0.95}]})
     decision = status_decision(a, "Inactive", 0.95)
     assert decision[0] == "NO_CHANGE" and "No owner_name" in decision[1]
+
+
+def test_active_account_with_only_missing_documents_is_attention_not_urgent(db, settings):
+    missing = [{"document_type": "SEC_CERT", "status": "MISSING", "valid_until": None},
+               {"document_type": "MAYORS_PERMIT", "status": "MISSING", "valid_until": None}]
+    fake, client, job = _setup(db, settings, account={"Customer_Status": "Active"},
+                               recommendation="MANUAL_REVIEW", requirements=missing)
+    auto_apply_job(db, job, client, "on", 0.95)
+    first = db.query(AccountAlert).one().alerts[0]
+    assert first["code"] == "ACTIVE_WITH_PROBLEMS" and first["severity"] == "WARNING"
+    assert first["message"].startswith("Account is Active in Zoho; documents incomplete: SEC")
+    assert "stays Active" in first["action"]
+    assert fake.account.get("Customer_Status") == "Active"

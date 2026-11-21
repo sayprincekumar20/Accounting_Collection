@@ -308,3 +308,19 @@ def test_auto_activation_needs_every_check():
     decision, why = status_decision(a, None, 0.95)
     assert a["recommendation"] == "MANUAL_REVIEW" and decision == "NO_CHANGE"
     assert "Accounting or primary contact" in a["reasons"][0]
+
+
+def test_file_named_for_the_document_is_preferred():
+    from app.assessment.assess import DocInput as D
+    inside_other = bir()
+    inside_other.document_id, inside_other.file_name = "credit", "Credit Increase_SMMegaFood.pdf"
+    named = bir()
+    named.document_id, named.file_name = "named", "2303_SMMegaFood.pdf"
+    a = assess({**SNAPSHOT, "BIR_Registration_COR": None}, [inside_other, named, dti(),
+                                                             permit()], TODAY)
+    req = next(r for r in a["requirements"] if r["document_type"] == "BIR_2303")
+    assert req["file"] == "2303_SMMegaFood.pdf"
+    attach = [p for p in a["proposals"] if p["action"] == "ATTACH"
+              and p["zoho_field"] == "BIR_Registration_COR"]
+    assert attach and attach[0]["proposed_value"] == "2303_SMMegaFood.pdf"
+    assert isinstance(D, type)
