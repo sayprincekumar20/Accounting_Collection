@@ -389,6 +389,23 @@ describe("Assistant: contact list flow", () => {
     expect(screen.getByRole("radio", { name: "Viber" }).getAttribute("aria-checked")).toBe("true");
   });
 
+  it("a page can open the assistant with a question (Diagnose with AI)", async () => {
+    chatEvents = [{ type: "text", delta: "Diagnosing." }, { type: "done" }];
+    mount();
+    window.dispatchEvent(
+      new CustomEvent("rgf-assistant-ask", {
+        detail: { text: "Diagnose system notification SYSTEM-20261118-070033" },
+      }),
+    );
+    await waitFor(() =>
+      expect(calls.some((c) => c.url.includes("/api/assistant/chat"))).toBe(true),
+    );
+    const chat = calls.find((c) => c.url.includes("/api/assistant/chat"))!;
+    expect(JSON.stringify(chat.body["messages"])).toContain(
+      "Diagnose system notification SYSTEM-20261118-070033",
+    );
+  });
+
   it("explains a file that is not Excel or CSV", async () => {
     const { container } = mount();
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;

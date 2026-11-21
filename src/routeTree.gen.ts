@@ -45,6 +45,7 @@ import { Route as ApiGmailThreadDetailRouteImport } from './routes/api/gmail-thr
 import { Route as ApiGmailThreadsListRouteImport } from './routes/api/gmail-threads-list'
 import { Route as ApiGooglePickerConfigRouteImport } from './routes/api/google-picker-config'
 import { Route as ApiInsightsRouteImport } from './routes/api/insights'
+import { Route as ApiIssueHistoryRouteImport } from './routes/api/issue-history'
 import { Route as ApiNotificationsRouteImport } from './routes/api/notifications'
 import { Route as ApiPromiseHistoryRouteImport } from './routes/api/promise-history'
 import { Route as ApiPromisesBoardRouteImport } from './routes/api/promises-board'
@@ -259,6 +260,11 @@ const ApiInsightsRoute = ApiInsightsRouteImport.update({
   path: '/api/insights',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiIssueHistoryRoute = ApiIssueHistoryRouteImport.update({
+  id: '/api/issue-history',
+  path: '/api/issue-history',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiNotificationsRoute = ApiNotificationsRouteImport.update({
   id: '/api/notifications',
   path: '/api/notifications',
@@ -466,6 +472,7 @@ export interface FileRoutesByFullPath {
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/google-picker-config': typeof ApiGooglePickerConfigRoute
   '/api/insights': typeof ApiInsightsRoute
+  '/api/issue-history': typeof ApiIssueHistoryRoute
   '/api/notifications': typeof ApiNotificationsRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
@@ -537,6 +544,7 @@ export interface FileRoutesByTo {
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/google-picker-config': typeof ApiGooglePickerConfigRoute
   '/api/insights': typeof ApiInsightsRoute
+  '/api/issue-history': typeof ApiIssueHistoryRoute
   '/api/notifications': typeof ApiNotificationsRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
@@ -609,6 +617,7 @@ export interface FileRoutesById {
   '/api/gmail-threads-list': typeof ApiGmailThreadsListRoute
   '/api/google-picker-config': typeof ApiGooglePickerConfigRoute
   '/api/insights': typeof ApiInsightsRoute
+  '/api/issue-history': typeof ApiIssueHistoryRoute
   '/api/notifications': typeof ApiNotificationsRoute
   '/api/promise-history': typeof ApiPromiseHistoryRoute
   '/api/promises-board': typeof ApiPromisesBoardRoute
@@ -682,6 +691,7 @@ export interface FileRouteTypes {
     | '/api/gmail-threads-list'
     | '/api/google-picker-config'
     | '/api/insights'
+    | '/api/issue-history'
     | '/api/notifications'
     | '/api/promise-history'
     | '/api/promises-board'
@@ -753,6 +763,7 @@ export interface FileRouteTypes {
     | '/api/gmail-threads-list'
     | '/api/google-picker-config'
     | '/api/insights'
+    | '/api/issue-history'
     | '/api/notifications'
     | '/api/promise-history'
     | '/api/promises-board'
@@ -824,6 +835,7 @@ export interface FileRouteTypes {
     | '/api/gmail-threads-list'
     | '/api/google-picker-config'
     | '/api/insights'
+    | '/api/issue-history'
     | '/api/notifications'
     | '/api/promise-history'
     | '/api/promises-board'
@@ -896,6 +908,7 @@ export interface RootRouteChildren {
   ApiGmailThreadsListRoute: typeof ApiGmailThreadsListRoute
   ApiGooglePickerConfigRoute: typeof ApiGooglePickerConfigRoute
   ApiInsightsRoute: typeof ApiInsightsRoute
+  ApiIssueHistoryRoute: typeof ApiIssueHistoryRoute
   ApiNotificationsRoute: typeof ApiNotificationsRoute
   ApiPromiseHistoryRoute: typeof ApiPromiseHistoryRoute
   ApiPromisesBoardRoute: typeof ApiPromisesBoardRoute
@@ -1179,6 +1192,13 @@ declare module '@tanstack/react-router' {
       path: '/api/insights'
       fullPath: '/api/insights'
       preLoaderRoute: typeof ApiInsightsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/issue-history': {
+      id: '/api/issue-history'
+      path: '/api/issue-history'
+      fullPath: '/api/issue-history'
+      preLoaderRoute: typeof ApiIssueHistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/notifications': {
@@ -1479,6 +1499,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGmailThreadsListRoute: ApiGmailThreadsListRoute,
   ApiGooglePickerConfigRoute: ApiGooglePickerConfigRoute,
   ApiInsightsRoute: ApiInsightsRoute,
+  ApiIssueHistoryRoute: ApiIssueHistoryRoute,
   ApiNotificationsRoute: ApiNotificationsRoute,
   ApiPromiseHistoryRoute: ApiPromiseHistoryRoute,
   ApiPromisesBoardRoute: ApiPromisesBoardRoute,

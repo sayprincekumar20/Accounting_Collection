@@ -4,6 +4,7 @@ import { escalationType } from "@/lib/escalation-type";
 import { clearDataTableCache, fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { isNotReachedAlert } from "@/lib/authorship";
 import { isSystemRow } from "@/lib/escalation-alerts";
+import { logIssueEvent } from "@/lib/n8n-actions";
 
 // AR worklist: every escalation raised by a client (not the automatic "Not reached by phone" alert), with its
 // handling status. POST updates status / handled_by / note for one escalation (entry_id).
@@ -86,6 +87,8 @@ export const Route = createFileRoute("/api/worklist")({
             status?: string;
             handled_by?: string;
             note?: string;
+            issue_kind?: string;
+            ref?: string;
           };
           const entryId = s(b.entry_id).trim();
           const status = s(b.status).toUpperCase();
@@ -114,6 +117,21 @@ export const Route = createFileRoute("/api/worklist")({
               404,
             );
           clearDataTableCache(ESCALATIONS);
+          // The issue's history (Escalations module, AI assistant): who changed what, and the resolution.
+          await logIssueEvent({
+            issue_id: entryId,
+            issue_kind: s(b.issue_kind).toUpperCase() === "SYSTEM" ? "SYSTEM" : "ESCALATION",
+            ref: s(b.ref),
+            event: status === "DONE" ? "RESOLUTION" : "STATUS",
+            summary:
+              status === "DONE"
+                ? `Done${s(b.note).trim() ? `: ${s(b.note).trim()}` : ""}`
+                : status === "IN_PROGRESS"
+                  ? "In progress"
+                  : "Reopened",
+            detail: { status, note: s(b.note).trim() },
+            actor: s(b.handled_by).trim() || "dashboard",
+          }).catch((e) => console.error("[worklist] history not recorded:", e));
           return json({ ok: true });
         } catch (err) {
           console.error("[worklist] POST error:", err);

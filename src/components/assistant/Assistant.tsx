@@ -95,6 +95,10 @@ const STORE = CONVERSATIONS_KEY;
 const TOOL_LABEL: Record<string, string> = {
   get_overview: "Reading the overview",
   prepare_reminder: "Opening the reminder composer",
+  list_issues: "Reading escalations and system notifications",
+  diagnose_issue: "Diagnosing the issue",
+  update_issue: "Updating the issue",
+  run_recovery: "Running the recovery action",
   find_clients: "Searching clients",
   get_client: "Loading the client",
   list_invoices: "Loading invoices",
@@ -210,6 +214,21 @@ export function Assistant() {
   const clientOnPage = path.startsWith("/clients/")
     ? decodeURIComponent(path.slice("/clients/".length))
     : "";
+
+  // Other pages (e.g. Escalations: "Diagnose with AI") open the assistant with a question.
+  const askRef = useRef<(text: string) => void>(() => undefined);
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      const text = String((e as CustomEvent<{ text?: string }>).detail?.text ?? "").trim();
+      if (!text) return;
+      setOpen(true);
+      askRef.current(text);
+    };
+    window.addEventListener("rgf-assistant-ask", onAsk);
+    return () => {
+      window.removeEventListener("rgf-assistant-ask", onAsk);
+    };
+  }, []);
 
   async function ask(text: string, confirm?: { id: string; args: unknown }) {
     if (busy) return;
@@ -360,6 +379,8 @@ export function Assistant() {
       ...c,
       messages: c.messages.map((m) => (m.uid === uid ? fn(m) : m)),
     }));
+  askRef.current = (text: string) => void ask(text);
+
   const failMsg = (convoId: string, uid: string, e: unknown) =>
     patchMsg(convoId, uid, (m) => {
       const reason = e instanceof Error ? e.message : "something went wrong";

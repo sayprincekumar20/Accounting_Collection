@@ -131,3 +131,80 @@ export async function sendReminderViaN8n(input: {
     return { ok: false, message: out.message || `n8n answered ${res.status}` };
   return { ok: !!out.ok, message: String(out.message || (out.ok ? "Sent" : "Not sent")) };
 }
+
+/**
+ * Escalations and system notifications: status (OPEN / IN_PROGRESS / DONE) and note on the row, saved by
+ * n8n 27_Worklist_Update (the same call the Escalations page makes). Returns how many rows were updated.
+ */
+export async function updateIssueStatus(
+  entryId: string,
+  status: "OPEN" | "IN_PROGRESS" | "DONE",
+  handledBy: string,
+  note: string,
+): Promise<number> {
+  const res = await fetch(`${N8N}/worklist-update`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-worklist-secret": await requireSecret("N8N_WORKLIST_SECRET"),
+    },
+    body: JSON.stringify({
+      entry_id: entryId,
+      status,
+      handled_by: handledBy.slice(0, 80),
+      note: note.slice(0, 1000),
+    }),
+  });
+  const out = (await res.json().catch(() => ({}))) as { ok?: boolean; updated?: number };
+  if (!res.ok || !out.ok) throw new Error(`Saving the status failed (${res.status})`);
+  return Number(out.updated) || 0;
+}
+
+/**
+ * History of an escalation or a system notification (n8n 33_Issue_Log, table issue_log): the AI's diagnosis,
+ * actions taken, status changes and the final resolution, with who and when.
+ */
+export async function logIssueEvent(e: {
+  issue_id: string;
+  issue_kind: "ESCALATION" | "SYSTEM";
+  ref: string;
+  event: "DIAGNOSIS" | "ACTION" | "STATUS" | "RESOLUTION" | "NOTE";
+  summary: string;
+  detail?: unknown;
+  actor: string;
+}): Promise<void> {
+  const res = await fetch(`${N8N}/issue-log`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-worklist-secret": await requireSecret("N8N_WORKLIST_SECRET"),
+    },
+    body: JSON.stringify({
+      ...e,
+      detail: typeof e.detail === "string" ? e.detail : JSON.stringify(e.detail ?? {}),
+    }),
+  });
+  if (!res.ok) throw new Error(`Recording the history failed (${res.status})`);
+}
+
+/**
+ * Recovery actions the AI assistant may run after the user confirms (n8n 34_Recovery_Actions, allow-list,
+ * none contacts a client): regenerate a client's statement PDF, refresh one client from Zoho.
+ */
+export async function runRecoveryAction(
+  action: "regenerate_statement_pdf" | "refresh_client_from_zoho",
+  clientId: string,
+  requestedBy: string,
+): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${N8N}/recovery-action`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-cliq-secret": await requireSecret("N8N_CONTACT_SECRET"),
+    },
+    body: JSON.stringify({ action, client_id: clientId, requested_by: requestedBy.slice(0, 80) }),
+  });
+  const out = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+  if (!res.ok) return { ok: false, message: out.message || `n8n answered ${res.status}` };
+  return { ok: out.ok === true, message: String(out.message || (out.ok ? "Done" : "Not done")) };
+}

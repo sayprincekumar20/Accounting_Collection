@@ -18,7 +18,6 @@ import {
   UserX,
   FileCheck2,
   ShieldCheck,
-  Bell,
 } from "lucide-react";
 
 const nav = [
@@ -27,7 +26,6 @@ const nav = [
   { to: "/queue", label: "Reminder Queue", icon: ListChecks },
   { to: "/approvals", label: "Contact Approvals", icon: ShieldCheck },
   { to: "/escalations", label: "Escalations", icon: ClipboardCheck },
-  { to: "/notifications", label: "System Notifications", icon: Bell },
   { to: "/promises", label: "Promises", icon: CalendarClock },
   { to: "/contacts", label: "Contacts to Fix", icon: UserX },
   { to: "/reports", label: "Reports", icon: FileBarChart },

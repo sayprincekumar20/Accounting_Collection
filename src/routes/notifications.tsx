@@ -1,27 +1,17 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
-import { AppShell } from "@/components/AppShell";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { SkeletonRows } from "@/components/collections/Skeleton";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { IssueTools } from "@/components/collections/IssueTools";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 
-// System Notifications: workflow failures, automation errors, run results, technical alerts. Kept apart from
-// customer escalations (Escalations page); the split is the shared rule isSystemRow (lib/escalation-alerts).
+// System notifications now live in the Escalations module, in their own tab (kept apart from customer
+// escalations). This address stays as a redirect so old links keep working.
 export const Route = createFileRoute("/notifications")({
-  head: () => ({ meta: [{ title: "System Notifications | Rare Global Food Collections" }] }),
-  component: NotificationsPage,
+  beforeLoad: () => {
+    throw redirect({ href: "/escalations?tab=system" });
+  },
 });
-
-function NotificationsPage() {
-  return (
-    <AppShell
-      title="System Notifications"
-      subtitle="Workflow failures, automation errors, integration issues, run results and technical alerts"
-    >
-      <NotificationsContent />
-    </AppShell>
-  );
-}
 
 interface Item {
   id: string;
@@ -30,7 +20,23 @@ interface Item {
   title: string;
   summary: string;
   message: string;
+  ref?: string;
+  status?: "OPEN" | "IN_PROGRESS" | "DONE";
+  handled_by?: string;
+  ar_note?: string;
 }
+const STATUS_LABEL: Record<string, string> = {
+  OPEN: "Open",
+  IN_PROGRESS: "In progress",
+  DONE: "Done",
+};
+const STATUS_TONE: Record<string, string> = {
+  OPEN: "bg-destructive/12 text-destructive",
+  IN_PROGRESS: "bg-warning/15 text-warning",
+  DONE: "bg-success/12 text-success",
+};
+/** Workflow failures need someone to act (status, diagnosis); the other notifications are information. */
+const actionable = (i: Item) => i.kind === "Error";
 const KINDS = ["All", "Error", "/call result", "Cycle close-out", "System"];
 const when = (v: string) =>
   v
@@ -52,6 +58,65 @@ const tone: Record<string, string> = {
 
 /** System messages that used to be posted to Zoho Cliq #sales (Cliq notifications are switched off). */
 export function NotificationsContent() {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [actErr, setActErr] = useState("");
+  async function setStatus(i: Item, next: "IN_PROGRESS" | "DONE" | "OPEN") {
+    setActErr("");
+    let who = "";
+    try {
+      who = sessionStorage.getItem("rgf-handler-name") || "";
+    } catch {
+      who = "";
+    }
+    if (!who) {
+      const entered = window.prompt("Your name (shown as 'handled by'):", "");
+      if (entered === null || !entered.trim()) return;
+      who = entered.trim();
+      try {
+        sessionStorage.setItem("rgf-handler-name", who);
+      } catch {
+        // ignore
+      }
+    }
+    let note = i.ar_note ?? "";
+    if (next === "DONE") {
+      const n = window.prompt(
+        "What fixed it? (the resolution, e.g. 'Drive credential reconnected, run repeated')",
+        note,
+      );
+      if (n === null) return;
+      if (!n.trim()) {
+        setActErr("Please give the resolution to mark it Done.");
+        return;
+      }
+      note = n.trim();
+    }
+    setBusy(i.id);
+    try {
+      const r = await fetch("/api/worklist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entry_id: i.id,
+          status: next,
+          handled_by: who,
+          note,
+          issue_kind: "SYSTEM",
+          ref: i.ref ?? "",
+        }),
+      });
+      if (!r.ok) {
+        const b = (await r.json().catch(() => ({}))) as { detail?: string; error?: string };
+        throw new Error(b.error || b.detail || "Update failed");
+      }
+      await qc.invalidateQueries({ queryKey: ["notifications"] });
+    } catch (e) {
+      setActErr(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setBusy(null);
+    }
+  }
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["notifications"],
     queryFn: async () => {
@@ -84,8 +149,8 @@ export function NotificationsContent() {
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Today" value={String(todayCount)} tone="primary" />
         <StatCard
-          label="Errors"
-          value={String(items.filter((i) => i.kind === "Error").length)}
+          label="Open failures"
+          value={String(items.filter((i) => actionable(i) && i.status !== "DONE").length)}
           onClick={() => setKind("Error")}
           active={kind === "Error"}
         />
@@ -112,7 +177,8 @@ export function NotificationsContent() {
         </select>
       </div>
       <div className="mt-5">
-        <Panel title="Notifications" description={`${visible.length} shown · newest first`}>
+        <Panel title="System notifications" description={`${visible.length} shown · newest first`}>
+          {actErr ? <p className="px-4 pt-2 text-xs text-destructive">{actErr}</p> : null}
           {isLoading ? <SkeletonRows /> : null}
           {error ? (
             <p className="px-4 py-6 text-sm text-destructive">Could not load notifications.</p>
@@ -132,6 +198,13 @@ export function NotificationsContent() {
                       {i.kind}
                     </span>
                     <span className="text-sm font-semibold">{i.title}</span>
+                    {actionable(i) && i.status ? (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_TONE[i.status]}`}
+                      >
+                        {STATUS_LABEL[i.status]}
+                      </span>
+                    ) : null}
                     <span className="ml-auto text-xs text-muted-foreground">{when(i.at)}</span>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">{i.summary}</p>
@@ -140,6 +213,48 @@ export function NotificationsContent() {
                   <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">
                     {i.message}
                   </pre>
+                ) : null}
+                {actionable(i) ? (
+                  <div className="mt-1.5 flex flex-wrap items-start gap-x-3 gap-y-1">
+                    <IssueTools issueId={i.id} issueRef={i.ref ?? ""} kind="SYSTEM" />
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      {i.status === "OPEN" ? (
+                        <button
+                          type="button"
+                          disabled={busy === i.id}
+                          onClick={() => void setStatus(i, "IN_PROGRESS")}
+                          className="rounded-md border border-border px-2 py-1 text-xs font-semibold hover:bg-muted disabled:opacity-50"
+                        >
+                          Mark in progress
+                        </button>
+                      ) : null}
+                      {i.status !== "DONE" ? (
+                        <button
+                          type="button"
+                          disabled={busy === i.id}
+                          onClick={() => void setStatus(i, "DONE")}
+                          className="rounded-md bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                        >
+                          Done…
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busy === i.id}
+                          onClick={() => void setStatus(i, "OPEN")}
+                          className="rounded-md border border-border px-2 py-1 text-xs font-semibold hover:bg-muted disabled:opacity-50"
+                        >
+                          Reopen
+                        </button>
+                      )}
+                      {i.handled_by ? (
+                        <span className="text-[11px] text-muted-foreground">
+                          {i.handled_by}
+                          {i.ar_note ? ` · ${i.ar_note}` : ""}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
                 ) : null}
               </li>
             ))}

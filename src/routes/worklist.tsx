@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 import { RefTag } from "@/components/collections/LogCells";
 import { downloadCsv } from "@/lib/csv";
+import { IssueTools } from "@/components/collections/IssueTools";
 
 export const Route = createFileRoute("/worklist")({
   // Moved: this content now lives on another page (kept as a redirect so old links keep working).
@@ -143,6 +144,8 @@ export function WorklistContent() {
           status: next,
           handled_by: name.trim(),
           note,
+          issue_kind: "ESCALATION",
+          ref: item.ref,
         }),
       });
       if (!r.ok) {
@@ -319,6 +322,7 @@ export function WorklistContent() {
                   {i.ar_note ? (
                     <p className="mt-1 text-xs text-muted-foreground">AR note: {i.ar_note}</p>
                   ) : null}
+                  <IssueTools issueId={i.entry_id} issueRef={i.ref} kind="ESCALATION" />
                 </div>
                 <div className="flex flex-col items-start gap-1.5">
                   <span

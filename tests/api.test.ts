@@ -880,3 +880,28 @@ describe("Reminder composer: /api/reminder/preview and /api/reminder/send", () =
     expect(n8nCalls()).toHaveLength(0);
   });
 });
+
+describe("Escalations module: status changes are recorded in the issue's history", () => {
+  it("a manual Done on a system notification records the resolution (issue-log webhook)", async () => {
+    fetchMock.mockImplementation(
+      async () => new Response(JSON.stringify({ ok: true, updated: 1 }), { status: 200 }),
+    );
+    const r = await call("worklist", "POST", "/api/worklist", {
+      entry_id: "SYSTEM___workflow-error-1",
+      status: "DONE",
+      handled_by: "Prince",
+      note: "Drive credential reconnected",
+      issue_kind: "SYSTEM",
+      ref: "SYSTEM-20261118-070033",
+    });
+    expect(r.status).toBe(200);
+    const log = fetchMock.mock.calls.find((c) => String(c[0]).includes("/webhook/issue-log"))!;
+    expect(JSON.parse(String((log[1] as RequestInit).body))).toMatchObject({
+      issue_id: "SYSTEM___workflow-error-1",
+      issue_kind: "SYSTEM",
+      event: "RESOLUTION",
+      summary: "Done: Drive credential reconnected",
+      actor: "Prince",
+    });
+  });
+});

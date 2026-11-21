@@ -40,6 +40,10 @@ export const Route = createFileRoute("/api/notifications")({
               title: s(r["client_name"]) || "System",
               summary: s(r["reason"]),
               message: s(r["message"]) || s(r["reason"]),
+              ref: s(r["ref"]),
+              status: (s(r["status"]) || "OPEN").toUpperCase(),
+              handled_by: s(r["handled_by"]),
+              ar_note: s(r["ar_note"]),
             }))
             .sort((a, b) => b.at.localeCompare(a.at))
             .slice(0, 300);
