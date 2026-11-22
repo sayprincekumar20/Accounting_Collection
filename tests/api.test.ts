@@ -239,7 +239,9 @@ describe("GET /api/promises-board", () => {
       client("Due___x"),
       client("Soon___x"),
       client("Late___x"),
-      client("Paid___x", { collection_amount: 0 }),
+      client("Paid___x", { collection_amount: 0, overdue_total: 0, current_total: 0 }),
+      // paid everything overdue as promised; a new invoice is open but not yet due
+      client("CurrentOnly___x", { collection_amount: 40, overdue_total: 0, current_total: 40 }),
     ];
     tables[PROMISES] = [
       {
@@ -266,12 +268,19 @@ describe("GET /api/promises-board", () => {
         promise_date: day(-3),
         timestamp: "2026-10-01T00:00:00Z",
       },
+      {
+        client_id: "CurrentOnly___x",
+        client_name: "CurrentOnly",
+        promise_date: day(-3),
+        timestamp: "2026-10-01T00:00:00Z",
+      },
     ];
     expect(await states()).toMatchObject({
       Due: "DUE_TODAY",
       Soon: "UPCOMING",
       Late: "BROKEN",
       Paid: "KEPT",
+      CurrentOnly: "KEPT", // invoices not yet due do not break a promise
     });
   });
   it("REGRESSION: a missed promise stays BROKEN after the client's contact changed (new client_id)", async () => {
@@ -903,5 +912,32 @@ describe("Escalations module: status changes are recorded in the issue's history
       summary: "Done: Drive credential reconnected",
       actor: "Prince",
     });
+  });
+});
+
+describe("GET /api/clients-list: reachability (same rule as Contacts to Fix)", () => {
+  it("a bounced or placeholder email is not 'reachable by email'; an invalid phone is not 'by phone'", async () => {
+    tables[CLIENTS] = [
+      client("Bounced___a@b.co", { email: "a@b.co", phone: "639170000000" }),
+      client("Fake___x", { email: "acme@fake.com", phone: "63962051595" }),
+      client("Good___g@c.co", { email: "g@c.co", phone: "09171234567" }),
+    ];
+    tables["mVW2GYHfpumghEeP"] = [
+      {
+        client_id: "Bounced___a@b.co",
+        address: "a@b.co",
+        reason: "address not found",
+        bounced_at: new Date().toISOString(),
+      },
+    ];
+    const list = (await (await call("clients-list", "GET", "/api/clients-list")).json())
+      .clients as {
+      client_name: string;
+      reach: { email: boolean; phone: boolean };
+    }[];
+    const by = Object.fromEntries(list.map((c) => [c.client_name, c.reach]));
+    expect(by["Bounced"]).toEqual({ email: false, phone: true });
+    expect(by["Fake"]).toEqual({ email: false, phone: false });
+    expect(by["Good"]).toEqual({ email: true, phone: true });
   });
 });

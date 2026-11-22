@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 import { downloadCsv } from "@/lib/csv";
+import { Pager, usePaged } from "@/components/collections/Pager";
 
 export const Route = createFileRoute("/promises")({
   head: () => ({ meta: [{ title: "Payment Promises | Rare Global Food Collections" }] }),
@@ -76,6 +77,7 @@ function PromisesPage() {
           .toLowerCase()
           .includes(q.toLowerCase())),
   );
+  const { paged, pager } = usePaged(visible);
   return (
     <AppShell
       title="Payment Promises"
@@ -159,7 +161,7 @@ function PromisesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {visible.map((i) => (
+                {paged.map((i) => (
                   <tr key={i.client_id}>
                     <td className="px-4 py-3">
                       <p className="font-semibold">{i.client_name}</p>
@@ -190,6 +192,7 @@ function PromisesPage() {
               </tbody>
             </table>
           </div>
+          <Pager {...pager} />
         </Panel>
       </div>
     </AppShell>

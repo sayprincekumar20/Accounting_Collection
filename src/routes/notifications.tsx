@@ -3,6 +3,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { IssueTools } from "@/components/collections/IssueTools";
+import { Pager, usePaged } from "@/components/collections/Pager";
 import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 
 // System notifications now live in the Escalations module, in their own tab (kept apart from customer
@@ -130,11 +131,15 @@ export function NotificationsContent() {
   const [kind, setKind] = useState("All");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
+  const [statusF, setStatusF] = useState<"ALL" | "OPEN" | "IN_PROGRESS" | "DONE">("ALL");
   const visible = items.filter(
     (i) =>
       (kind === "All" || i.kind === kind) &&
+      // a status applies to workflow failures (information notices have none)
+      (statusF === "ALL" || (actionable(i) && (i.status ?? "OPEN") === statusF)) &&
       (!q || `${i.title} ${i.summary} ${i.message}`.toLowerCase().includes(q.toLowerCase())),
   );
+  const { paged, pager } = usePaged(visible);
   const today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
   const todayCount = items.filter(
     (i) => new Date(new Date(i.at).getTime() + 8 * 3600000).toISOString().slice(0, 10) === today,
@@ -168,6 +173,19 @@ export function NotificationsContent() {
           placeholder="Search notifications…"
           className={`${control} min-w-[220px] flex-1`}
         />
+        <select
+          value={statusF}
+          aria-label="Status"
+          onChange={(e) => {
+            setStatusF(e.target.value as typeof statusF);
+          }}
+          className={control}
+        >
+          <option value="ALL">All statuses</option>
+          <option value="OPEN">Open</option>
+          <option value="IN_PROGRESS">In progress</option>
+          <option value="DONE">Done</option>
+        </select>
         <select value={kind} onChange={(e) => setKind(e.target.value)} className={control}>
           {KINDS.map((k) => (
             <option key={k} value={k}>
@@ -184,7 +202,7 @@ export function NotificationsContent() {
             <p className="px-4 py-6 text-sm text-destructive">Could not load notifications.</p>
           ) : null}
           <ul className="divide-y divide-border">
-            {visible.map((i) => (
+            {paged.map((i) => (
               <li key={i.id + i.at} className="px-4 py-3">
                 <button
                   type="button"
@@ -264,6 +282,7 @@ export function NotificationsContent() {
               </li>
             ) : null}
           </ul>
+          <Pager {...pager} />
         </Panel>
       </div>
     </>

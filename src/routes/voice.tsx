@@ -15,6 +15,7 @@ import {
 } from "@/components/collections/LogCells";
 import { isNotReachedReason } from "@/lib/escalation-alerts";
 import { promiseForCall } from "@/lib/overview-calc";
+import { Pager, usePaged } from "@/components/collections/Pager";
 import {
   LogFilterBar,
   matchesLogFilters,
@@ -346,7 +347,7 @@ function VoiceLogs() {
   const notConnected = calls.length - connected;
 
   // Same filter bar as the text channels; status means call outcome here.
-  const [filters, setFilters, clearFilters] = useLogFilters();
+  const [filters, setFilters, clearFilters] = useLogFilters("voice");
   const rowFor = (c: CallListItem): FilterableRow => {
     const client = clients.find((cl) => cl.client_id === c.client_id);
     return {
@@ -361,6 +362,7 @@ function VoiceLogs() {
     };
   };
   const visible = calls.filter((c) => matchesLogFilters(rowFor(c), filters));
+  const { paged, pager } = usePaged(visible, 50);
   // "Call again" is on every call row; the next attempt only on the LATEST call of each client.
   const latestCallId = new Map<string, string>();
   for (const c of calls
@@ -437,7 +439,7 @@ function VoiceLogs() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {visible.map((c) => {
+              {paged.map((c) => {
                 const promise = latestFor(promises, c.client_id);
                 const escalation = latestFor(escalations, c.client_id);
                 const notReached = escalation ? undefined : latestFor(notReachedRows, c.client_id);
@@ -572,6 +574,7 @@ function VoiceLogs() {
             </tbody>
           </table>
         </div>
+        <Pager {...pager} />
       </section>
 
       {activeItem ? (

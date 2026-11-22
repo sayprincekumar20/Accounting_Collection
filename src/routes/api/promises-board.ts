@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
 
 // Payment promises per client (latest promise each): due today, upcoming, broken (date passed and
-// the client still owes money), or kept (date passed and no balance left / no longer overdue).
+// the client still has an OVERDUE balance), or kept (date passed and nothing overdue any more; invoices
+// not yet due do not count).
 const PROMISES = "JyGFOqTqI3QXHJbb";
 const CLIENTS = "rJpqXxmxhqJnlLrJ";
 type Row = Record<string, unknown>;
@@ -58,11 +59,14 @@ export const Route = createFileRoute("/api/promises-board")({
                   )
                 : "";
               const balance = Number(c["collection_amount"] || 0);
+              // A passed promise is broken only while something is still OVERDUE: invoices not yet due
+              // (current) do not break it.
+              const overdue = Number(c["overdue_total"] || 0);
               const active = !!c["client_id"] && s(c["status"]).toUpperCase() !== "INACTIVE";
               let state = "UPCOMING";
               if (!pd) state = "UNKNOWN";
               else if (pd === today) state = "DUE_TODAY";
-              else if (pd < today) state = active && balance > 0 ? "BROKEN" : "KEPT";
+              else if (pd < today) state = active && overdue > 0 ? "BROKEN" : "KEPT";
               return {
                 client_id: s(p["client_id"]),
                 client_name: s(p["client_name"]) || s(c["client_name"]),

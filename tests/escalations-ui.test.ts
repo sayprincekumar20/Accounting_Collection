@@ -74,7 +74,8 @@ describe("Escalations > System notifications tab", () => {
     mount(createElement(NotificationsContent));
     await screen.findByText("00_Zoho_Data_Fetch_Master_v3");
     expect(screen.getAllByRole("button", { name: /Diagnose with AI/ })).toHaveLength(1); // only the failure
-    expect(screen.getByText("Open")).toBeTruthy();
+    expect(screen.getByText("Open", { selector: "span" })).toBeTruthy(); // the status chip
+    expect(screen.getByLabelText("Status")).toBeTruthy(); // the new status filter
     expect(screen.getByText("Open failures")).toBeTruthy();
   });
   it("Done needs the resolution, which is saved with the status and the issue kind", async () => {

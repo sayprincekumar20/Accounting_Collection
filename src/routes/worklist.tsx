@@ -7,6 +7,7 @@ import { Panel, StatCard, RefreshButton } from "@/components/collections/Bits";
 import { RefTag } from "@/components/collections/LogCells";
 import { downloadCsv } from "@/lib/csv";
 import { IssueTools } from "@/components/collections/IssueTools";
+import { Pager, usePaged } from "@/components/collections/Pager";
 
 export const Route = createFileRoute("/worklist")({
   // Moved: this content now lives on another page (kept as a redirect so old links keep working).
@@ -108,7 +109,10 @@ export function WorklistContent() {
   const visible = items.filter(
     (i) =>
       (status === "ALL" || i.status === status) &&
-      (channel === "ALL" || i.channel === channel) &&
+      // "Voice" includes callback requests (channel VOICE_CALLBACK)
+      (channel === "ALL" ||
+        i.channel === channel ||
+        (channel === "VOICE" && i.channel === "VOICE_CALLBACK")) &&
       (!q ||
         `${i.client_name} ${i.contact_person} ${i.reason} ${i.ref} ${i.ar_owner} ${i.handled_by}`
           .toLowerCase()
@@ -160,6 +164,7 @@ export function WorklistContent() {
     }
   }
 
+  const { paged, pager } = usePaged(visible);
   const select =
     "h-9 rounded-lg border border-border bg-background px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
   return (
@@ -208,6 +213,7 @@ export function WorklistContent() {
           <option value="EMAIL">Email</option>
           <option value="SMS">SMS</option>
           <option value="WHATSAPP">WhatsApp</option>
+          <option value="VIBER">Viber</option>
           <option value="VOICE">Voice</option>
         </select>
         <input
@@ -272,7 +278,7 @@ export function WorklistContent() {
             <p className="px-4 py-6 text-sm text-destructive">Could not load the worklist.</p>
           ) : null}
           <ul className="divide-y divide-border">
-            {visible.map((i) => (
+            {paged.map((i) => (
               <li key={i.entry_id} className="grid gap-3 px-4 py-3 lg:grid-cols-[1.2fr_2fr_1fr]">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{i.client_name}</p>
@@ -373,6 +379,7 @@ export function WorklistContent() {
               <li className="px-4 py-8 text-center text-sm text-muted-foreground">Nothing here.</li>
             ) : null}
           </ul>
+          <Pager {...pager} />
         </Panel>
       </div>
     </>

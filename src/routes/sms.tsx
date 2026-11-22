@@ -205,7 +205,7 @@ function SmsInbox() {
   const escalations = data?.escalations ?? [];
   const clients = data?.clients ?? [];
   const sourceByClient = new Map((data?.queue ?? []).map((q) => [q.client_id, q]));
-  const [filters, setFilters, clearFilters] = useLogFilters();
+  const [filters, setFilters, clearFilters] = useLogFilters("sms");
   // Conversations are keyed by phone: match clients on the last 10 digits (63917…, 0917…, 917…).
   const last10 = (v: string | null | undefined) => digits(v).slice(-10);
   const clientForPhone = (phone: string) =>

@@ -327,7 +327,7 @@ export function Assistant() {
           else if (ev["type"] === "ui") {
             if (ev["op"] === "navigate" && ev["to"]) {
               const search = (ev["search"] as Record<string, string>) ?? {};
-              if (Object.keys(search).length) setLogFilters(search);
+              if (Object.keys(search).length) setLogFilters(String(ev["to"]), search);
               void navigate({ to: String(ev["to"]) as "/" });
             } else if (ev["op"] === "refresh") void qc.invalidateQueries();
             else if (ev["op"] === "reminder" && ev["client_id"]) {

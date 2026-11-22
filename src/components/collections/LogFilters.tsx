@@ -1,6 +1,7 @@
-// One filter bar shared by the Email, SMS, WhatsApp and Voice pages. The selection is kept for
-// the browser session, so it carries over when switching tabs.
-import { useEffect, useState } from "react";
+// One filter bar used by Overview, Clients, Queue, Reports and the channel pages. Each page keeps its OWN
+// selection for the browser session (its "scope"): the pages give Status and Period different meanings
+// (a channel on Overview, a due date on Clients…), so one shared selection used to empty other lists.
+import { useEffect, useState, type ReactNode } from "react";
 
 export type StatusFilter =
   | "all"
@@ -28,39 +29,41 @@ const DEFAULT: LogFilterState = { q: "", status: "all", range: "all", source: "a
 const KEY = "rgf-log-filters";
 const EVT = "rgf-log-filters-change";
 
-function read(): LogFilterState {
+function read(scope: string): LogFilterState {
   try {
     return {
       ...DEFAULT,
-      ...(JSON.parse(sessionStorage.getItem(KEY) || "{}") as Partial<LogFilterState>),
+      ...(JSON.parse(sessionStorage.getItem(`${KEY}:${scope}`) || "{}") as Partial<LogFilterState>),
     };
   } catch {
     return DEFAULT;
   }
 }
 
-/** Filter state shared across all channel tabs (session-wide). */
-export function useLogFilters(): [
-  LogFilterState,
-  (patch: Partial<LogFilterState>) => void,
-  () => void,
-] {
+/** This page's filter state, kept for the browser session (one scope per page). */
+export function useLogFilters(
+  scope: string,
+): [LogFilterState, (patch: Partial<LogFilterState>) => void, () => void] {
   const [state, setState] = useState<LogFilterState>(DEFAULT);
   useEffect(() => {
-    setState(read());
-    const onChange = () => setState(read());
+    setState(read(scope));
+    const onChange = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === scope) setState(read(scope));
+    };
     window.addEventListener(EVT, onChange);
-    return () => window.removeEventListener(EVT, onChange);
-  }, []);
+    return () => {
+      window.removeEventListener(EVT, onChange);
+    };
+  }, [scope]);
   const update = (patch: Partial<LogFilterState>) => {
-    const next = { ...read(), ...patch };
+    const next = { ...read(scope), ...patch };
     try {
-      sessionStorage.setItem(KEY, JSON.stringify(next));
+      sessionStorage.setItem(`${KEY}:${scope}`, JSON.stringify(next));
     } catch {
       // storage unavailable: still filter this page
     }
     setState(next);
-    window.dispatchEvent(new Event(EVT));
+    window.dispatchEvent(new CustomEvent(EVT, { detail: scope }));
   };
   return [state, update, () => update(DEFAULT)];
 }
@@ -183,8 +186,10 @@ export function LogFilterBar({
   statusOptions,
   hideStatus = false,
   hideSource = false,
+  hideRange = false,
   rangeLabel,
   searchPlaceholder,
+  children,
 }: {
   filters: LogFilterState;
   onChange: (patch: Partial<LogFilterState>) => void;
@@ -196,15 +201,24 @@ export function LogFilterBar({
   statusOptions?: { value: string; label: string }[] | undefined;
   hideStatus?: boolean | undefined;
   hideSource?: boolean | undefined;
+  /** Hide the Period select (a page with its own date filter). */
+  hideRange?: boolean | undefined;
+  /** Page-specific controls shown in the bar. */
+  children?: ReactNode;
   /** What the period filters on, shown as the first option (e.g. "Any run date"). */
   rangeLabel?: string | undefined;
   searchPlaceholder?: string | undefined;
 }) {
   const statuses = statusOptions ?? (variant === "voice" ? VOICE_STATUSES : TEXT_STATUSES);
+  const foreign = !hideStatus && !statuses.some((s) => s.value === filters.status);
+  useEffect(() => {
+    if (foreign) onChange({ status: "all" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [foreign]);
   const active =
     filters.q ||
     (!hideStatus && filters.status !== "all") ||
-    filters.range !== "all" ||
+    (!hideRange && filters.range !== "all") ||
     (!hideSource && filters.source !== "all");
   const select =
     "h-9 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -232,17 +246,20 @@ export function LogFilterBar({
           ))}
         </select>
       )}
-      <select
-        aria-label="Period"
-        value={filters.range}
-        onChange={(e) => onChange({ range: e.target.value as RangeFilter })}
-        className={select}
-      >
-        <option value="all">{rangeLabel || "Any time"}</option>
-        <option value="today">Today</option>
-        <option value="7d">Last 7 days</option>
-        <option value="30d">Last 30 days</option>
-      </select>
+      {hideRange ? null : (
+        <select
+          aria-label="Period"
+          value={filters.range}
+          onChange={(e) => onChange({ range: e.target.value as RangeFilter })}
+          className={select}
+        >
+          <option value="all">{rangeLabel || "Any time"}</option>
+          <option value="today">Today</option>
+          <option value="7d">Last 7 days</option>
+          <option value="30d">Last 30 days</option>
+        </select>
+      )}
+      {children}
       {hideSource ? null : (
         <select
           aria-label="Source"
@@ -273,13 +290,21 @@ export function LogFilterBar({
   );
 }
 
-/** Set the shared filters from outside a page (used by the AI assistant's navigate action). */
-export function setLogFilters(patch: Partial<LogFilterState>): void {
-  const next = { ...read(), ...patch };
+/** The filter scope of a page address ("/sms" -> "sms", "/" -> "overview"). */
+export function filterScopeForPath(path: string): string {
+  const p = path.split(/[?#]/)[0]!.replace(/\/+$/, "");
+  if (!p) return "overview";
+  return p.slice(1).split("/")[0] || "overview";
+}
+
+/** Set a page's filters from outside it (the AI assistant's navigate action), by that page's address. */
+export function setLogFilters(path: string, patch: Partial<LogFilterState>): void {
+  const scope = filterScopeForPath(path);
+  const next = { ...read(scope), ...patch };
   try {
-    sessionStorage.setItem(KEY, JSON.stringify(next));
+    sessionStorage.setItem(`${KEY}:${scope}`, JSON.stringify(next));
   } catch {
     // storage unavailable
   }
-  window.dispatchEvent(new Event(EVT));
+  window.dispatchEvent(new CustomEvent(EVT, { detail: scope }));
 }

@@ -140,7 +140,7 @@ const notRecorded = (
 function ReportsPage() {
   const { data, isLoading, isFetching, error, refetch } = useRunLogs();
   const { data: callReports, refetch: refetchReports } = useCallReports();
-  const [filters, setFilters, clearFilters] = useLogFilters();
+  const [filters, setFilters, clearFilters] = useLogFilters("reports");
   const all = data ?? [];
   const runs = all.filter((r) => inRange(r.run_date, filters.range));
   // Weekly AR report (25, source WEEKLY_RUN) of a run: the first one built on or after that run's date and

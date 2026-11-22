@@ -216,7 +216,7 @@ function Overview() {
   const counters = data?.counters ?? [];
   const latestRun = data?.latestRun;
   // Shared filters (search, channel, period) narrow every card and list on this page.
-  const [filters, setFilters, clearFilters] = useLogFilters();
+  const [filters, setFilters, clearFilters] = useLogFilters("overview");
   const OVERVIEW_CHANNELS = [
     { value: "all", label: "All channels" },
     { value: "ch_email", label: "Email" },

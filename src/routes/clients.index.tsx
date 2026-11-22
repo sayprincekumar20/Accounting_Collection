@@ -58,6 +58,8 @@ interface ClientRow {
   next_retry_at?: string;
   retry_reason?: string;
   contacted_via_call_command?: boolean;
+  /** Reachable by email / phone (same rule as Contacts to Fix). */
+  reach?: { email: boolean; phone: boolean };
   sales_person?: string;
 }
 
@@ -65,9 +67,9 @@ const CLIENT_STATUSES = [
   { value: "all", label: "All clients" },
   { value: "c_promise", label: "Payment promise active" },
   { value: "c_handoff", label: "AR team handling (escalated)" },
-  { value: "c_email", label: "Email clients" },
-  { value: "c_sms", label: "Phone only (SMS)" },
-  { value: "c_nocontact", label: "No contact channel" },
+  { value: "c_email", label: "Reachable by email" },
+  { value: "c_sms", label: "Reachable by phone only" },
+  { value: "c_nocontact", label: "Can't be reached" },
   { value: "c_overdue", label: "Has overdue invoices" },
   { value: "c_callcmd", label: "Contacted via /call" },
   { value: "c_notreached", label: "Last call: not reached (incl. retry pending)" },
@@ -84,12 +86,13 @@ function clientStatusMatch(c: ClientRow, status: string) {
       return activeUntil(c.promise_suppressed_until) && c.suppression_reason !== "ar_handoff";
     case "c_handoff":
       return activeUntil(c.ar_handoff_until);
+    // Same rule as Contacts to Fix: a working email / a valid PH mobile (not just a filled field).
     case "c_email":
-      return !!c.email;
+      return !!c.reach?.email;
     case "c_sms":
-      return !c.email && !!c.phone;
+      return !c.reach?.email && !!c.reach?.phone;
     case "c_nocontact":
-      return !c.email && !c.phone;
+      return !c.reach?.email && !c.reach?.phone;
     case "c_callcmd":
       return !!c.contacted_via_call_command;
     case "c_notreached":
@@ -142,7 +145,7 @@ function useClients() {
 function ClientsPage() {
   const { data, isLoading, isFetching, error, refetch } = useClients();
   const clients = data ?? [];
-  const [filters, setFilters, clearFilters] = useLogFilters();
+  const [filters, setFilters, clearFilters] = useLogFilters("clients");
   const { data: queue } = useQuery({
     queryKey: ["reminder-queue-list"],
     queryFn: async () => {
@@ -161,9 +164,22 @@ function ClientsPage() {
   const queueByClient = new Map((queue ?? []).map((q) => [q.client_id, q]));
   const sourceByClient = new Map((queue ?? []).map((q) => [q.client_id, q.trigger_source || ""]));
   const statusIsMine = CLIENT_STATUSES.some((o) => o.value === filters.status);
+  // Due date, by the earliest open invoice's due date (Manila day): a clear choice instead of a period.
+  const [due, setDue] = useState<"all" | "passed" | "next7" | "later">("all");
+  const todayManila = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+  const in7 = new Date(Date.now() + 8 * 3600000 + 7 * 86400000).toISOString().slice(0, 10);
+  const dueMatch = (d: string) => {
+    if (due === "all") return true;
+    const day = (d || "").slice(0, 10);
+    if (!day) return false;
+    if (due === "passed") return day < todayManila;
+    if (due === "next7") return day >= todayManila && day <= in7;
+    return day > in7;
+  };
   const filtered = clients.filter(
     (c) =>
       (!statusIsMine || clientStatusMatch(c, filters.status)) &&
+      dueMatch(c.due_date) &&
       matchesLogFilters(
         {
           name: `${c.client_name} ${c.parent_name ?? ""}`,
@@ -172,7 +188,7 @@ function ClientsPage() {
           lastActivity: c.due_date,
           source: sourceByClient.get(c.client_id),
         },
-        { ...filters, status: "all" },
+        { ...filters, status: "all", range: "all" },
       ),
   );
   const [page, setPage] = useState(0);
@@ -252,9 +268,23 @@ function ClientsPage() {
           shown={filtered.length}
           total={clients.length}
           statusOptions={CLIENT_STATUSES}
-          rangeLabel="Any due date"
+          hideRange
           searchPlaceholder="Search client, contact, email, phone, invoice, sales person…"
-        />
+        >
+          <select
+            aria-label="Due date"
+            value={due}
+            onChange={(e) => {
+              setDue(e.target.value as typeof due);
+            }}
+            className="h-9 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+          >
+            <option value="all">Any due date</option>
+            <option value="passed">Due date passed</option>
+            <option value="next7">Due in the next 7 days</option>
+            <option value="later">Due later</option>
+          </select>
+        </LogFilterBar>
       </div>
       <Panel title="Client ledger" description={`${filtered.length} accounts`}>
         {isLoading ? <SkeletonRows /> : null}

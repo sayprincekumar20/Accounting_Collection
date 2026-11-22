@@ -293,7 +293,7 @@ function EmailInbox() {
   const promises = sidebar?.promises ?? [];
   const escalations = sidebar?.escalations ?? [];
   const sourceByClient = new Map((sidebar?.queue ?? []).map((q) => [q.client_id, q]));
-  const [filters, setFilters, clearFilters] = useLogFilters();
+  const [filters, setFilters, clearFilters] = useLogFilters("email");
 
   const [active, setActive] = useState<string | null>(null);
 

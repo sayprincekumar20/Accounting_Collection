@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { fetchDataTable, truncationHeaders } from "@/lib/n8n-datatable";
+import { fetchAllDataTableRows, fetchDataTable, truncationHeaders } from "@/lib/n8n-datatable";
+import { bounceIssue, latestBounces } from "@/lib/contact-bounces";
+import { classifyContact } from "@/lib/contact-issues";
 import { buildActivity, loadActivityTables } from "@/lib/client-activity";
 
 // Direct n8n Data Table REST API call -- replaces the old N8N_WEBHOOK_BASE_URL
@@ -48,6 +50,20 @@ export const Route = createFileRoute("/api/clients-list")({
 
           // Last contact per client (weekly run or /call): shared helper, see src/lib/client-activity.ts.
           const activityFor = buildActivity(...(await loadActivityTables()));
+          // Reachable by email / phone: the same rule as Contacts to Fix (valid, real, not bounced).
+          const bounces = latestBounces(
+            await fetchAllDataTableRows<Record<string, unknown>>("mVW2GYHfpumghEeP").catch(
+              () => [],
+            ),
+          );
+          const reachOf = (r: ClientTableRow) =>
+            classifyContact({
+              email: r.email || "",
+              phone: r.phone || "",
+              contact_person: r.contact_person || "x",
+              bounce:
+                bounceIssue((r.email || "").trim().toLowerCase(), bounces.get(r.client_id)) || "",
+            }).reach;
 
           // v3 retires stale duplicate rows (e.g. after a CRM contact change) as
           // INACTIVE; hide them so each customer appears once with current data.
@@ -80,6 +96,7 @@ export const Route = createFileRoute("/api/clients-list")({
               sales_person: r.sales_person || "",
               segment: r.segment || "",
               ar_owner: r.ar_owner || "",
+              reach: reachOf(r),
               ...activityFor(r.client_id),
             }));
 

@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 /** Pagination bar: 'Showing 1–50 of 138', page size, previous / next. */
 export function Pager({
   total,
@@ -54,4 +56,19 @@ export function Pager({
       </div>
     </div>
   );
+}
+
+/** Page state for a filtered list: back to page 1 whenever the list or the page size changes. */
+export function usePaged<T>(list: T[], initialSize = 25) {
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(initialSize);
+  useEffect(() => {
+    setPage(0);
+  }, [list.length, pageSize]);
+  const pages = Math.max(1, Math.ceil(list.length / pageSize));
+  const safe = Math.min(page, pages - 1);
+  return {
+    paged: list.slice(safe * pageSize, (safe + 1) * pageSize),
+    pager: { total: list.length, page: safe, pageSize, onPage: setPage, onPageSize: setPageSize },
+  };
 }

@@ -231,8 +231,8 @@ registerAction({
     if (a.no_contact != null)
       list = list.filter((c) => (!s(c["phone"]) && !s(c["email"])) === a.no_contact);
     if (a.has_active_promise != null) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Start of today in Manila (the server runs in UTC).
+      const today = new Date(`${manilaDay(new Date())}T00:00:00+08:00`);
       list = list.filter(
         (c) =>
           (!!s(c["promise_suppressed_until"]) &&

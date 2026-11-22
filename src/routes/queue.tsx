@@ -65,6 +65,8 @@ const QUEUE_STATUSES = [
   { value: "q_SUPPRESSED", label: "Suppressed (promise / AR)" },
   { value: "q_SKIPPED_MULTIBRANCH", label: "Skipped: 5+ branches" },
   { value: "q_SKIPPED_SALESPERSON", label: "Skipped: sales person" },
+  { value: "q_SKIPPED_NOT_SALES_TEAM", label: "Skipped: owner not in Sales Team" },
+  { value: "q_PAID", label: "Paid before sending" },
   { value: "q_STALE", label: "Stale (retired)" },
 ];
 
@@ -107,7 +109,7 @@ function QueuePage() {
   const skipped = queue.filter((q) => q.queue_status.toUpperCase().startsWith("SKIPPED"));
   // Not approved by Accounting yet this cycle: never texted or called until approved (Contact Approvals).
   const awaitingApproval = queue.filter((q) => q.queue_status.toUpperCase() === "WAITING_APPROVAL");
-  const [filters, setFilters, clearFilters] = useLogFilters();
+  const [filters, setFilters, clearFilters] = useLogFilters("queue");
   const statusIsMine = QUEUE_STATUSES.some((o) => o.value === filters.status);
   const wanted = statusIsMine && filters.status !== "all" ? filters.status.slice(2) : "";
   const visible = (wanted === "STALE" ? all : queue).filter(
@@ -223,7 +225,7 @@ function QueuePage() {
           shown={visible.length}
           total={queue.length}
           statusOptions={QUEUE_STATUSES}
-          rangeLabel="Any sent date"
+          rangeLabel="Any activity date"
           searchPlaceholder="Search client, contact, invoice, channel…"
         />
       </div>
