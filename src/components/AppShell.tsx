@@ -167,7 +167,7 @@ export function AppShell({
             ))}
           </nav>
         </header>
-        <main className="flex-1 px-5 py-6 md:px-8">{children}</main>
+        <main className="flex-1 px-5 pb-24 pt-6 md:px-8">{children}</main>
         <AssistantBoundary>
           <Assistant />
         </AssistantBoundary>

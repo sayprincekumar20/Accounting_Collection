@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { bounceIssue, latestBounces } from "@/lib/contact-bounces";
+import { classifyContact } from "@/lib/contact-issues";
 
-// Clients whose contact details should be corrected in Zoho, with the reasons.
+// Clients whose contact details should be corrected in Zoho: each problem (code, short label, details) and
+// whether the client can still be reached by email / phone (lib/contact-issues.ts).
 const CLIENTS = "rJpqXxmxhqJnlLrJ";
 const ESCALATIONS = "ANfkZZDIrDuC4RjK";
 const BOUNCES = "mVW2GYHfpumghEeP"; // written by the n8n workflow 18_Email_Bounce_Watcher
@@ -33,26 +35,13 @@ export const Route = createFileRoute("/api/contacts-to-fix")({
             .filter((c) => s(c["status"]).toUpperCase() !== "INACTIVE")
             .map((c) => {
               const email = s(c["email"]).trim().toLowerCase();
-              const phone = s(c["phone"]).replace(/\D/g, "");
-              const issues: string[] = [];
-              if (!email && !phone) issues.push("No phone and no email");
-              if (
-                email &&
-                /(^|[@.])fake|fake\d*@|@example\.|@test\.|noemail|none@|n\/a/.test(email)
-              )
-                issues.push("Fake / placeholder email");
-              if (email.endsWith("@rareglobalfood.com"))
-                issues.push("Internal Rare Global email used as the client email");
-              if (email && !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(email))
-                issues.push("Email looks invalid");
-              if (phone && !/^(63)?9\d{9}$/.test(phone.replace(/^0/, "")))
-                issues.push("Phone is not a valid PH mobile number");
-              if (!s(c["contact_person"]).trim())
-                issues.push("No contact person (no Accounting / Primary contact in CRM)");
-              const bounced = bounceIssue(email, bounces.get(s(c["client_id"])));
-              if (bounced) issues.push(bounced);
-              const wrong = wrongBy.get(s(c["client_id"]));
-              if (wrong) issues.push("Escalated as wrong / former contact: " + wrong);
+              const { issues, reach } = classifyContact({
+                email: s(c["email"]),
+                phone: s(c["phone"]),
+                contact_person: s(c["contact_person"]),
+                bounce: bounceIssue(email, bounces.get(s(c["client_id"]))) || "",
+                wrongPerson: wrongBy.get(s(c["client_id"])) || "",
+              });
               return {
                 client_id: s(c["client_id"]),
                 client_name: s(c["client_name"]),
@@ -64,6 +53,7 @@ export const Route = createFileRoute("/api/contacts-to-fix")({
                 sales_person: s(c["sales_person"]),
                 balance: Number(c["collection_amount"] || 0),
                 issues,
+                reach,
               };
             })
             .filter((x) => x.issues.length)
