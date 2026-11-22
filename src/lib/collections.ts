@@ -13,8 +13,24 @@ export const CHANNELS: {
   { id: "voice", label: "Voice", provider: "ElevenLabs / Vapi", colorVar: "var(--voice)" },
 ];
 
+/**
+ * The channel's label and colour. Matches regardless of capitals (the n8n tables store "EMAIL", "VOICE"…);
+ * a callback request counts as Voice. An unknown or empty channel gets a neutral grey badge with its own
+ * name, never another channel's (it used to fall back to WhatsApp, so every promise looked like WhatsApp).
+ */
 export function channelMeta(id: string) {
-  return CHANNELS.find((c) => c.id === id) ?? CHANNELS[0]!;
+  const key = String(id ?? "")
+    .trim()
+    .toLowerCase();
+  const norm = key === "voice_callback" || key === "call" || key === "phone" ? "voice" : key;
+  const known = CHANNELS.find((c) => c.id === norm);
+  if (known) return known;
+  return {
+    id: norm as Channel,
+    label: norm ? norm.charAt(0).toUpperCase() + norm.slice(1).replace(/_/g, " ") : "Unknown",
+    provider: "",
+    colorVar: "var(--muted-foreground)",
+  };
 }
 
 export function peso(value: number | null | undefined) {

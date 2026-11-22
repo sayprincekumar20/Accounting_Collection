@@ -7,6 +7,7 @@ import {
   getGmailBusinessEmail,
 } from "@/lib/gmail-server";
 import { fetchAllDataTableRows } from "@/lib/n8n-datatable";
+import { decodeHtmlEntities } from "@/lib/html-entities";
 
 // Direct Gmail API call — replaces the old N8N_WEBHOOK_BASE_URL proxy.
 // Matches the real ThreadListItem contract from email.tsx exactly:
@@ -311,15 +312,15 @@ export const Route = createFileRoute("/api/gmail-threads-list")({
                 notified_ar: escalatedClientIds.has(client.client_id),
                 promise_recorded: promisedClientIds.has(client.client_id),
                 message_count: thread.messages.length,
-                lastMessagePreview: lastMessage.snippet || "",
+                lastMessagePreview: decodeHtmlEntities(lastMessage.snippet || ""),
                 lastDirection: isOutbound ? "outbound" : "inbound",
                 lastMessageAt: getHeader(headers, "Date"),
                 clientReplyCount: clientMsgs.length,
                 lastFrom: lastFromHuman,
                 bounced,
-                lastClientPreview: lastClient?.snippet || "",
+                lastClientPreview: decodeHtmlEntities(lastClient?.snippet || ""),
                 lastClientAt: lastClient ? getHeader(lastClient.payload?.headers, "Date") : "",
-                lastOurPreview: lastOurs?.snippet || "",
+                lastOurPreview: decodeHtmlEntities(lastOurs?.snippet || ""),
               };
             })
             .filter((t): t is NonNullable<typeof t> => t !== null);
