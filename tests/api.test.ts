@@ -941,3 +941,38 @@ describe("GET /api/clients-list: reachability (same rule as Contacts to Fix)", (
     expect(by["Good"]).toEqual({ email: true, phone: true });
   });
 });
+
+describe("GET /api/promise-history", () => {
+  it("returns the newest promises first (Overview 'Recent payment promises')", async () => {
+    tables[PROMISES] = [
+      {
+        client_id: "Old___x",
+        client_name: "Old",
+        channel: "VOICE",
+        promise_date: "2026-10-19",
+        timestamp: "2026-10-13T14:38:25+08:00",
+      },
+      {
+        client_id: "New___x",
+        client_name: "New",
+        channel: "EMAIL",
+        promise_date: "2026-11-25",
+        timestamp: "2026-11-21T09:00:00+08:00",
+      },
+      {
+        client_id: "Mid___x",
+        client_name: "Mid",
+        channel: "SMS",
+        promise_date: "2026-11-13",
+        timestamp: "2026-11-12T20:30:46+08:00",
+      },
+    ];
+    const list = (await (await call("promise-history", "GET", "/api/promise-history")).json())
+      .promises as {
+      client_name: string;
+      channel: string;
+    }[];
+    expect(list.map((p) => p.client_name)).toEqual(["New", "Mid", "Old"]);
+    expect(list[0]!.channel).toBe("EMAIL");
+  });
+});

@@ -23,15 +23,21 @@ export const Route = createFileRoute("/api/promise-history")({
         try {
           const rows = await fetchAllDataTableRows<PromiseTableRow>(PROMISE_HISTORY_DATA_TABLE_ID);
 
-          const promises = rows.map((r) => ({
-            entry_id: r.entry_id,
-            client_id: r.client_id,
-            client_name: r.client_name,
-            channel: r.channel,
-            promise_date: r.promise_date,
-            reason: r.reason,
-            recorded_at: r.timestamp,
-          }));
+          // Newest first: the Overview shows the first few as "Recent payment promises" (they used to come
+          // in table order, oldest first, so new promises never appeared there).
+          const at = (r: PromiseTableRow) =>
+            new Date(r.timestamp || (r as { createdAt?: string }).createdAt || "").getTime() || 0;
+          const promises = [...rows]
+            .sort((a, b) => at(b) - at(a))
+            .map((r) => ({
+              entry_id: r.entry_id,
+              client_id: r.client_id,
+              client_name: r.client_name,
+              channel: r.channel,
+              promise_date: r.promise_date,
+              reason: r.reason,
+              recorded_at: r.timestamp,
+            }));
 
           return new Response(JSON.stringify({ promises }), {
             headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
