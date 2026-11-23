@@ -118,6 +118,13 @@ class Settings(BaseSettings):
 
     # Automatic Zoho updates for high-confidence proposals (app/assessment/policy.py rules).
     auto_apply_mode: str = "off"               # off | shadow (record only) | on (write)
+    # Activation (Customer Status -> Active) has its own switch, so it can run while field
+    # updates stay in shadow mode. Empty = same as AUTO_APPLY_MODE.
+    auto_activate_mode: str = ""
+    # Zoho function behind the Accounts "Activate or Inactive" button (it may change Customer
+    # Status where the API user's profile may not). Empty = write the field directly.
+    zoho_activate_function: str = ""
+    zoho_activate_function_arg: str = "accId"
     auto_apply_threshold: float = 0.95
     zoho_update_triggers: list[str] = []       # [] = our updates start no Zoho workflows
     # Alerts (same mode): a Note on the Account + a Task for the Account owner.

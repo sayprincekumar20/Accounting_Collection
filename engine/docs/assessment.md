@@ -100,3 +100,14 @@ Besides valid, consistent documents, an Account becomes **Active automatically**
 A check that is not met makes the recommendation MANUAL_REVIEW; the review record lists every
 check (OK / AFTER UPDATE / NOT MET) under "Activation checks". The values and field names are in
 `app/assessment/policy.py` (COD_PAYMENT_TERMS, CONTACT_ROLE_FIELDS, ACCOUNTING_ROLE, PRIMARY_CONTACT_FIELDS, ph_mobile).
+
+
+## rules-1.3 (2026-11-23): one valid document is enough
+
+`policy.ACTIVATION_DOCUMENTS = "ANY_ONE"`: when at least one required document is valid, its values
+are correct (the five activation checks pass) and no document is expired or in conflict, the
+recommendation is ACTIVE; the missing documents are listed "still to collect" and raised as
+alerts. With no valid document, an expired document or a conflict, nothing changes from
+rules-1.2. `"ALL_REQUIRED"` restores rules-1.2. Activation runs through the Zoho function behind
+the Accounts "Activate or Inactive" button when `ZOHO_ACTIVATE_FUNCTION` is set, with its own switch
+`AUTO_ACTIVATE_MODE`, and is confirmed by reading Customer Status back.

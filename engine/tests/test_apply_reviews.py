@@ -50,6 +50,9 @@ class FakeZoho:
         if request.method == "PUT":
             body = json.loads(request.content)
             self.puts.append((path.rsplit("/", 1)[-1], body))
+            if path.endswith("/Accounts"):          # like Zoho: the record changes
+                self.account.update({k: v for k, v in body["data"][0].items()
+                                     if k != "id" and k not in getattr(self, "read_only", ())})
             return httpx.Response(200, json={"data": [{"code": "SUCCESS", "details": {}}]})
         if path.endswith(f"/Accounts/{ACCOUNT}"):
             return httpx.Response(200, json={"data": [self.account]})
@@ -156,3 +159,35 @@ def test_no_activation_without_the_tick(settings):
     assert result.activated is None
     assert not any("Customer_Status" in body["data"][0] for name, body in fake.puts
                    if name == "Accounts")
+
+
+
+def test_field_zoho_silently_skips_is_reported_failed(settings):
+    """Zoho answers SUCCESS but keeps a field the API user may not edit (field permissions)."""
+    from app.review.apply import apply_rows
+    fake = FakeZoho()
+    fake.read_only = {"Customer_Status", "Tax_Identification_Number_TIN"}
+    fake.account["Customer_Status"] = "Inactive"
+    result = apply_rows(fake.client(settings), ACCOUNT, [
+        {"id": "1", "zoho_field": "Tax_Identification_Number_TIN", "decision": "Approve",
+         "value": "123-456-789-00000", "current_value": None},
+        {"id": "2", "zoho_field": "Business_Style", "decision": "Approve", "value": "MEAT SHOP",
+         "current_value": None}], dry_run=False, activate=True)
+    rows = {r.zoho_field: r for r in result.rows}
+    assert rows["Business_Style"].outcome == "APPLIED"
+    assert rows["Tax_Identification_Number_TIN"].outcome == "FAILED"
+    assert "field permissions" in rows["Tax_Identification_Number_TIN"].detail
+    assert result.status == "Failed" and result.activated is False   # no activation after a failure
+
+
+def test_activation_zoho_silently_skips_is_not_reported_as_done(settings):
+    from app.review.apply import apply_rows
+    fake = FakeZoho()
+    fake.read_only = {"Customer_Status"}
+    fake.account["Customer_Status"] = "Inactive"
+    result = apply_rows(fake.client(settings), ACCOUNT, [
+        {"id": "1", "zoho_field": "Business_Style", "decision": "Approve", "value": "MEAT SHOP",
+         "current_value": None}], dry_run=False, activate=True)
+    assert result.status == "Applied" and result.activated is False
+    assert any("Customer Status could not be set: Zoho kept 'Inactive'" in n
+               for n in result.notes)

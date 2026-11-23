@@ -20,6 +20,7 @@ from app.review.engine import create_engine_review, create_problem_review
 from app.services.audit import record_event
 from app.storage.base import build_storage
 from app.workers.celery_app import celery_app
+from app.zoho.activation import activate_account
 from app.zoho.errors import ZohoAuthError, ZohoNotFoundError, ZohoTransientError
 from app.zoho.factory import get_zoho_client
 
@@ -152,12 +153,17 @@ def extract_documents(self, job_id: str) -> str:
             extract_job(db, job, build_storage(get_settings()), provider)
             assess_job(db, job, extraction_version(provider), manila_today())  # Phase 1D
             s = get_settings()
-            if s.auto_apply_mode != "off":
-                auto_apply_job(db, job, get_zoho_client(), s.auto_apply_mode,
+            activation_mode = s.auto_activate_mode or s.auto_apply_mode
+            if s.auto_apply_mode != "off" or activation_mode != "off":
+                client = get_zoho_client()
+                auto_apply_job(db, job, client, s.auto_apply_mode,
                                s.auto_apply_threshold, s.zoho_update_triggers,
                                alert_tasks=s.alert_tasks,
                                task_due_days=s.alert_task_due_days,
-                               repeat_after_days=s.alert_repeat_after_days)
+                               repeat_after_days=s.alert_repeat_after_days,
+                               activation_mode=activation_mode,
+                               activator=lambda: activate_account(
+                                   client, job.account_id, s, s.zoho_update_triggers))
             if s.create_review_records:
                 create_review_record(db, job, get_zoho_client(), build_storage(s),
                                      s.review_max_images)  # Phase 3

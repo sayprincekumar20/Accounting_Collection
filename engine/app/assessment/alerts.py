@@ -122,11 +122,15 @@ def status_decision(assessment: dict, current_status: str | None, threshold: flo
             if not ok:
                 return "NO_CHANGE", (f"{c['label']}: {c['detail']}; not updated automatically "
                                      f"({why}), a person must approve it.")
+    missing = [r["document_type"] for r in assessment.get("requirements", [])
+               if r["status"] != "VALID" and r["status"] != "NO_EXPIRY"]
+    docs_text = ("All required documents present, valid and consistent" if not missing else
+                 "A valid document with correct values (still to collect: "
+                 + ", ".join(missing) + ")")
     if is_active:
-        return "ALREADY_ACTIVE", "Documents complete and valid; account already Active."
-    return "ACTIVATE", "All required documents present, valid and consistent; owner and TIN " \
-                       "confirmed; COD, Accounting contact, TIN, invoice name and billing " \
-                       "address checked."
+        return "ALREADY_ACTIVE", f"{docs_text}; account already Active."
+    return "ACTIVATE", (f"{docs_text}; owner and TIN confirmed; COD, Accounting contact, TIN, "
+                        "invoice name and billing address checked.")
 
 
 def format_note(assessment: dict, alerts: list[dict], status: tuple[str, str],

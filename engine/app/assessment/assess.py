@@ -201,6 +201,24 @@ def _confidence(chosen: Fact, facts: list[Fact], matcher) -> float:
     return round(min(0.98, base + 0.05 * len(agreeing)), 2)
 
 
+# Words in a file name that say which document the file is
+_NAME_HINTS = {
+    "BIR_2303": ("2303", "bir", "cor", "certificate of registration"),
+    "DTI_BN_CERT": ("dti", "business name"),
+    "SEC_CERT": ("sec", "incorporation"),
+    "MAYORS_PERMIT": ("mayor", "permit", "business permit"),
+    "GIS": ("gis", "general information"),
+}
+
+
+def _named_for(doc) -> bool:
+    """True when the file name says it is this document type (e.g. '2303_SMMegaFood.pdf')."""
+    import re
+    name = re.sub(r"[_\-.]+", " ", str(doc.file_name or "").lower())
+    return any(re.search(rf"\b{re.escape(h)}\b", name) for h in
+               _NAME_HINTS.get(doc.document_type, ()))
+
+
 def _proposal(zoho_field, current, proposed, action, confidence, sources, reason,
               attention=False, grounding=None, agreeing=0) -> dict:
     return {"zoho_field": zoho_field, "current_value": current, "proposed_value": proposed,
@@ -358,7 +376,8 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
             "name, or documents of another business?). Not changed automatically.",
             verdict == DIFFERENT))
 
-    # Requirements and validity
+    # Requirements and validity. Several files can hold the same document (e.g. a BIR 2303
+    # inside a credit application): prefer the file named for it, e.g. "2303_SMMegaFood.pdf".
     required = policy.REQUIRED_DOCUMENTS[form]
     by_type: dict[str, list[DocInput]] = {}
     for d in docs:
@@ -366,7 +385,8 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
     requirements = []
     for doc_type in required:
         candidates = sorted(by_type.get(doc_type, []), key=lambda d: (
-            d.validity_status in ("VALID", "NO_EXPIRY"), d.valid_until or ""), reverse=True)
+            d.validity_status in ("VALID", "NO_EXPIRY"), _named_for(d), d.valid_until or ""),
+            reverse=True)
         best = candidates[0] if candidates else None
         status = "MISSING" if best is None else (best.validity_status or "UNKNOWN")
         requirements.append({"document_type": doc_type, "status": status,
@@ -379,7 +399,8 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
         candidates = [d for d in by_type.get(doc_type, [])
                       if d.validity_status in ("VALID", "NO_EXPIRY", "UNKNOWN")]
         if candidates and not snap.get(zoho_field):
-            best = sorted(candidates, key=lambda d: d.valid_until or "", reverse=True)[0]
+            best = sorted(candidates, key=lambda d: (_named_for(d), d.valid_until or ""),
+                          reverse=True)[0]
             proposals.append(_proposal(
                 zoho_field, None, best.file_name, "ATTACH", None,
                 [{"document": best.file_name, "type": doc_type}],
@@ -401,7 +422,11 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
     failed = [c for c in activation if c["status"] == "FAIL"]
     if recommendation == "ACTIVE" and failed:
         recommendation = "MANUAL_REVIEW"
-        reasons = [f"Activation check not met: {c['label']} - {c['detail']}" for c in failed]
+        # keep the documents still to collect (rules-1.3) next to the unmet checks
+        to_collect = [r for r in reasons if r.startswith(("Required document missing",
+                                                           "Validity of required document"))]
+        reasons = ([f"Activation check not met: {c['label']} - {c['detail']}" for c in failed]
+                   + to_collect)
     return {
         "rules_version": policy.RULES_VERSION, "assessed_on": today.isoformat(),
         "business_form": form, "recommendation": recommendation, "reasons": reasons,
@@ -528,17 +553,21 @@ def activation_checks(snap: dict, facts: dict, proposals: list[dict], form: str)
 
 
 def _recommend(checks, requirements, docs) -> tuple[str, list[str]]:
-    reasons_review, reasons_inactive = [], []
+    reasons_review, reasons_inactive, to_collect = [], [], []
+    valid = [r["document_type"] for r in requirements if r["status"] in ("VALID", "NO_EXPIRY")]
+    any_one = policy.ACTIVATION_DOCUMENTS == "ANY_ONE" and bool(valid)
     for c in checks:
         if c["status"] == "CONFLICT" and c["severity"] == "CRITICAL":
             values = " vs ".join(f"{v['value']} ({v['type']})" for v in c["values"])
             reasons_review.append(f"Documents disagree on {c['attribute']}: {values}")
     for r in requirements:
         if r["status"] == "MISSING":
-            reasons_review.append(f"Required document missing: {r['document_type']}")
+            (to_collect if any_one else reasons_review).append(
+                f"Required document missing: {r['document_type']}")
         elif r["status"] == "UNKNOWN" and r["document_type"] in EXPIRING_DOCUMENTS:
-            reasons_review.append(f"Validity of required document could not be determined: "
-                                  f"{r['document_type']} (check its expiry date)")
+            (to_collect if any_one else reasons_review).append(
+                f"Validity of required document could not be determined: "
+                f"{r['document_type']} (check its expiry date)")
         elif r["status"] == "EXPIRED":
             msg = f"Required document expired: {r['document_type']} (until {r['valid_until']})"
             (reasons_inactive if policy.EXPIRED_REQUIRED_DOCUMENT == "INACTIVE"
@@ -551,4 +580,8 @@ def _recommend(checks, requirements, docs) -> tuple[str, list[str]]:
         return "MANUAL_REVIEW", reasons_review + reasons_inactive
     if reasons_inactive:
         return "INACTIVE", reasons_inactive
+    if to_collect:
+        return "ACTIVE", ([f"Valid document: {v}" for v in valid]
+                          + ["One valid document is enough (rules-1.3); still to collect:"]
+                          + to_collect)
     return "ACTIVE", ["All required documents present and valid; documents agree."]

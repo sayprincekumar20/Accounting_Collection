@@ -174,6 +174,16 @@ class ZohoClient:
 
     # ---------- updates ----------
 
+    def execute_function(self, api_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        """Run a Zoho CRM function that has REST API (OAuth 2.0) switched on.
+        POST /functions/{api_name}/actions/execute?auth_type=oauth&arguments={...}"""
+        resp = self._request("POST", f"/functions/{api_name}/actions/execute",
+                             params={"auth_type": "oauth", "arguments": json.dumps(arguments)})
+        body = resp.json() if resp.content else {}
+        if str(body.get("code", "success")).lower() != "success":
+            raise ZohoAPIError(resp.status_code, str(body)[:500])
+        return body
+
     def update_record(self, module: str, record_id: str, values: dict[str, Any],
                       trigger: list[str] | None = None) -> dict[str, Any]:
         """PUT /{module} with one record. `trigger` = [] runs no workflows/approvals/blueprints

@@ -134,7 +134,10 @@ def test_corporation_needs_sec_and_has_no_picklist_value():
                ttype="DOMESTIC CORPORATION")
     a = assess({"Account_Name": "SAMPLE BRAND MALL"}, [corp], TODAY)
     assert a["business_form"] == "CORPORATION"
+    # rules-1.3: the BIR 2303 would be enough, but this Account fails the activation checks
+    # (no COD, no contacts); the SEC certificate stays listed as still to collect
     assert a["recommendation"] == "MANUAL_REVIEW"
+    assert any("Activation check not met: Payment Terms" in r for r in a["reasons"])
     assert any("SEC_CERT" in r for r in a["reasons"])
     p = by_field(a)
     assert p["Type_of_Business_Organization"]["action"] == "FILL"
@@ -308,3 +311,41 @@ def test_auto_activation_needs_every_check():
     decision, why = status_decision(a, None, 0.95)
     assert a["recommendation"] == "MANUAL_REVIEW" and decision == "NO_CHANGE"
     assert "Accounting or primary contact" in a["reasons"][0]
+
+
+def test_file_named_for_the_document_is_preferred():
+    from app.assessment.assess import DocInput as D
+    inside_other = bir()
+    inside_other.document_id, inside_other.file_name = "credit", "Credit Increase_SMMegaFood.pdf"
+    named = bir()
+    named.document_id, named.file_name = "named", "2303_SMMegaFood.pdf"
+    a = assess({**SNAPSHOT, "BIR_Registration_COR": None}, [inside_other, named, dti(),
+                                                             permit()], TODAY)
+    req = next(r for r in a["requirements"] if r["document_type"] == "BIR_2303")
+    assert req["file"] == "2303_SMMegaFood.pdf"
+    attach = [p for p in a["proposals"] if p["action"] == "ATTACH"
+              and p["zoho_field"] == "BIR_Registration_COR"]
+    assert attach and attach[0]["proposed_value"] == "2303_SMMegaFood.pdf"
+    assert isinstance(D, type)
+
+
+
+def test_rules_1_3_one_valid_document_is_enough(monkeypatch):
+    from app.assessment import policy
+    a = assess(SNAPSHOT, [bir()], TODAY)                        # only the BIR 2303
+    assert a["recommendation"] == "ACTIVE"
+    assert "One valid document is enough (rules-1.3); still to collect:" in a["reasons"]
+    assert any("DTI_BN_CERT" in r for r in a["reasons"])
+    monkeypatch.setattr(policy, "ACTIVATION_DOCUMENTS", "ALL_REQUIRED")   # rules-1.2
+    assert assess(SNAPSHOT, [bir()], TODAY)["recommendation"] == "MANUAL_REVIEW"
+
+
+def test_no_valid_document_still_needs_a_person():
+    expired_permit = permit(until="2025-01-31", status="EXPIRED")
+    assert assess(SNAPSHOT, [], TODAY)["recommendation"] == "MANUAL_REVIEW"
+    assert assess(SNAPSHOT, [expired_permit], TODAY)["recommendation"] != "ACTIVE"
+
+
+def test_expired_document_still_blocks_even_with_a_valid_one():
+    a = assess(SNAPSHOT, [bir(), permit(until="2025-01-31", status="EXPIRED")], TODAY)
+    assert a["recommendation"] == "INACTIVE"

@@ -170,7 +170,7 @@ def set_row(review: Review, row_id: str, decision: str, value: str | None = None
 
 def approve(db: Session, review: Review, client: ZohoClient, reviewer: str, *,
             values_compared: bool, activate_account: bool = False, notes: str | None = None,
-            triggers: list[str] | None = None) -> dict:
+            triggers: list[str] | None = None, activator=None) -> dict:
     _require_open(review)
     if not values_compared:
         raise ReviewError("Confirm that every approved value was compared with the document")
@@ -181,7 +181,7 @@ def approve(db: Session, review: Review, client: ZohoClient, reviewer: str, *,
           "value": r["edited_value"] if r["decision"] == "Edit" else r["proposed_value"],
           "current_value": r["current_value"]} for r in rows],
         dry_run=False, triggers=triggers, activate=activate_account,
-        review_id=f"DV-{review.number}")
+        review_id=f"DV-{review.number}", activator=activator)
     if result.status is None:                          # e.g. the Account could not be read
         raise ReviewError(result.error or "Nothing was written")
     outcome = {r.row_id: r for r in result.rows}
@@ -246,8 +246,23 @@ def summary_view(r: Review) -> dict:
             "closed_at": r.closed_at.isoformat() if r.closed_at else None}
 
 
+def _writable(row: dict) -> tuple[bool, str | None]:
+    """Whether approving this row can write it, and why not (shown in the approve dialog)."""
+    from app.review.apply import WRITABLE_FIELDS
+    if row.get("action") == "ATTACH":
+        return False, "File attachments are not written to Zoho (attach the file by hand)"
+    if row.get("zoho_field") not in WRITABLE_FIELDS:
+        return False, "This field is never changed by the verification"
+    value = row.get("edited_value") if row.get("decision") == "Edit" else row.get("proposed_value")
+    if value in (None, ""):
+        return False, "No value from the documents"
+    return True, None
+
+
 def detail_view(r: Review) -> dict:
-    return {**summary_view(r), "job_id": str(r.job_id), "summary": r.summary, "rows": r.rows,
+    rows = [{**row, "writable": _writable(row)[0], "not_writable_reason": _writable(row)[1]}
+            for row in r.rows]
+    return {**summary_view(r), "job_id": str(r.job_id), "summary": r.summary, "rows": rows,
             "pages": [{k: v for k, v in p.items() if k != "key"}
                       for p in ([] if r.images_purged else r.pages)],
             "reviewer_notes": r.reviewer_notes, "values_compared": r.values_compared,
