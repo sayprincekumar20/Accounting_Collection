@@ -42,6 +42,8 @@ SCOPES = [
     "ZohoCRM.settings.modules.READ",
     "ZohoCRM.users.READ",
     "ZohoCRM.Files.READ",
+    "ZohoCRM.functions.execute.READ",       # activation through the Zoho function
+    "ZohoCRM.functions.execute.CREATE",     # behind the "Activate or Inactive" button
 ]
 # Extra scopes only for scripts/create_zoho_review_module.py (one-time setup, admin user).
 SETUP_SCOPES = [

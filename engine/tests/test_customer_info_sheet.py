@@ -95,11 +95,12 @@ def test_manila_epermit_without_printed_expiry(monkeypatch):
     assert v.issues[0].code == "VALIDITY_DERIVED"
 
 
-def test_unknown_validity_of_required_document_blocks_active():
+def test_unknown_validity_of_required_document_is_listed_to_check():
     p = permit()
     p.validity_status, p.valid_until = "UNKNOWN", None
     a = assess(SNAPSHOT, [bir(), dti(), p], TODAY)
-    assert a["recommendation"] == "MANUAL_REVIEW"
+    # rules-1.3: valid BIR and DTI are enough; the permit's expiry is listed to check
+    assert a["recommendation"] == "ACTIVE"
     assert any("could not be determined: MAYORS_PERMIT" in r for r in a["reasons"])
 
 

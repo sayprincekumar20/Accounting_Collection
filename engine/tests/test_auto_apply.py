@@ -153,7 +153,9 @@ def test_complete_valid_documents_activate_the_account(db, settings):
     updates = {u.zoho_field: (u.action, u.status, u.old_value, u.new_value)
                for u in auto_apply_job(db, job, client, "on", 0.95)}
     assert updates["Customer_Status"] == ("ACTIVATE", "APPLIED", "Inactive", "Active")
-    assert fake.updates[0]["data"][0]["Customer_Status"] == "Active"
+    # field values first, then activation (its own step, read back afterwards)
+    assert "Customer_Status" not in fake.updates[0]["data"][0]
+    assert fake.updates[1]["data"][0]["Customer_Status"] == "Active"
     assert fake.account["Customer_Status"] == "Active"
 
 
@@ -261,3 +263,27 @@ def test_active_account_with_only_missing_documents_is_attention_not_urgent(db, 
     assert first["message"].startswith("Account is Active in Zoho; documents incomplete: SEC")
     assert "stays Active" in first["action"]
     assert fake.account.get("Customer_Status") == "Active"
+
+
+def test_activation_on_while_field_updates_stay_in_shadow(db, settings):
+    fake, client, job = _setup(db, settings, TIN, account={
+        "Tax_Identification_Number_TIN": None, "Customer_Status": "Inactive"},
+        recommendation="ACTIVE", requirements=VALID_REQS, facts=GOOD_FACTS)
+    calls = []
+    updates = {u.zoho_field: (u.status, u.mode) for u in auto_apply_job(
+        db, job, client, "shadow", 0.95, activation_mode="on",
+        activator=lambda: calls.append(1) or (True, "Customer Status set to Active (test)"))}
+    assert updates["Tax_Identification_Number_TIN"] == ("SHADOW", "shadow")
+    assert updates["Customer_Status"] == ("APPLIED", "on") and calls == [1]
+    assert fake.updates == []                      # no field written in shadow mode
+
+
+def test_activation_failure_is_recorded(db, settings):
+    fake, client, job = _setup(db, settings, TIN, account={
+        "Tax_Identification_Number_TIN": None, "Customer_Status": "Inactive"},
+        recommendation="ACTIVE", requirements=VALID_REQS, facts=GOOD_FACTS)
+    updates = {u.zoho_field: (u.status, u.detail) for u in auto_apply_job(
+        db, job, client, "shadow", 0.95, activation_mode="on",
+        activator=lambda: (False, "Customer Status could not be set: Zoho kept 'Inactive'"))}
+    assert updates["Customer_Status"][0] == "FAILED"
+    assert "Zoho kept 'Inactive'" in updates["Customer_Status"][1]

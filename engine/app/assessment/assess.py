@@ -422,7 +422,11 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
     failed = [c for c in activation if c["status"] == "FAIL"]
     if recommendation == "ACTIVE" and failed:
         recommendation = "MANUAL_REVIEW"
-        reasons = [f"Activation check not met: {c['label']} - {c['detail']}" for c in failed]
+        # keep the documents still to collect (rules-1.3) next to the unmet checks
+        to_collect = [r for r in reasons if r.startswith(("Required document missing",
+                                                           "Validity of required document"))]
+        reasons = ([f"Activation check not met: {c['label']} - {c['detail']}" for c in failed]
+                   + to_collect)
     return {
         "rules_version": policy.RULES_VERSION, "assessed_on": today.isoformat(),
         "business_form": form, "recommendation": recommendation, "reasons": reasons,
@@ -549,17 +553,21 @@ def activation_checks(snap: dict, facts: dict, proposals: list[dict], form: str)
 
 
 def _recommend(checks, requirements, docs) -> tuple[str, list[str]]:
-    reasons_review, reasons_inactive = [], []
+    reasons_review, reasons_inactive, to_collect = [], [], []
+    valid = [r["document_type"] for r in requirements if r["status"] in ("VALID", "NO_EXPIRY")]
+    any_one = policy.ACTIVATION_DOCUMENTS == "ANY_ONE" and bool(valid)
     for c in checks:
         if c["status"] == "CONFLICT" and c["severity"] == "CRITICAL":
             values = " vs ".join(f"{v['value']} ({v['type']})" for v in c["values"])
             reasons_review.append(f"Documents disagree on {c['attribute']}: {values}")
     for r in requirements:
         if r["status"] == "MISSING":
-            reasons_review.append(f"Required document missing: {r['document_type']}")
+            (to_collect if any_one else reasons_review).append(
+                f"Required document missing: {r['document_type']}")
         elif r["status"] == "UNKNOWN" and r["document_type"] in EXPIRING_DOCUMENTS:
-            reasons_review.append(f"Validity of required document could not be determined: "
-                                  f"{r['document_type']} (check its expiry date)")
+            (to_collect if any_one else reasons_review).append(
+                f"Validity of required document could not be determined: "
+                f"{r['document_type']} (check its expiry date)")
         elif r["status"] == "EXPIRED":
             msg = f"Required document expired: {r['document_type']} (until {r['valid_until']})"
             (reasons_inactive if policy.EXPIRED_REQUIRED_DOCUMENT == "INACTIVE"
@@ -572,4 +580,8 @@ def _recommend(checks, requirements, docs) -> tuple[str, list[str]]:
         return "MANUAL_REVIEW", reasons_review + reasons_inactive
     if reasons_inactive:
         return "INACTIVE", reasons_inactive
+    if to_collect:
+        return "ACTIVE", ([f"Valid document: {v}" for v in valid]
+                          + ["One valid document is enough (rules-1.3); still to collect:"]
+                          + to_collect)
     return "ACTIVE", ["All required documents present and valid; documents agree."]

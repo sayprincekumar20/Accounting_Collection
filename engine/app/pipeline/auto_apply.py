@@ -50,8 +50,13 @@ def _recent_same_alert(db: Session, account_id: str, signature: str, days: int,
 def auto_apply_job(db: Session, job: VerificationJob, client: ZohoClient | None, mode: str,
                    threshold: float, triggers: list[str] | None = None, *,
                    alert_tasks: bool = True, task_due_days: int = 3,
-                   repeat_after_days: int = 7) -> list[FieldUpdate]:
-    if mode not in ("shadow", "on"):
+                   repeat_after_days: int = 7, activation_mode: str | None = None,
+                   activator=None) -> list[FieldUpdate]:
+    """mode: field updates (off | shadow | on). activation_mode: Customer Status -> Active,
+    its own switch (default: same as mode). activator(): (ok, message) - the Zoho function or
+    field write with read-back (app/zoho/activation.py)."""
+    act_mode = activation_mode or mode
+    if mode not in ("shadow", "on") and act_mode not in ("shadow", "on"):
         return []
     row = db.get(JobAssessment, job.id)
     if row is None:
@@ -60,23 +65,25 @@ def auto_apply_job(db: Session, job: VerificationJob, client: ZohoClient | None,
     today = date.fromisoformat(assessment.get("assessed_on") or date.today().isoformat())
     snapshot = job.account_snapshot or {}
 
-    items = plan(assessment, threshold)
+    items = plan(assessment, threshold) if mode in ("shadow", "on") else []
     status = status_decision(assessment, snapshot.get("Customer_Status"), threshold)
-    if status[0] == "ACTIVATE":
-        items.append({"zoho_field": "Customer_Status", "action": "ACTIVATE",
+    activation = None
+    if status[0] == "ACTIVATE" and act_mode in ("shadow", "on"):
+        activation = {"zoho_field": "Customer_Status", "action": "ACTIVATE",
                       "current_value": snapshot.get("Customer_Status"),
                       "new_value": ACTIVE_VALUE, "confidence": None, "grounding": None,
                       "agreeing_documents": None, "sources": [], "decision": "AUTO",
-                      "reason": status[1]})
+                      "reason": status[1]}
     auto = [i for i in items if i["decision"] == "AUTO"]
     updates: list[FieldUpdate] = []
 
-    def record(item, st, detail=None):
+    def record(item, st, detail=None, item_mode=None):
         u = FieldUpdate(job_id=job.id, account_id=job.account_id,
                         zoho_field=item["zoho_field"], action=item["action"],
                         old_value=item["current_value"], new_value=item["new_value"],
                         confidence=item["confidence"], grounding=item["grounding"],
-                        sources=item["sources"], mode=mode, status=st, detail=detail)
+                        sources=item["sources"], mode=item_mode or mode, status=st,
+                        detail=detail)
         db.add(u)
         updates.append(u)
 
@@ -109,6 +116,23 @@ def auto_apply_job(db: Session, job: VerificationJob, client: ZohoClient | None,
                 for item in auto:
                     if item["zoho_field"] in to_write:
                         record(item, st, detail or item["reason"])
+    # ---- activation: after the field values, only if none of them failed ----
+    if activation is not None:
+        if act_mode == "shadow":
+            record(activation, "SHADOW", activation["reason"], act_mode)
+        elif any(u.status == "FAILED" for u in updates):
+            record(activation, "SKIPPED", "Not activated: a field update failed", act_mode)
+        else:
+            if activator is None:
+                from app.zoho.activation import activate_account
+
+                class _S:
+                    zoho_activate_function = ""
+                ok, msg = activate_account(client, job.account_id, _S, triggers)
+            else:
+                ok, msg = activator()
+            record(activation, "APPLIED" if ok else "FAILED", msg, act_mode)
+
     applied = {u.zoho_field: u.status for u in updates}
 
     # ---- 3: alerts ----

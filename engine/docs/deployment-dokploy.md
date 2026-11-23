@@ -32,6 +32,16 @@ CREATE_REVIEW_RECORDS=false
 AUTO_APPLY_MODE=shadow
 KEEP_DOCUMENT_FILES=false
 ```
+Activation (rules-1.3, Nov 2026):
+```
+AUTO_ACTIVATE_MODE=on                      # activate automatically; field updates follow AUTO_APPLY_MODE
+ZOHO_ACTIVATE_FUNCTION=<API name of the function behind the Accounts "Activate or Inactive" button>
+ZOHO_ACTIVATE_FUNCTION_ARG=accId
+```
+The function needs REST API > OAuth 2.0 switched on, and the engine's token the scopes
+`ZohoCRM.functions.execute.READ` and `.CREATE` (`scripts/zoho_auth.py scopes` lists them). The
+engine calls it only when the Account is not Active yet and reads Customer Status back.
+
 Emails (to the person who clicked Verify Account, CC the Account owner; expiry reminders to the owner):
 ```
 GMAIL_BUSINESS_EMAIL=<same as the dashboard>

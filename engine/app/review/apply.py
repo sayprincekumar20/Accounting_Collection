@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from app.assessment.alerts import ACTIVE_VALUE
 from app.zoho.client import ZohoClient
 from app.zoho.errors import ZohoError
 from app.zoho.review_record import load_names
@@ -79,7 +78,7 @@ def _verify_written(client: ZohoClient, account_id: str, result: "ApplyResult",
 
 def apply_rows(client: ZohoClient, account_id: str | None, rows: list[dict], *,
                dry_run: bool = True, triggers: list[str] | None = None,
-               activate: bool = False, review_id: str = "") -> ApplyResult:
+               activate: bool = False, review_id: str = "", activator=None) -> ApplyResult:
     """Write approved rows to the Account, safely. Each row: id, zoho_field, decision,
     value (proposed or edited), current_value (as seen when the review was made).
     Only Approve / Edit rows of writable fields; a field changed in Zoho since the review is a
@@ -142,21 +141,16 @@ def apply_rows(client: ZohoClient, account_id: str | None, rows: list[dict], *,
             result.activated = False
             result.notes.append("Account NOT activated: the field update failed")
         else:
-            try:
-                client.update_record("Accounts", account_id,
-                                     {"Customer_Status": ACTIVE_VALUE}, triggers)
-                kept = _read_field(client, account_id, "Customer_Status")
-                if kept is not None and _norm(kept) != _norm(ACTIVE_VALUE):
-                    result.activated = False
-                    result.notes.append(
-                        f"Customer Status could not be set: Zoho kept {kept!r} (check the field "
-                        "permissions of the API user's profile)")
-                else:
-                    result.activated = True
-                    result.notes.append("Customer Status set to Active (reviewer decision)")
-            except ZohoError as exc:
-                result.activated = False
-                result.notes.append(f"Activation failed: {str(exc)[:300]}")
+            if activator is None:
+                from app.zoho.activation import activate_account
+
+                class _S:
+                    zoho_activate_function = ""
+                ok, msg = activate_account(client, account_id, _S, triggers)
+            else:
+                ok, msg = activator()
+            result.activated = ok
+            result.notes.append(msg + (" (reviewer decision)" if ok else ""))
     return result
 
 

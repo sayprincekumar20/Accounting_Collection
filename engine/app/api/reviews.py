@@ -20,6 +20,7 @@ from app.notify.events import notify_engine_review
 from app.notify.notifier import Notifier
 from app.review import engine
 from app.storage.base import build_storage
+from app.zoho.activation import activate_account
 from app.zoho.factory import get_zoho_client
 
 router = APIRouter(prefix="/v1/reviews", tags=["reviews"],
@@ -115,10 +116,13 @@ def approve(review_id: uuid.UUID, body: Approval, x_reviewer: str | None = Heade
             db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> dict:
     r = _review(review_id, db)
     who = _reviewer(x_reviewer)
+    client = get_zoho_client()
     result = _guard(lambda: engine.approve(
-        db, r, get_zoho_client(), who, values_compared=body.values_compared,
+        db, r, client, who, values_compared=body.values_compared,
         activate_account=body.activate_account, notes=body.notes,
-        triggers=settings.zoho_update_triggers))
+        triggers=settings.zoho_update_triggers,
+        activator=lambda: activate_account(client, r.account_id, settings,
+                                           settings.zoho_update_triggers)))
     db.commit()
     _announce(db, r, settings)
     return {**result, "review": engine.detail_view(r)}

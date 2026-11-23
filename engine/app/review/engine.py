@@ -170,7 +170,7 @@ def set_row(review: Review, row_id: str, decision: str, value: str | None = None
 
 def approve(db: Session, review: Review, client: ZohoClient, reviewer: str, *,
             values_compared: bool, activate_account: bool = False, notes: str | None = None,
-            triggers: list[str] | None = None) -> dict:
+            triggers: list[str] | None = None, activator=None) -> dict:
     _require_open(review)
     if not values_compared:
         raise ReviewError("Confirm that every approved value was compared with the document")
@@ -181,7 +181,7 @@ def approve(db: Session, review: Review, client: ZohoClient, reviewer: str, *,
           "value": r["edited_value"] if r["decision"] == "Edit" else r["proposed_value"],
           "current_value": r["current_value"]} for r in rows],
         dry_run=False, triggers=triggers, activate=activate_account,
-        review_id=f"DV-{review.number}")
+        review_id=f"DV-{review.number}", activator=activator)
     if result.status is None:                          # e.g. the Account could not be read
         raise ReviewError(result.error or "Nothing was written")
     outcome = {r.row_id: r for r in result.rows}
