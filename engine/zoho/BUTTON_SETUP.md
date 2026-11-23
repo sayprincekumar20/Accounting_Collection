@@ -1,3 +1,19 @@
+## Function button for all layouts (Nov 2026, recommended)
+
+Client Script buttons are tied to one layout; a Function button works on All Layouts.
+
+1. Setup > Modules and Fields > Accounts > Buttons > Create New Button
+   - Name: Verify Account, Define action: Function, Select Page: In Record, Position: Details
+   - Function: New Function > Write your own: name dv_verify_account_button
+   - Edit Arguments: accId = Accounts - Account Id
+   - Paste deluge_dv_verify_account_button.dg (it calls the standalone dv_verify_account, which
+     must stay in place), Save
+   - Layouts: All Layouts; Profiles: the sales and accounts profiles; Save
+2. Remove the old Client Script button (Standard layout) so Standard does not show two buttons.
+
+The reason is recorded as "Verify Account button"; the clicking user comes from zoho.loginuserid;
+the message appears in Zoho's pop-up.
+
 # "Verify Account" button - PULL MODE (recommended: no public address needed)
 
 The button only marks the Account; the engine (local Docker or a server) asks Zoho every
