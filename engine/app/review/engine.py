@@ -246,8 +246,23 @@ def summary_view(r: Review) -> dict:
             "closed_at": r.closed_at.isoformat() if r.closed_at else None}
 
 
+def _writable(row: dict) -> tuple[bool, str | None]:
+    """Whether approving this row can write it, and why not (shown in the approve dialog)."""
+    from app.review.apply import WRITABLE_FIELDS
+    if row.get("action") == "ATTACH":
+        return False, "File attachments are not written to Zoho (attach the file by hand)"
+    if row.get("zoho_field") not in WRITABLE_FIELDS:
+        return False, "This field is never changed by the verification"
+    value = row.get("edited_value") if row.get("decision") == "Edit" else row.get("proposed_value")
+    if value in (None, ""):
+        return False, "No value from the documents"
+    return True, None
+
+
 def detail_view(r: Review) -> dict:
-    return {**summary_view(r), "job_id": str(r.job_id), "summary": r.summary, "rows": r.rows,
+    rows = [{**row, "writable": _writable(row)[0], "not_writable_reason": _writable(row)[1]}
+            for row in r.rows]
+    return {**summary_view(r), "job_id": str(r.job_id), "summary": r.summary, "rows": rows,
             "pages": [{k: v for k, v in p.items() if k != "key"}
                       for p in ([] if r.images_purged else r.pages)],
             "reviewer_notes": r.reviewer_notes, "values_compared": r.values_compared,

@@ -115,9 +115,20 @@ def auto_apply_job(db: Session, job: VerificationJob, client: ZohoClient | None,
     alerts = build_alerts(assessment, today)
     if status[0] == "NO_CHANGE" and assessment["recommendation"] != "ACTIVE" and _same(
             snapshot.get("Customer_Status"), ACTIVE_VALUE):
-        alerts.insert(0, {"severity": "CRITICAL", "code": "ACTIVE_WITH_PROBLEMS",
-                          "document_type": None, "message": status[1],
-                          "action": "Decide whether this account should stay Active"})
+        # URGENT only with a real problem (expired document, documents of another business);
+        # missing documents on an account that is already Active are a follow-up.
+        serious = any(a["severity"] == "CRITICAL" for a in alerts)
+        missing = [r["document_type"] for r in assessment.get("requirements", [])
+                   if r["status"] == "MISSING"]
+        from app.assessment.alerts import label
+        message = ("Account is Active in Zoho; documents incomplete: "
+                   + ", ".join(label(m) for m in missing) if missing and not serious else status[1])
+        alerts.insert(0, {"severity": "CRITICAL" if serious else "WARNING",
+                          "code": "ACTIVE_WITH_PROBLEMS", "document_type": None,
+                          "message": message,
+                          "action": ("Decide whether this account should stay Active" if serious
+                                     else "Collect the missing documents; the account stays "
+                                          "Active")})
     actionable = [a for a in alerts if a["severity"] in ("CRITICAL", "WARNING")]
     signature = alert_signature(alerts)
     note_status = task_status = "SKIPPED"

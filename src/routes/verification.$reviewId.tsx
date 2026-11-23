@@ -551,9 +551,11 @@ function ApproveDialog({
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const write = review.rows.filter(
+  const approved = review.rows.filter(
     (r) => isDecidable(r) && (r.decision === "Approve" || r.decision === "Edit"),
   );
+  const write = approved.filter((r) => r.writable !== false);
+  const notWritten = approved.filter((r) => r.writable === false);
   const rejected = review.rows.filter((r) => isDecidable(r) && r.decision === "Reject");
   const pending = review.rows.filter((r) => isDecidable(r) && r.decision === "Pending");
   const checks = review.summary.activation_checks ?? [];
@@ -629,8 +631,33 @@ function ApproveDialog({
               </p>
             )}
           </div>
-          <p className="text-muted-foreground">
-            Rejected: {rejected.length} · Left pending (not written): {pending.length}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+              <p className="font-semibold text-destructive">Rejected ({rejected.length})</p>
+              {rejected.map((r) => (
+                <p key={r.id} className="text-xs">
+                  {r.field_label || r.zoho_field}: not written
+                </p>
+              ))}
+            </div>
+            <div className="rounded-lg border border-border bg-muted p-3">
+              <p className="font-semibold">Not written ({notWritten.length + pending.length})</p>
+              {notWritten.map((r) => (
+                <p key={r.id} className="text-xs">
+                  {r.field_label || r.zoho_field}: {r.not_writable_reason}
+                </p>
+              ))}
+              {pending.map((r) => (
+                <p key={r.id} className="text-xs">
+                  {r.field_label || r.zoho_field}: no decision (left as it is)
+                </p>
+              ))}
+            </div>
+          </div>
+          <p className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs">
+            <strong>Safety check before writing:</strong> each value is re-checked against the
+            Account and read back after writing. A field someone changed meanwhile is not written
+            (Conflict); a field Zoho did not change is reported as failed.
           </p>
           <label className="flex items-start gap-2.5">
             <input
