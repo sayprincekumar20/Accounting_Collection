@@ -5,7 +5,7 @@ import re
 
 # rules-1.0 (2026-10-22): approved by the business = rules-draft-1 unchanged, plus the
 # "Corporation" value in Type of Business Organization.
-RULES_VERSION = "rules-1.3"
+RULES_VERSION = "rules-1.4"
 # rules-1.2 (2026-10-28): activation also needs Payment Terms = COD, an Accounting contact with
 # name, mobile and email, and TIN / Invoice Company Name / Billing Address matching the documents.
 # rules-1.1 (2026-10-22): no assumed expiry dates. A document without a printed expiry date is
@@ -26,7 +26,10 @@ REQUIRED_DOCUMENTS = {
 
 # What happens when a required document has expired: "INACTIVE" (per the HLD) or
 # "MANUAL_REVIEW" (e.g. to allow a renewal grace period).
-EXPIRED_REQUIRED_DOCUMENT = "INACTIVE"
+# rules-1.4 (2026-11-23, business decision "for now"): an expired required document does not
+# block activation; the account is activated (when its values are correct) and an URGENT alert
+# asks for the renewal. INACTIVE / MANUAL_REVIEW restore the stricter behaviour.
+EXPIRED_REQUIRED_DOCUMENT = "ALERT"
 
 # rules-1.3 (2026-11-23, business decision): ONE valid required document is enough for ACTIVE
 # when its values are correct (the five activation checks) and nothing conflicts or is expired;

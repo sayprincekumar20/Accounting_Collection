@@ -333,3 +333,19 @@ def test_gmail_client_sends_mime_with_to_cc_subject():
     assert "To: rep@x.com" in seen["mime"] and "Cc: owner@x.com" in seen["mime"]
     assert "Subject: Account activated: X" in seen["mime"]
     assert "ar@rareglobalfood.com" in seen["mime"]
+
+
+def test_activation_with_an_expired_document_is_flagged_in_email_and_cliq(db):
+    job = _job(db, until="2026-01-31", status="EXPIRED")
+    db.add(FieldUpdate(job_id=job.id, account_id=ACC, zoho_field="Customer_Status",
+                       action="ACTIVATE", old_value="Inactive", new_value="Active",
+                       confidence=None, grounding=None, sources=[], mode="on",
+                       status="APPLIED"))
+    db.commit()
+    n, rec = notifier()
+    notify_verification(db, job, n)
+    mail = rec.emails[0]
+    assert mail["subject"] == "Account activated - expired document to renew: EXAMPLE CAFE INC."
+    assert "IMPORTANT - expired documents" in mail["text"]
+    assert "Mayor's permit: expired on 31 Jan 2026" in mail["text"]
+    assert "⚠️ Activated with expired documents" in rec.messages[0]

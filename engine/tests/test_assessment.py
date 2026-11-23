@@ -105,12 +105,17 @@ def test_all_valid_and_consistent_is_active():
     assert p["Owner_Name"]["confidence"] == 0.98  # three documents agree
 
 
-def test_expired_required_documents_make_inactive():
-    a = assess(SNAPSHOT, [bir(), dti(until="2026-05-11", status="EXPIRED"),
-                          permit(until="2025-12-31", status="EXPIRED")], TODAY)
-    assert a["recommendation"] == "INACTIVE"
+def test_expired_required_documents_alert_but_do_not_block(monkeypatch):
+    from app.assessment import policy
+    docs = [bir(), dti(until="2026-05-11", status="EXPIRED"),
+            permit(until="2025-12-31", status="EXPIRED")]
+    a = assess(SNAPSHOT, docs, TODAY)                      # rules-1.4: alert only
+    assert a["recommendation"] == "ACTIVE"
     assert len([r for r in a["reasons"] if "expired" in r]) == 2
+    assert any("do not block activation (rules-1.4)" in r for r in a["reasons"])
     assert "Business_Permit" not in by_field(a)  # expired documents are not attached
+    monkeypatch.setattr(policy, "EXPIRED_REQUIRED_DOCUMENT", "INACTIVE")   # stricter setting
+    assert assess(SNAPSHOT, docs, TODAY)["recommendation"] == "INACTIVE"
 
 
 def test_documents_of_another_person_hold_everything():
@@ -346,6 +351,9 @@ def test_no_valid_document_still_needs_a_person():
     assert assess(SNAPSHOT, [expired_permit], TODAY)["recommendation"] != "ACTIVE"
 
 
-def test_expired_document_still_blocks_even_with_a_valid_one():
+def test_only_an_expired_document_with_correct_values_is_activated_with_an_alert():
+    from app.assessment.alerts import build_alerts
     a = assess(SNAPSHOT, [bir(), permit(until="2025-01-31", status="EXPIRED")], TODAY)
-    assert a["recommendation"] == "INACTIVE"
+    assert a["recommendation"] == "ACTIVE"
+    alerts = build_alerts(a, TODAY)
+    assert any(x["code"] == "EXPIRED_DOCUMENT" and x["severity"] == "CRITICAL" for x in alerts)

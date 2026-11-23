@@ -43,7 +43,9 @@ def winner_like():
     return a
 
 
-def test_record_has_summary_and_one_row_per_proposal():
+def test_record_has_summary_and_one_row_per_proposal(monkeypatch):
+    from app.assessment import policy
+    monkeypatch.setattr(policy, "EXPIRED_REQUIRED_DOCUMENT", "INACTIVE")   # wording of that case
     a = winner_like()
     r = build_record(a, ACCOUNT_ID, job_id="job-1", requested_by="rep@example.com",
                      request_reason="for activation po Ma'am")

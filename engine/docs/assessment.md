@@ -111,3 +111,12 @@ alerts. With no valid document, an expired document or a conflict, nothing chang
 rules-1.2. `"ALL_REQUIRED"` restores rules-1.2. Activation runs through the Zoho function behind
 the Accounts "Activate or Inactive" button when `ZOHO_ACTIVATE_FUNCTION` is set, with its own switch
 `AUTO_ACTIVATE_MODE`, and is confirmed by reading Customer Status back.
+
+
+## rules-1.4 (2026-11-23): an expired document alerts, it does not block
+
+`policy.EXPIRED_REQUIRED_DOCUMENT = "ALERT"` (business decision "for now"): an expired required
+document still counts as present; when the activation checks pass, the account is activated and an
+URGENT "expired, collect the renewal" alert is raised; the activation email's subject says
+"expired document to renew" and lists them, the Cliq message too. `"INACTIVE"` (rules-1.2/1.3) or
+`"MANUAL_REVIEW"` restore the stricter behaviour.

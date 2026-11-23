@@ -553,8 +553,11 @@ def activation_checks(snap: dict, facts: dict, proposals: list[dict], form: str)
 
 
 def _recommend(checks, requirements, docs) -> tuple[str, list[str]]:
-    reasons_review, reasons_inactive, to_collect = [], [], []
-    valid = [r["document_type"] for r in requirements if r["status"] in ("VALID", "NO_EXPIRY")]
+    reasons_review, reasons_inactive, to_collect, expired_alerts = [], [], [], []
+    alert_only = policy.EXPIRED_REQUIRED_DOCUMENT == "ALERT"
+    # with rules-1.4 an expired document still counts as present (its values can be checked)
+    present = ("VALID", "NO_EXPIRY", "EXPIRED") if alert_only else ("VALID", "NO_EXPIRY")
+    valid = [r["document_type"] for r in requirements if r["status"] in present]
     any_one = policy.ACTIVATION_DOCUMENTS == "ANY_ONE" and bool(valid)
     for c in checks:
         if c["status"] == "CONFLICT" and c["severity"] == "CRITICAL":
@@ -570,8 +573,11 @@ def _recommend(checks, requirements, docs) -> tuple[str, list[str]]:
                 f"{r['document_type']} (check its expiry date)")
         elif r["status"] == "EXPIRED":
             msg = f"Required document expired: {r['document_type']} (until {r['valid_until']})"
-            (reasons_inactive if policy.EXPIRED_REQUIRED_DOCUMENT == "INACTIVE"
-             else reasons_review).append(msg)
+            if alert_only:
+                expired_alerts.append(msg)
+            else:
+                (reasons_inactive if policy.EXPIRED_REQUIRED_DOCUMENT == "INACTIVE"
+                 else reasons_review).append(msg)
     for d in docs:
         for i in d.issues:
             if i.get("severity") == "CRITICAL" and i.get("code") != "EXPIRED":
@@ -580,6 +586,10 @@ def _recommend(checks, requirements, docs) -> tuple[str, list[str]]:
         return "MANUAL_REVIEW", reasons_review + reasons_inactive
     if reasons_inactive:
         return "INACTIVE", reasons_inactive
+    if expired_alerts:
+        return "ACTIVE", (expired_alerts
+                          + ["Expired documents do not block activation (rules-1.4): collect "
+                             "the renewal."] + to_collect)
     if to_collect:
         return "ACTIVE", ([f"Valid document: {v}" for v in valid]
                           + ["One valid document is enough (rules-1.3); still to collect:"]
