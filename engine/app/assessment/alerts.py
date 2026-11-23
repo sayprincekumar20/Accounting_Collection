@@ -122,11 +122,15 @@ def status_decision(assessment: dict, current_status: str | None, threshold: flo
             if not ok:
                 return "NO_CHANGE", (f"{c['label']}: {c['detail']}; not updated automatically "
                                      f"({why}), a person must approve it.")
-    missing = [r["document_type"] for r in assessment.get("requirements", [])
-               if r["status"] != "VALID" and r["status"] != "NO_EXPIRY"]
-    docs_text = ("All required documents present, valid and consistent" if not missing else
-                 "A valid document with correct values (still to collect: "
-                 + ", ".join(missing) + ")")
+    reqs = assessment.get("requirements", [])
+    expired = [r["document_type"] for r in reqs if r["status"] == "EXPIRED"]
+    missing = [r["document_type"] for r in reqs
+               if r["status"] not in ("VALID", "NO_EXPIRY", "EXPIRED")]
+    docs_text = ("All required documents present, valid and consistent"
+                 if not missing and not expired else
+                 "A document with correct values"
+                 + (f" (EXPIRED, renewal needed: {', '.join(expired)})" if expired else "")
+                 + (f" (still to collect: {', '.join(missing)})" if missing else ""))
     if is_active:
         return "ALREADY_ACTIVE", f"{docs_text}; account already Active."
     return "ACTIVATE", (f"{docs_text}; owner and TIN confirmed; COD, Accounting contact, TIN, "

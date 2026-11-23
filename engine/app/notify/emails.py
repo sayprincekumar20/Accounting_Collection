@@ -33,12 +33,24 @@ def _body(lines: list[str], links: str) -> str:
     return "\n".join(lines) + (f"\n\n{links}" if links else "") + SIGN_OFF
 
 
-def activated(name: str, number: str, links: str) -> tuple[str, str]:
-    return (f"Account activated: {name}", _body([
-        "Hello,", "",
-        f"{name}{f' ({number})' if number else ''} is now Active in Zoho CRM.",
-        "All required documents are valid and every activation check passed.",
-    ], links))
+def activated(name: str, number: str, links: str,
+              expired: list[str] | None = None, missing: list[str] | None = None
+              ) -> tuple[str, str]:
+    lines = ["Hello,", "",
+             f"{name}{f' ({number})' if number else ''} is now Active in Zoho CRM.",
+             "Every activation check passed (Payment Terms, contact, TIN, invoice name, "
+             "billing address)."]
+    if expired:
+        lines += ["", "IMPORTANT - expired documents (activated anyway, renewal needed):"]
+        lines += [f"- {e}" for e in expired]
+    if missing:
+        lines += ["", "Still to collect from the customer:"] + [f"- {m}" for m in missing]
+    if expired or missing:
+        lines += ["", "Please collect them, attach them to the Account and click Verify "
+                      "Account again."]
+    subject = (f"Account activated - expired document to renew: {name}" if expired
+               else f"Account activated: {name}")
+    return (subject, _body(lines, links))
 
 
 def needs_review(name: str, number: str, reasons: list[str], links: str) -> tuple[str, str]:

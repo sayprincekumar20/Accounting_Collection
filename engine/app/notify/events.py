@@ -89,6 +89,11 @@ def notify_verification(db: Session, job: VerificationJob, notifier: Notifier,
         lines.append("Would update automatically (shadow mode): " + ", ".join(shadow))
     if activated:
         lines.append("Customer Status → Active (automatic)")
+        expired_docs = [f"{_doc(r['document_type'])} (expired {_date(r['valid_until'])})"
+                        for r in a.get("requirements", []) if r["status"] == "EXPIRED"]
+        if expired_docs:
+            lines.append("⚠️ Activated with expired documents, renewal needed: "
+                         + ", ".join(expired_docs))
     notifier.message("\n".join(lines))
 
     now = manila_now()
@@ -118,7 +123,11 @@ def _email_verification(db, job, a, notifier: Notifier, name, number, activated)
     review = db.query(Review).filter_by(job_id=job.id).first()
     links = notifier.links(job.account_id, str(review.id) if review else None)
     if activated:
-        subject, text = emails.activated(name, number, links)
+        reqs = a.get("requirements", [])
+        expired = [f"{_doc(r['document_type'])}: expired on {_date(r['valid_until'])}"
+                   for r in reqs if r["status"] == "EXPIRED"]
+        missing = [_doc(r["document_type"]) for r in reqs if r["status"] == "MISSING"]
+        subject, text = emails.activated(name, number, links, expired, missing)
     else:
         reasons = [_short_reason(r) for r in a.get("reasons", [])]
         reasons += [f"{c['label']}: {c['detail']}" for c in a.get("activation_checks") or []
