@@ -37,6 +37,7 @@ import { Route as ApiContactApprovalsRouteImport } from './routes/api/contact-ap
 import { Route as ApiContactNowRouteImport } from './routes/api/contact-now'
 import { Route as ApiContactsToFixRouteImport } from './routes/api/contacts-to-fix'
 import { Route as ApiDailyRunLogsRouteImport } from './routes/api/daily-run-logs'
+import { Route as ApiDvExpiryRouteImport } from './routes/api/dv-expiry'
 import { Route as ApiDvReviewsRouteImport } from './routes/api/dv-reviews'
 import { Route as ApiEscalationsRouteImport } from './routes/api/escalations'
 import { Route as ApiGmailAttachmentRouteImport } from './routes/api/gmail-attachment'
@@ -66,6 +67,7 @@ import { Route as ClientsIndexRouteImport } from './routes/clients.index'
 import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
 import { Route as VerificationIndexRouteImport } from './routes/verification.index'
 import { Route as VerificationReviewIdRouteImport } from './routes/verification.$reviewId'
+import { Route as VerificationExpiryRouteImport } from './routes/verification.expiry'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant.chat'
 import { Route as ApiAssistantClientErrorRouteImport } from './routes/api/assistant.client-error'
 import { Route as ApiAssistantContactListRouteImport } from './routes/api/assistant.contact-list'
@@ -220,6 +222,11 @@ const ApiDailyRunLogsRoute = ApiDailyRunLogsRouteImport.update({
   path: '/api/daily-run-logs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDvExpiryRoute = ApiDvExpiryRouteImport.update({
+  id: '/api/dv-expiry',
+  path: '/api/dv-expiry',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDvReviewsRoute = ApiDvReviewsRouteImport.update({
   id: '/api/dv-reviews',
   path: '/api/dv-reviews',
@@ -366,6 +373,11 @@ const VerificationReviewIdRoute = VerificationReviewIdRouteImport.update({
   path: '/verification/$reviewId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerificationExpiryRoute = VerificationExpiryRouteImport.update({
+  id: '/verification/expiry',
+  path: '/verification/expiry',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
   id: '/api/assistant/chat',
   path: '/api/assistant/chat',
@@ -464,6 +476,7 @@ export interface FileRoutesByFullPath {
   '/api/contact-now': typeof ApiContactNowRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
+  '/api/dv-expiry': typeof ApiDvExpiryRoute
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
@@ -491,6 +504,7 @@ export interface FileRoutesByFullPath {
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
+  '/verification/expiry': typeof VerificationExpiryRoute
   '/clients/': typeof ClientsIndexRoute
   '/verification/': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
@@ -536,6 +550,7 @@ export interface FileRoutesByTo {
   '/api/contact-now': typeof ApiContactNowRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
+  '/api/dv-expiry': typeof ApiDvExpiryRoute
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
@@ -563,6 +578,7 @@ export interface FileRoutesByTo {
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
+  '/verification/expiry': typeof VerificationExpiryRoute
   '/clients': typeof ClientsIndexRoute
   '/verification': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
@@ -609,6 +625,7 @@ export interface FileRoutesById {
   '/api/contact-now': typeof ApiContactNowRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
+  '/api/dv-expiry': typeof ApiDvExpiryRoute
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
@@ -636,6 +653,7 @@ export interface FileRoutesById {
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
+  '/verification/expiry': typeof VerificationExpiryRoute
   '/clients/': typeof ClientsIndexRoute
   '/verification/': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
@@ -683,6 +701,7 @@ export interface FileRouteTypes {
     | '/api/contact-now'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
+    | '/api/dv-expiry'
     | '/api/dv-reviews'
     | '/api/escalations'
     | '/api/gmail-attachment'
@@ -710,6 +729,7 @@ export interface FileRouteTypes {
     | '/api/worklist'
     | '/clients/$clientId'
     | '/verification/$reviewId'
+    | '/verification/expiry'
     | '/clients/'
     | '/verification/'
     | '/api/assistant/chat'
@@ -755,6 +775,7 @@ export interface FileRouteTypes {
     | '/api/contact-now'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
+    | '/api/dv-expiry'
     | '/api/dv-reviews'
     | '/api/escalations'
     | '/api/gmail-attachment'
@@ -782,6 +803,7 @@ export interface FileRouteTypes {
     | '/api/worklist'
     | '/clients/$clientId'
     | '/verification/$reviewId'
+    | '/verification/expiry'
     | '/clients'
     | '/verification'
     | '/api/assistant/chat'
@@ -827,6 +849,7 @@ export interface FileRouteTypes {
     | '/api/contact-now'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
+    | '/api/dv-expiry'
     | '/api/dv-reviews'
     | '/api/escalations'
     | '/api/gmail-attachment'
@@ -854,6 +877,7 @@ export interface FileRouteTypes {
     | '/api/worklist'
     | '/clients/$clientId'
     | '/verification/$reviewId'
+    | '/verification/expiry'
     | '/clients/'
     | '/verification/'
     | '/api/assistant/chat'
@@ -900,6 +924,7 @@ export interface RootRouteChildren {
   ApiContactNowRoute: typeof ApiContactNowRoute
   ApiContactsToFixRoute: typeof ApiContactsToFixRoute
   ApiDailyRunLogsRoute: typeof ApiDailyRunLogsRoute
+  ApiDvExpiryRoute: typeof ApiDvExpiryRoute
   ApiDvReviewsRoute: typeof ApiDvReviewsRouteWithChildren
   ApiEscalationsRoute: typeof ApiEscalationsRoute
   ApiGmailAttachmentRoute: typeof ApiGmailAttachmentRoute
@@ -927,6 +952,7 @@ export interface RootRouteChildren {
   ApiWorklistRoute: typeof ApiWorklistRoute
   ClientsClientIdRoute: typeof ClientsClientIdRoute
   VerificationReviewIdRoute: typeof VerificationReviewIdRoute
+  VerificationExpiryRoute: typeof VerificationExpiryRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
   VerificationIndexRoute: typeof VerificationIndexRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
@@ -1138,6 +1164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDailyRunLogsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dv-expiry': {
+      id: '/api/dv-expiry'
+      path: '/api/dv-expiry'
+      fullPath: '/api/dv-expiry'
+      preLoaderRoute: typeof ApiDvExpiryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dv-reviews': {
       id: '/api/dv-reviews'
       path: '/api/dv-reviews'
@@ -1341,6 +1374,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerificationReviewIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/verification/expiry': {
+      id: '/verification/expiry'
+      path: '/verification/expiry'
+      fullPath: '/verification/expiry'
+      preLoaderRoute: typeof VerificationExpiryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/assistant/chat': {
       id: '/api/assistant/chat'
       path: '/api/assistant/chat'
@@ -1491,6 +1531,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiContactNowRoute: ApiContactNowRoute,
   ApiContactsToFixRoute: ApiContactsToFixRoute,
   ApiDailyRunLogsRoute: ApiDailyRunLogsRoute,
+  ApiDvExpiryRoute: ApiDvExpiryRoute,
   ApiDvReviewsRoute: ApiDvReviewsRouteWithChildren,
   ApiEscalationsRoute: ApiEscalationsRoute,
   ApiGmailAttachmentRoute: ApiGmailAttachmentRoute,
@@ -1518,6 +1559,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorklistRoute: ApiWorklistRoute,
   ClientsClientIdRoute: ClientsClientIdRoute,
   VerificationReviewIdRoute: VerificationReviewIdRoute,
+  VerificationExpiryRoute: VerificationExpiryRoute,
   ClientsIndexRoute: ClientsIndexRoute,
   VerificationIndexRoute: VerificationIndexRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,

@@ -105,6 +105,9 @@ class FakeZoho:
     def list_attachments(self, module, rid):
         return self.attachments
 
+    def list_notes(self, module, rid):
+        return []
+
 
 def _review(status="Applied", modified=None, activate=True):
     modified = modified or datetime.now(MANILA).isoformat()
@@ -173,7 +176,8 @@ def test_expiry_in_cliq_only_when_switched_on(db):
 def test_new_attachment_triggers_recheck_instead_of_alert(db):
     _job(db, until=(TODAY + timedelta(days=5)).isoformat(),
          created=datetime(2026, 10, 1, tzinfo=MANILA))
-    zoho = FakeZoho(attachments=[{"Created_Time": "2026-11-01T10:00:00+08:00"}])
+    zoho = FakeZoho(attachments=[{"id": "9001", "File_Name": "renewed permit.pdf",
+                                  "Created_Time": "2026-11-01T10:00:00+08:00"}])
     n, rec = notifier()
     queued = []
     summary = check_expiry(db, zoho, n, S, queued.append, TODAY)
@@ -358,3 +362,56 @@ def test_activation_with_an_expired_document_is_flagged_in_email_and_cliq(db):
     assert "Permit - expired on 31 Jan 2026" in mail["text"]
     assert "<div" in mail["html"] and "Expired documents - renewal needed" in mail["html"]
     assert "⚠️ Activated with expired documents" in rec.messages[0]
+
+
+
+def test_files_already_verified_are_not_new(db):
+    from app.db.models import Document
+    from app.notify.events import new_files
+    job = _job(db)
+    db.add(Document(job_id=job.id, source="attachment", zoho_file_ref="9001",
+                    file_name="permit.pdf", status="STORED"))
+    db.commit()
+    known = FakeZoho(attachments=[{"id": "9001", "File_Name": "permit.pdf"}])
+    assert new_files(known, job) == []
+    more = FakeZoho(attachments=[{"id": "9001", "File_Name": "permit.pdf"},
+                                 {"id": "9002", "File_Name": "renewed permit.pdf"}])
+    assert new_files(more, job) == ["renewed permit.pdf"]
+
+
+def test_expired_reminder_repeats_weekly_until_renewed(db):
+    _job(db, until=(TODAY - timedelta(days=1)).isoformat(), status="EXPIRED")
+    n, rec = notifier()
+    sent = [check_expiry(db, FakeZoho(), n, S, lambda _: None, TODAY + timedelta(days=d))["alerts"]
+            for d in (0, 3, 6, 7, 13, 14)]
+    assert sent == [1, 0, 0, 1, 0, 1]                # day 1, 8, 15 after expiry
+    assert all(m["to"] == ["owner@example.com"] for m in rec.emails)
+
+
+def test_renewal_email_goes_to_the_account_owner(db):
+    _job(db, until=(TODAY + timedelta(days=3)).isoformat(),
+         created=datetime(2026, 10, 1, tzinfo=MANILA))
+    n, rec = notifier()
+    check_expiry(db, FakeZoho(), n, S, lambda _: None, TODAY)
+    notify_verification(db, _job(db, until="2027-12-31"), n)
+    renewal = next(m for m in rec.emails if m["subject"].startswith("Mayor's permit renewed"))
+    assert renewal["to"] == ["owner@example.com"] and "valid until 31 Dec 2027" in renewal["text"]
+
+
+def test_expiry_overview_lists_documents_with_days_left(db):
+    from app.review.expiry import expiry_overview
+    _job(db, until=(TODAY + timedelta(days=5)).isoformat())
+    rows = {r["document_type"]: r for r in expiry_overview(db, TODAY)}
+    assert rows["MAYORS_PERMIT"]["days_left"] == 5
+    assert rows["MAYORS_PERMIT"]["state"] == "Expiring in 7 days"
+    assert rows["BIR_2303"]["state"] == "No expiry date"
+    assert rows["MAYORS_PERMIT"]["account_owner"] == "Owner Rep"
+
+
+def test_weekly_scan_reverifies_accounts_with_new_files(db):
+    from app.notify.events import scan_for_new_files
+    _job(db, until=(TODAY + timedelta(days=40)).isoformat())
+    queued = []
+    zoho = FakeZoho(attachments=[{"id": "9002", "File_Name": "renewed permit.pdf"}])
+    summary = scan_for_new_files(db, zoho, S, queued.append, TODAY)
+    assert summary == {"checked": 1, "rechecks": 1} and len(queued) == 1

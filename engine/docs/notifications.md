@@ -57,3 +57,21 @@ The engine creates the four tabs with header rows on first use.
 
 ## Test
 `python scripts/test_notifications.py --env .env.sandbox` posts one test message and one test row.
+
+
+## Expiry tracking (Nov 2026)
+
+- **Daily (8:00 Manila):** reminders at 30, 7 and 0 days to the Account Owner (CC the last
+  requester); after expiry the reminder **repeats every EXPIRED_REPEAT_DAYS (7)** until the renewed
+  document is verified.
+- **New files:** before any reminder the engine compares the files on the Account now
+  (attachments, file fields, note files; by Zoho file id) with those the last verification read;
+  new files mean a new verification instead of a reminder.
+- **Weekly scan (NEW_FILE_SCAN_WEEKDAY, Monday):** accounts with a document expiring within
+  NEW_FILE_SCAN_DAYS (60) or expired are checked the same way (3 Zoho calls each); only accounts
+  with new files are verified again, and only new files go to the AI.
+- **Renewed:** when a new verification finds a later expiry date for an alerted document, the
+  Account Owner gets "<document> renewed" and the reminders for the old date stop.
+- **Dashboard:** Document Verification > Document expiry (GET /v1/expiry): every document of each
+  account's latest verification with valid until, days left, state, reminders sent, link to the
+  review.

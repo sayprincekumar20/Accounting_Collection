@@ -165,3 +165,38 @@ export function when(value: string | null) {
     minute: "2-digit",
   });
 }
+
+export interface ExpiryItem {
+  account_id: string;
+  account_name: string;
+  customer_number: string | null;
+  account_owner: string | null;
+  document_type: string;
+  document: string;
+  file: string | null;
+  valid_until: string | null;
+  days_left: number | null;
+  state: "Expired" | "Expiring in 7 days" | "Expiring in 30 days" | "Valid" | "No expiry date";
+  reminders_sent: number;
+  last_reminder_at: string | null;
+  verified_at: string | null;
+  review_id: string | null;
+  review_number: string | null;
+}
+
+export const EXPIRY_TONE: Record<string, string> = {
+  Expired: "bg-destructive/12 text-destructive",
+  "Expiring in 7 days": "bg-warning/15 text-warning",
+  "Expiring in 30 days": "bg-warning/10 text-warning",
+  Valid: "bg-success/12 text-success",
+  "No expiry date": "bg-muted text-muted-foreground",
+};
+
+export function day(value: string | null) {
+  if (!value) return "—";
+  return new Date(`${value}T00:00:00`).toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}

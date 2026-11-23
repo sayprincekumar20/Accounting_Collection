@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
+import { VerificationTabs } from "@/routes/verification.expiry";
 import { Panel, RefreshButton, StatCard } from "@/components/collections/Bits";
 import {
   dvRequest,
@@ -62,6 +63,7 @@ function VerificationListPage() {
       subtitle="Accounts checked with the Verify Account button in Zoho CRM that need a person's decision"
       actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
     >
+      <VerificationTabs active="reviews" />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {FILTERS.map((f) => (
           <StatCard

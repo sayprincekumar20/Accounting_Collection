@@ -119,3 +119,15 @@ def test_page_image_and_api_key(setup):
     assert img.status_code == 200 and img.headers["content-type"] == "image/jpeg"
     assert api.get(f"/v1/reviews/{review.id}/pages/9", headers=KEY).status_code == 404
     assert api.get("/v1/reviews", headers={"X-API-Key": "wrong"}).status_code == 401
+
+
+def test_expiry_endpoint_lists_documents_and_counts(setup):
+    api, review, _ = setup
+    body = api.get("/v1/expiry", headers=KEY).json()
+    assert set(body["counts"]) == {"Expired", "Expiring in 7 days", "Expiring in 30 days",
+                                   "Valid", "No expiry date"}
+    assert body["items"] and all("days_left" in i and "state" in i for i in body["items"])
+    assert any(i["review_number"] == f"DV-{review.number}" for i in body["items"])
+    only = api.get("/v1/expiry?state=Valid", headers=KEY).json()["items"]
+    assert all(i["state"] == "Valid" for i in only)
+    assert api.get("/v1/expiry", headers={"X-API-Key": "wrong"}).status_code == 401
