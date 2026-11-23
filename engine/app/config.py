@@ -88,6 +88,9 @@ class Settings(BaseSettings):
     notify_reviews: bool = True              # approved / applied reviews (checked by the scheduler)
     expiry_alert_days: str = "30,7,0"        # reminder levels (days before expiry)
     expiry_check_hour: int = 8               # daily expiry check, Manila time
+    expired_repeat_days: int = 7             # after expiry: remind again every N days until renewed
+    new_file_scan_days: int = 60             # weekly: re-verify accounts with documents expiring
+    new_file_scan_weekday: int = 0           # within N days that have new files (0 = Monday)
     zoho_crm_web_url: str = ""               # e.g. https://crm.zoho.com/crm/org824163551 (links)
     dashboard_url: str = ""                  # e.g. https://accounting.rareglobalfood.com (links)
     # Emails (company Gmail, same mailbox as the dashboard): to the person who clicked Verify

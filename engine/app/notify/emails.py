@@ -200,6 +200,8 @@ def not_completed(name: str, reason: str, no_documents: bool,
 
 
 def expiring(name: str, number: str, document: str, when: str) -> tuple[str, str, str]:
+    """Reminder to the Account Owner (who collects the renewal); after expiry it repeats
+    weekly until the renewed document is verified."""
     expired_now = "expired" in when
     state = "has expired" if expired_now else "expires soon"
     intro = [f"A document of {_who(name, number)} {state}."]
@@ -209,3 +211,10 @@ def expiring(name: str, number: str, document: str, when: str) -> tuple[str, str
                "Account in Zoho CRM and click Verify Account."]
     return _compose(f"{document} {'expired' if expired_now else 'expiring'}: {name}", intro,
                     sections, closing)
+
+
+def renewed(name: str, number: str, document: str, until: str) -> tuple[str, str, str]:
+    intro = [f"The renewed {document} of {_who(name, number)} was verified.",
+             "No more reminders will be sent for the old document."]
+    sections = [("Document renewed", [f"{document}: valid until {until}"], "ok")]
+    return _compose(f"{document} renewed: {name}", intro, sections, [])

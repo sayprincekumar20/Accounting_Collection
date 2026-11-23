@@ -16,7 +16,7 @@ from app.api.deps import get_enqueuer
 from app.config import get_settings
 from app.db.session import session_scope
 from app.logging import setup_logging
-from app.notify.events import check_expiry, notify_applied_reviews
+from app.notify.events import check_expiry, notify_applied_reviews, scan_for_new_files
 from app.notify.notifier import MANILA, Notifier
 from app.review.engine import purge_old_review_images
 from app.services.request_poller import poll_once
@@ -48,6 +48,10 @@ def run_due(now: float, last: dict, settings, client, enqueue, notifier=None) ->
         with session_scope() as db:
             done = check_expiry(db, client, notifier, settings, enqueue, manila.date())
         log.info("Expiry check: %s", done)
+        if manila.weekday() == settings.new_file_scan_weekday:
+            with session_scope() as db:
+                log.info("Weekly new-file scan: %s",
+                         scan_for_new_files(db, client, settings, enqueue, manila.date()))
     if settings.engine_reviews and last.get("purge_day") != manila.date():
         last["purge_day"] = manila.date()
         with session_scope() as db:

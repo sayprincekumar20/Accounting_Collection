@@ -147,6 +147,11 @@ def _announce_renewals(db: Session, job: VerificationJob, a: dict, notifier: Not
             continue
         notifier.message(f"♻️ {_doc(r['document_type'])} of {name} renewed: valid until "
                          f"{_date(until)}. No more reminders for the old one.")
+        if notifier.mailer:   # the Account Owner collects documents; CC who verified it
+            to, cc = emails.recipients(emails.owner_email(job.account_snapshot),
+                                       job.requested_by_email)
+            notifier.email(to, cc, *emails.renewed(name, number, _doc(r["document_type"]),
+                                                   _date(until)))
         notifier.rows("Document Expiry", [[
             manila_now(), name, job.account_id, number, _doc(r["document_type"]),
             short_name(r.get("file")), until, (date.fromisoformat(until) - date.today()).days,
@@ -349,23 +354,39 @@ def _latest_assessments(db: Session) -> list[tuple[JobAssessment, VerificationJo
                   & (JobAssessment.created_at == latest.c.at)).all())
 
 
-def _new_attachments(client: ZohoClient, account_id: str, since: datetime) -> bool:
+def new_files(client: ZohoClient, job: VerificationJob, settings=None) -> list[str]:
+    """Files on the Account now that the job did not see: attachments, file fields (BIR
+    Registration COR, Business Permit...) and files on Notes. Compared by Zoho file id, so it
+    needs no timestamps. 3 Zoho calls; nothing is downloaded."""
+    from app.config import get_settings
+    from app.pipeline.sources import discover_sources
+    s = settings if hasattr(settings, "zoho_file_fields") else get_settings()
     try:
-        files = client.list_attachments("Accounts", account_id)
+        account = client.get_record("Accounts", job.account_id)
+        refs = discover_sources(client, job.account_id, account, s)
     except ZohoError as exc:
-        log.warning("Attachments of %s could not be checked: %s", account_id, exc)
-        return False
-    if since.tzinfo is None:
-        since = since.replace(tzinfo=MANILA)
-    return any((_parse(x.get("Created_Time")) or since) > since for x in files)
+        log.warning("Files of %s could not be checked: %s", job.account_id, exc)
+        return []
+    known = {d.zoho_file_ref for d in job.documents}
+    return [r.file_name or r.file_ref for r in refs if r.file_ref not in known]
+
+
+def _reverify(db: Session, job: VerificationJob, enqueue, reason: str) -> bool:
+    from app.schemas import JobCreate
+    from app.services.jobs import create_or_get_active_job
+    snap = job.account_snapshot or {}
+    new_job, created = create_or_get_active_job(db, JobCreate(
+        account_id=job.account_id,
+        customer_number=(snap.get("Inventory_Customer_Number") or job.customer_number or None),
+        reason=reason, document_status="YES", source="schedule"))
+    if created:
+        enqueue(str(new_job.id))
+    return created
 
 
 def check_expiry(db: Session, client: ZohoClient, notifier: Notifier, settings,
                  enqueue: Callable[[str], None], today: date) -> dict:
     """Daily: remind about documents expiring in 30 / 7 / 0 days or expired, once each."""
-    from app.schemas import JobCreate
-    from app.services.jobs import create_or_get_active_job
-
     summary = {"alerts": 0, "rechecks": 0}
     levels = _levels(settings)
     for row, job in _latest_assessments(db):
@@ -379,20 +400,19 @@ def check_expiry(db: Session, client: ZohoClient, notifier: Notifier, settings,
                 continue
             days = (date.fromisoformat(until) - today).days
             level = _level(days, levels)
-            ref = f"{job.account_id}|{r['document_type']}|{until}|{level}"
+            key = level
+            if level == "expired":   # again every EXPIRED_REPEAT_DAYS until renewed
+                repeat = max(1, int(getattr(settings, "expired_repeat_days", 7) or 7))
+                key = f"expired-{(-days - 1) // repeat}"
+            ref = f"{job.account_id}|{r['document_type']}|{until}|{key}"
             if level and not already_sent(db, "expiry", ref):
                 due.append((r, until, days, level, ref))
         if not due:
             continue
         # New files uploaded since the last verification? Re-verify first; the alert is only
         # sent later if the new verification still shows the document expiring.
-        if _new_attachments(client, job.account_id, row.created_at):
-            new_job, created = create_or_get_active_job(db, JobCreate(
-                account_id=job.account_id, customer_number=number or None,
-                reason="New documents found before an expiry reminder", document_status="YES",
-                source="schedule"))
-            if created:
-                enqueue(str(new_job.id))
+        if new_files(client, job, settings):
+            _reverify(db, job, enqueue, "New documents found before an expiry reminder")
             summary["rechecks"] += 1
             continue
         for r, until, days, level, ref in due:
@@ -412,6 +432,26 @@ def check_expiry(db: Session, client: ZohoClient, notifier: Notifier, settings,
                 until, days, level, "Open"]])
             mark_sent(db, "expiry", ref, job.account_id, {"days_left": days})
             summary["alerts"] += 1
+    db.commit()
+    return summary
+
+
+def scan_for_new_files(db: Session, client: ZohoClient, settings, enqueue,
+                       today: date) -> dict:
+    """Weekly: accounts with a document expiring within NEW_FILE_SCAN_DAYS (or expired) that have
+    new files since their last verification are verified again. Only those accounts are asked
+    (3 Zoho calls each); new files alone go to the AI."""
+    within = int(getattr(settings, "new_file_scan_days", 60) or 60)
+    summary = {"checked": 0, "rechecks": 0}
+    for row, job in _latest_assessments(db):
+        due = [r for r in row.assessment.get("requirements", []) if r.get("valid_until")
+               and (date.fromisoformat(r["valid_until"]) - today).days <= within]
+        if not due:
+            continue
+        summary["checked"] += 1
+        if new_files(client, job, settings) and _reverify(
+                db, job, enqueue, "Weekly check: new documents on the Account"):
+            summary["rechecks"] += 1
     db.commit()
     return summary
 
