@@ -54,9 +54,10 @@ class Notifier:
     def enabled(self) -> bool:
         return bool(self.cliq or self.sheets or self.mailer)
 
-    def email(self, to: list[str], cc: list[str], subject: str, text: str) -> None:
+    def email(self, to: list[str], cc: list[str], subject: str, text: str,
+              html: str | None = None) -> None:
         if self.mailer:
-            self.mailer.send(to, cc, subject, text)
+            self.mailer.send(to, cc, subject, text, html)
 
     def links(self, account_id: str, review_id: str | None = None) -> str:
         """Footer with links to the Account in Zoho and the review in the dashboard."""

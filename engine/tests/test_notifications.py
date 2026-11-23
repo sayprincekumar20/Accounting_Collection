@@ -21,8 +21,8 @@ class Recorder:
     def __init__(self):
         self.messages, self.rows, self.emails = [], [], []
 
-    def send(self, to, cc, subject, text):
-        self.emails.append({"to": to, "cc": cc, "subject": subject, "text": text})
+    def send(self, to, cc, subject, text, html=None):
+        self.emails.append({"to": to, "cc": cc, "subject": subject, "text": text, "html": html})
         return True
 
     def post(self, text):
@@ -252,6 +252,9 @@ def test_verification_needing_review_lists_reasons(db):
     row = db.get(JobAssessment, job.id)
     row.assessment = {**row.assessment, "recommendation": "MANUAL_REVIEW",
                       "reasons": ["Required document missing: SEC_CERT"],
+                      "requirements": row.assessment["requirements"] + [
+                          {"document_type": "SEC_CERT", "status": "MISSING", "file": None,
+                           "valid_until": None}],
                       "activation_checks": [{"key": "tin", "label": "TIN", "status": "FAIL",
                                              "detail": "empty in Zoho"}]}
     db.commit()
@@ -259,7 +262,11 @@ def test_verification_needing_review_lists_reasons(db):
     notify_verification(db, job, n)
     mail = rec.emails[0]
     assert mail["subject"] == "Verification in review: EXAMPLE CAFE INC."
-    assert "- SEC certificate missing" in mail["text"] and "- TIN: empty in Zoho" in mail["text"]
+    assert ("MISSING DOCUMENTS - STILL TO COLLECT\n  - SEC Certificate of Registration"
+            in mail["text"])
+    assert "ACTIVATION CHECKS NOT MET\n  - TIN: empty in Zoho" in mail["text"]
+    assert mail["text"].count("TIN") == 1                  # each problem once
+    assert "Missing documents - still to collect" in mail["html"] and "http" not in mail["text"]
 
 
 def _engine_review(db, status, notes="", activated=None):
@@ -283,7 +290,8 @@ def test_review_decision_emails(db):
     notify_engine_review(db, _engine_review(db, "Applied", activated=True), n)
     mail = rec.emails[-1]
     assert mail["subject"] == "Verification approved: EXAMPLE CAFE INC."
-    assert "approved by Ana" in mail["text"] and "Updated in Zoho CRM: Owner Name." in mail["text"]
+    assert "approved by Ana" in mail["text"]
+    assert "UPDATED IN ZOHO CRM\n  - Owner Name: empty -> ANA REYES" in mail["text"]
     assert "Customer Status: Active." in mail["text"]
     assert mail["to"] == ["rep@example.com"] and mail["cc"] == ["owner@example.com"]
 
@@ -303,7 +311,7 @@ def test_rejected_email(db):
     n, rec = notifier()
     notify_engine_review(db, _engine_review(db, "Rejected", "Documents of another company"), n)
     assert rec.emails[-1]["subject"] == "Verification not approved: EXAMPLE CAFE INC."
-    assert "Reason: Documents of another company" in rec.emails[-1]["text"]
+    assert "REASON\n  - Documents of another company" in rec.emails[-1]["text"]
 
 
 def test_recipients_rules():
@@ -346,6 +354,7 @@ def test_activation_with_an_expired_document_is_flagged_in_email_and_cliq(db):
     notify_verification(db, job, n)
     mail = rec.emails[0]
     assert mail["subject"] == "Account activated - expired document to renew: EXAMPLE CAFE INC."
-    assert "IMPORTANT - expired documents" in mail["text"]
-    assert "Mayor's permit: expired on 31 Jan 2026" in mail["text"]
+    assert "EXPIRED DOCUMENTS - RENEWAL NEEDED" in mail["text"]
+    assert "Permit - expired on 31 Jan 2026" in mail["text"]
+    assert "<div" in mail["html"] and "Expired documents - renewal needed" in mail["html"]
     assert "⚠️ Activated with expired documents" in rec.messages[0]
