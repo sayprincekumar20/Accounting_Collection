@@ -47,7 +47,8 @@ class GmailClient:
         self._token = (body["access_token"], time.time() + int(body.get("expires_in", 3600)))
         return self._token[0]
 
-    def send(self, to: list[str], cc: list[str], subject: str, text: str) -> bool:
+    def send(self, to: list[str], cc: list[str], subject: str, text: str,
+             html: str | None = None) -> bool:
         to = [a for a in dict.fromkeys(to) if a]
         cc = [a for a in dict.fromkeys(cc) if a and a not in to]
         if not to:
@@ -59,6 +60,8 @@ class GmailClient:
             msg["Cc"] = ", ".join(cc)
         msg["Subject"] = subject
         msg.set_content(text)
+        if html:
+            msg.add_alternative(html, subtype="html")   # formatted; text stays as fallback
         raw = base64.urlsafe_b64encode(msg.as_bytes()).decode().rstrip("=")
         try:
             r = self.http.post(SEND_URL, json={"raw": raw},

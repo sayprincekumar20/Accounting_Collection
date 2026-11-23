@@ -54,7 +54,8 @@ def test_task_helper_creates_review_and_emails(db, settings, monkeypatch):
     mail = rec.emails[0]
     assert mail["subject"] == "Verification could not be completed: ZOHO TEST COMP"
     assert mail["to"] == ["rep@example.com"] and mail["cc"] == ["owner@example.com"]
-    assert "attached to the Account as PDF or image files" in mail["text"]
+    assert "to the Account as PDF or image files" in mail["text"]
+    assert "permit.pdf: download failed" in mail["text"]
     assert rec.messages[0].startswith(f"⚠️ DV-{review.number} for ZOHO TEST COMP: not verified")
     tasks._problem_review(job.id, "Waiting for Documents", "again")      # sent once
     assert len(rec.emails) == 1

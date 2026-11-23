@@ -17,7 +17,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.assessment.alerts import label
-from app.db.models import FieldUpdate, JobAssessment, Notification, Review, VerificationJob
+from app.db.models import FieldUpdate, JobAssessment, Notification, VerificationJob
 from app.notify import emails
 from app.notify.notifier import MANILA, Notifier, already_sent, manila_now, mark_sent
 from app.zoho.client import ZohoClient
@@ -115,25 +115,20 @@ def notify_verification(db: Session, job: VerificationJob, notifier: Notifier,
 
 
 def _email_verification(db, job, a, notifier: Notifier, name, number, activated) -> None:
-    """To the person who clicked Verify Account, CC the Account owner."""
+    """To the person who clicked Verify Account, CC the Account Owner."""
     if not notifier.mailer:
         return
-    from app.zoho.review_record import _short_reason
     to, cc = emails.recipients(job.requested_by_email, emails.owner_email(job.account_snapshot))
-    review = db.query(Review).filter_by(job_id=job.id).first()
-    links = notifier.links(job.account_id, str(review.id) if review else None)
+    facts = emails.document_facts(a)
+    already_active = str((job.account_snapshot or {}).get("Customer_Status") or "").lower() \
+        == "active"
     if activated:
-        reqs = a.get("requirements", [])
-        expired = [f"{_doc(r['document_type'])}: expired on {_date(r['valid_until'])}"
-                   for r in reqs if r["status"] == "EXPIRED"]
-        missing = [_doc(r["document_type"]) for r in reqs if r["status"] == "MISSING"]
-        subject, text = emails.activated(name, number, links, expired, missing)
+        mail = emails.activated(name, number, facts)
+    elif already_active and a.get("recommendation") == "ACTIVE":
+        mail = emails.verified_already_active(name, number, facts)
     else:
-        reasons = [_short_reason(r) for r in a.get("reasons", [])]
-        reasons += [f"{c['label']}: {c['detail']}" for c in a.get("activation_checks") or []
-                    if c["status"] == "FAIL" and not any(c["label"] in r for r in reasons)]
-        subject, text = emails.needs_review(name, number, list(dict.fromkeys(reasons)), links)
-    notifier.email(to, cc, subject, text)
+        mail = emails.needs_review(name, number, facts)
+    notifier.email(to, cc, *mail)
 
 
 def _announce_renewals(db: Session, job: VerificationJob, a: dict, notifier: Notifier,
@@ -240,10 +235,9 @@ def _announce_review(db, client, notifier, rec, status, f, sf) -> None:
     if notifier.mailer:
         to, cc = emails.recipients(str(rec.get(f["Requested By"]) or ""),
                                    emails.owner_email(account))
-        links = notifier.links(acc_id)
-        subject, body = (emails.failed(name, links) if status == "Failed" else
-                         emails.approved(name, reviewer, labels, len(skipped), activated, links))
-        notifier.email(to, cc, subject, body)
+        mail = (emails.failed(name) if status == "Failed" else
+                emails.approved(name, reviewer, labels, len(skipped), activated))
+        notifier.email(to, cc, *mail)
 
 
 def notify_engine_review(db: Session, review, notifier: Notifier) -> None:
@@ -289,22 +283,25 @@ def _email_engine_review(db, review, notifier: Notifier, applied, skipped) -> No
     if not notifier.mailer:
         return
     job = db.get(VerificationJob, review.job_id)
+    row = db.get(JobAssessment, review.job_id)
+    facts = emails.document_facts(row.assessment if row else None)
     to, cc = emails.recipients(review.requested_by,
                                emails.owner_email(job.account_snapshot if job else None))
     name, who = review.account_name or review.account_id, review.reviewer or "the accounts team"
-    links = notifier.links(review.account_id, str(review.id))
     notes = review.reviewer_notes or ""
     if review.status == "Waiting for Documents":
-        subject, text = emails.waiting_for_documents(name, who, notes, links)
+        mail = emails.waiting_for_documents(name, who, notes, facts)
     elif review.status == "Rejected":
-        subject, text = emails.rejected(name, who, notes, links)
+        mail = emails.rejected(name, who, notes)
     elif review.status == "Failed":
-        subject, text = emails.failed(name, links)
+        mail = emails.failed(name)
     else:
-        labels = [r.get("field_label") or r["zoho_field"] for r in applied]
-        subject, text = emails.approved(name, who, labels, len(skipped), bool(review.activated),
-                                        links)
-    notifier.email(to, cc, subject, text)
+        def _new(r):
+            return r.get("edited_value") if r["decision"] == "Edit" else r.get("proposed_value")
+        updated = [f"{r.get('field_label') or r['zoho_field']}: "
+                   f"{r.get('current_value') or 'empty'} -> {_new(r)}" for r in applied]
+        mail = emails.approved(name, who, updated, len(skipped), bool(review.activated), facts)
+    notifier.email(to, cc, *mail)
 
 
 def notify_problem(db: Session, job: VerificationJob, review, notifier: Notifier) -> None:
@@ -318,10 +315,10 @@ def notify_problem(db: Session, job: VerificationJob, review, notifier: Notifier
     if notifier.mailer:
         to, cc = emails.recipients(job.requested_by_email,
                                    emails.owner_email(job.account_snapshot))
-        subject, text = emails.not_completed(name, reason,
-                                             review.status == "Waiting for Documents",
-                                             notifier.links(job.account_id, str(review.id)))
-        notifier.email(to, cc, subject, text)
+        files = [f"{d.file_name or d.zoho_file_ref}: {d.status.lower().replace('_', ' ')}"
+                 for d in job.documents]
+        notifier.email(to, cc, *emails.not_completed(
+            name, reason, review.status == "Waiting for Documents", files))
     mark_sent(db, "verification", ref, job.account_id, {"status": review.status})
     db.commit()
 
@@ -409,9 +406,7 @@ def check_expiry(db: Session, client: ZohoClient, notifier: Notifier, settings,
                                    f"to the Account.")
             owner = emails.owner_email(snap)
             to, cc = emails.recipients(owner, job.requested_by_email)   # owner first
-            subject, text = emails.expiring(name, number, doc, when,
-                                            notifier.links(job.account_id))
-            notifier.email(to, cc, subject, text)
+            notifier.email(to, cc, *emails.expiring(name, number, doc, when))
             notifier.rows("Document Expiry", [[
                 manila_now(), name, job.account_id, number, doc, short_name(r.get("file")),
                 until, days, level, "Open"]])
