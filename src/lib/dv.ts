@@ -75,6 +75,9 @@ export interface ReviewDetail extends ReviewSummary {
   activated: boolean | null;
   /** every value read from each document (latest verification) */
   extracted?: ExtractedDocument[];
+  /** the Account's Channel, and the channel rule applied (WET_MARKET) */
+  channel?: string | null;
+  channel_rule?: string | null;
 }
 
 export interface ExtractedDocument {
@@ -183,6 +186,7 @@ export interface ExpiryItem {
   account_name: string;
   customer_number: string | null;
   account_owner: string | null;
+  channel?: string | null;
   document_type: string;
   document: string;
   file: string | null;

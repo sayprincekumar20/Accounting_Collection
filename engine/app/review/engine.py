@@ -294,4 +294,6 @@ def detail_view(r: Review, assessment: dict | None = None) -> dict:
                       for p in ([] if r.images_purged else r.pages)],
             "reviewer_notes": r.reviewer_notes, "values_compared": r.values_compared,
             "activate_account": r.activate_account, "activated": r.activated,
-            "extracted": extracted_view(assessment)}
+            "extracted": extracted_view(assessment),
+            "channel": (assessment or {}).get("channel"),
+            "channel_rule": (assessment or {}).get("channel_rule")}

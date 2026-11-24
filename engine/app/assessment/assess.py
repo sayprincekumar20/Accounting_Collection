@@ -501,8 +501,17 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
                 p["reason"] = (f"On hold: documents disagree on {', '.join(critical)}. Confirm "
                                "which documents belong to this customer first. " + p["reason"])
 
-    recommendation, reasons = _recommend(checks, requirements, docs)
-    activation = activation_checks(snap, facts, proposals, form)
+    channel = policy.channel_of(snap)
+    wet = policy.is_wet_market(channel)
+    # Wet Market: any valid business document of this customer counts (also barangay clearance,
+    # food safety permit), not only the required ones
+    wet_valid = sorted({d.document_type for d in docs if wet
+                        and d.document_type in policy.WET_MARKET_DOCUMENTS
+                        and d.validity_status in ("VALID", "NO_EXPIRY", "EXPIRED")
+                        and identity.get(d.document_id, ("UNCONFIRMED",))[0]
+                        not in ("OTHER", "CONFLICT")})
+    recommendation, reasons = _recommend(checks, requirements, docs, wet_valid)
+    activation = activation_checks(snap, facts, proposals, form, wet)
     failed = [c for c in activation if c["status"] == "FAIL"]
     if recommendation == "ACTIVE" and failed:
         recommendation = "MANUAL_REVIEW"
@@ -514,6 +523,8 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
     return {
         "rules_version": policy.RULES_VERSION, "assessed_on": today.isoformat(),
         "business_form": form, "recommendation": recommendation, "reasons": reasons,
+        "channel": channel, "channel_rule": "WET_MARKET" if wet else None,
+        "identity_confirmed": any(v == "MATCH" for v, _ in identity.values()),
         "requirements": requirements, "cross_document": checks, "proposals": proposals,
         "activation_checks": activation,
         "facts": {a: [asdict(f) for f in fs] for a, fs in facts.items() if fs},
@@ -579,7 +590,21 @@ def _field_check(key: str, label: str, field: str, current, best, matcher, propo
                        f"Zoho has {current}, documents say {best.value}")}
 
 
-def activation_checks(snap: dict, facts: dict, proposals: list[dict], form: str) -> list[dict]:
+def _filled_check(key: str, label: str, field: str, current, proposals) -> dict:
+    """Wet Market: the field only needs a value (it is not compared with the documents)."""
+    p = _proposal_for(proposals, field)
+    if current not in (None, "", "-None-"):
+        return {"key": key, "label": label, "status": "PASS", "field": field,
+                "detail": f"filled: {current} (Wet Market: matching not required)"}
+    if p and p["action"] == "FILL":
+        return {"key": key, "label": label, "status": "AFTER_UPDATE", "field": field,
+                "detail": f"empty - to be filled with {p['proposed_value']}"}
+    return {"key": key, "label": label, "status": "FAIL", "field": field,
+            "detail": "empty in Zoho (fill it in the Account)"}
+
+
+def activation_checks(snap: dict, facts: dict, proposals: list[dict], form: str,
+                      wet_market: bool = False) -> list[dict]:
     """rules-1.2: the Account data an Active (COD) customer must have, checked against the
     documents."""
     out = []
@@ -596,12 +621,17 @@ def activation_checks(snap: dict, facts: dict, proposals: list[dict], form: str)
         eligible = [c for c in contacts if c.get("primary") or any(
             role in str(v).upper() for v in (c.get("roles") or {}).values()
             for role in policy.ACCOUNTING_ROLES)]
-        complete = [c for c in eligible if c.get("name") and _contact_mobile(c)[1]
-                    and email_format_ok(c.get("email"))]
+        # rules-1.5: a name and at least one way to reach them (PH mobile or email)
+        complete = sorted([c for c in eligible if c.get("name") and (
+            _contact_mobile(c)[1] or email_format_ok(c.get("email")))],
+            key=lambda c: bool(_contact_mobile(c)[1]) + email_format_ok(c.get("email")),
+            reverse=True)
         if complete:
             c = complete[0]
             status = "PASS"
-            detail = (f"{c['name']}, {_contact_mobile(c)[1]}, {str(c['email']).strip()}"
+            reach = [x for x in (_contact_mobile(c)[1], str(c.get("email") or "").strip()
+                                 if email_format_ok(c.get("email")) else None) if x]
+            detail = (f"{c['name']}, {', '.join(reach)}"
                       + (" (primary contact)" if c.get("primary") else " (Accounting)"))
         elif eligible:
             c = eligible[0]
@@ -609,11 +639,9 @@ def activation_checks(snap: dict, facts: dict, proposals: list[dict], form: str)
             missing = []
             if not c.get("name"):
                 missing.append("a name")
-            if not _contact_mobile(c)[1]:
+            if c.get("name"):
                 missing.append("a mobile number in Philippine format, e.g. 0917 123 4567 "
-                               f"(has {raw_mobile or 'none'})")
-            if not email_format_ok(c.get("email")):
-                missing.append("an email in a valid format, e.g. name@company.com "
+                               f"(has {raw_mobile or 'none'}), or an email in a valid format "
                                f"(has {c.get('email') or 'none'})")
             status, detail = "FAIL", f"{c.get('name') or 'The contact'} needs " \
                                      + " and ".join(missing)
@@ -623,9 +651,27 @@ def activation_checks(snap: dict, facts: dict, proposals: list[dict], form: str)
     out.append({"key": "accounting_contact", "label": label, "status": status, "field": None,
                 "detail": detail})
 
-    out.append(_field_check("tin", "TIN matches the BIR 2303", "Tax_Identification_Number_TIN",
-                            snap.get("Tax_Identification_Number_TIN"), _best(facts["tin"]),
-                            lambda a, b: match_tin(a, b) or DIFFERENT, proposals))
+    zoho_tin = snap.get("Tax_Identification_Number_TIN")
+    if wet_market and not facts["tin"]:
+        out.append({"key": "tin", "label": "TIN matches the BIR 2303", "status": "PASS",
+                    "field": "Tax_Identification_Number_TIN",
+                    "detail": (f"Zoho has {zoho_tin}; no TIN on the documents" if zoho_tin else
+                               "no TIN (not required for Wet Market)")})
+    else:
+        out.append(_field_check("tin", "TIN matches the BIR 2303",
+                                "Tax_Identification_Number_TIN", zoho_tin, _best(facts["tin"]),
+                                lambda a, b: match_tin(a, b) or DIFFERENT, proposals))
+    if wet_market:
+        city = snap.get("Billing_City") or (snap.get("Billing_City1") or {}).get("name") \
+            if isinstance(snap.get("Billing_City1"), dict) else snap.get("Billing_City")
+        out.append(_filled_check("invoice_name", "Invoice Company Name is filled",
+                                 "Invoice_Company_Name", snap.get("Invoice_Company_Name"),
+                                 proposals))
+        street = snap.get("Billing_Street")
+        out.append(_filled_check("billing_address", "Billing Address is filled", "Billing_Street",
+                                 ", ".join(str(v) for v in (street, city) if v not in
+                                           (None, "", "-None-")) if street else None, proposals))
+        return out
     name_attr = "registered_name" if form in ("CORPORATION", "PARTNERSHIP") else "business_name"
     out.append(_field_check("invoice_name", "Invoice Company Name matches the documents",
                             "Invoice_Company_Name", snap.get("Invoice_Company_Name"),
@@ -643,12 +689,14 @@ def activation_checks(snap: dict, facts: dict, proposals: list[dict], form: str)
     return out
 
 
-def _recommend(checks, requirements, docs) -> tuple[str, list[str]]:
+def _recommend(checks, requirements, docs, wet_valid: list[str] | None = None
+               ) -> tuple[str, list[str]]:
     reasons_review, reasons_inactive, to_collect, expired_alerts = [], [], [], []
     alert_only = policy.EXPIRED_REQUIRED_DOCUMENT == "ALERT"
     # with rules-1.4 an expired document still counts as present (its values can be checked)
     present = ("VALID", "NO_EXPIRY", "EXPIRED") if alert_only else ("VALID", "NO_EXPIRY")
     valid = [r["document_type"] for r in requirements if r["status"] in present]
+    valid += [t for t in wet_valid or [] if t not in valid]       # rules-1.5 Wet Market
     any_one = policy.ACTIVATION_DOCUMENTS == "ANY_ONE" and bool(valid)
     for c in checks:
         if c["status"] == "CONFLICT" and c["severity"] == "CRITICAL":

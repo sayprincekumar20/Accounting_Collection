@@ -120,3 +120,14 @@ document still counts as present; when the activation checks pass, the account i
 URGENT "expired, collect the renewal" alert is raised; the activation email's subject says
 "expired document to renew" and lists them, the Cliq message too. `"INACTIVE"` (rules-1.2/1.3) or
 `"MANUAL_REVIEW"` restore the stricter behaviour.
+
+
+## rules-1.5 (2026-11-24): contacts, Channel, Wet Market
+
+- **All channels:** the Accounting or primary contact needs a name and a PH mobile **or** a valid
+  email (before: both).
+- **Channel** (Account field Channel) is recorded on every assessment and shown on the review.
+- **General Trade - Wet Market:** any one valid business document of this customer is enough (BIR
+  2303, DTI, SEC, Mayor's permit, barangay clearance, food safety permit); TIN is checked only when
+  a TIN is on the documents; Invoice Company Name and Billing Address only need to be filled;
+  activation needs COD, the contact and one document confirmed as this customer's (name or TIN).

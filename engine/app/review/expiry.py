@@ -46,6 +46,7 @@ def expiry_overview(db: Session, today: date) -> list[dict]:
                 "account_name": snap.get("Account_Name") or job.account_id,
                 "customer_number": snap.get("Inventory_Customer_Number") or job.customer_number,
                 "account_owner": owner.get("name"),
+                "channel": row.assessment.get("channel"),
                 "document_type": r["document_type"], "document": label(r["document_type"]),
                 "file": r.get("file"), "valid_until": until, "days_left": days,
                 "state": _state(days), "reminders_sent": len(sent),
