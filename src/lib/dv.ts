@@ -221,6 +221,9 @@ export interface RequestDoc {
   type: string;
   label: string;
   reason: string;
+  /** missing | wrong | unclear | expired | expiring | renewal */
+  kind?: string;
+  valid_until?: string | null;
 }
 
 export interface RequestDraft {
@@ -238,6 +241,8 @@ export interface RequestDraft {
   body: string;
   documents: RequestDoc[];
   placeholder: string;
+  /** days the upload link stays open (renewals: until 30 days after expiry) */
+  link_days?: number;
 }
 
 export interface DocumentRequestItem {

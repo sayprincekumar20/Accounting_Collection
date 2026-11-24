@@ -79,7 +79,8 @@ def test_draft_for_the_account_owner_lists_what_is_needed(env):
     assert d["to"] == "jhoanna@example.com" and d["recipient_kind"] == "owner"
     assert d["subject"] == "Documents needed: SANDY MEAT SHOP"
     assert d["body"].startswith("Hello Jhoanna,") and "{{upload_link}}" in d["body"]
-    assert "- DTI Business Name Certificate (missing)" in d["body"]
+    assert "- DTI Business Name Certificate: not on file yet" in d["body"]
+    assert "To complete the verification of SANDY MEAT SHOP" in d["body"]
     assert {x["type"] for x in d["documents"]} == {"DTI_BN_CERT", "MAYORS_PERMIT"}
     assert d["recipients"]["customer"]["email"] == "procurement@customer.ph"
 
@@ -197,3 +198,42 @@ def test_list_shows_links_of_open_requests_and_resend(env):
     assert items[0]["link"] == sent["link"] and items[0]["status"] == "Requested"
     r = api.post(f"/v1/requests/{sent['id']}/resend", headers=KEY)
     assert r.status_code == 200 and len(mailer.sent) == 2
+
+
+
+def test_renewal_wording_for_a_document_expiring_soon():
+    from datetime import date
+
+    from app.review.requests import link_days, needed_documents, template
+    today = date(2026, 11, 24)
+    a = {"requirements": [{"document_type": "MAYORS_PERMIT", "status": "VALID",
+                           "valid_until": "2026-12-31"}]}
+    docs = needed_documents(a, ["MAYORS_PERMIT"], today)
+    assert docs[0]["kind"] == "expiring"
+    assert docs[0]["reason"] == "expires on 31 Dec 2026 (in 37 days)"
+    assert link_days(docs, 14, today) == 67                  # 30 days after it expires
+    subject, body = template("owner", "RHAINHEART MEATSHOP", "RGFC-03057", docs,
+                             "RICHARD BERNADOS", "Prince", date(2027, 1, 30))
+    assert subject == "Renewal needed: Mayor's / Business Permit - RHAINHEART MEATSHOP"
+    assert body.startswith("Hello Richard,\n\nThe Mayor's / Business Permit of RHAINHEART "
+                           "MEATSHOP (RGFC-03057) expires on 31 Dec 2026 (in 37 days).")
+    assert "so it is on file before the current one expires" in body
+    assert "complete the verification" not in body and "((" not in body
+
+
+def test_expired_wording_and_customer_version():
+    from datetime import date
+
+    from app.review.requests import needed_documents, template
+    a = {"requirements": [{"document_type": "MAYORS_PERMIT", "status": "EXPIRED",
+                           "valid_until": "2026-01-31"},
+                          {"document_type": "BIR_2303", "status": "MISSING"}]}
+    docs = needed_documents(a, None, date(2026, 11, 24))
+    subject, body = template("owner", "GDRM", None, docs, "Jo", "Prince", date(2026, 12, 8))
+    assert subject == "Documents needed: GDRM"
+    assert "expired on 31 Jan 2026" in body and "GDRM also needs:" in body
+    assert "- BIR Form 2303 (Certificate of Registration): not on file yet" in body
+    subject, body = template("customer", "GDRM", None, docs[:1], "Glydel", "Prince",
+                             date(2026, 12, 8))
+    assert subject == "Document renewal for your account: GDRM"
+    assert "following document has expired" in body and "keep your account up to date" in body

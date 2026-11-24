@@ -37,23 +37,45 @@ def latest(db: Session, account_id: str) -> tuple[VerificationJob | None, dict |
     return (row[0], row[1].assessment) if row else (None, None)
 
 
-def needed_documents(assessment: dict | None, only: list[str] | None = None) -> list[dict]:
-    """Missing, expired and unclear required documents (or the ones asked for)."""
+def needed_documents(assessment: dict | None, only: list[str] | None = None,
+                     today: date | None = None) -> list[dict]:
+    """Documents to request, each with its kind and a plain reason:
+    missing | wrong (another business) | unclear | expired | expiring (60 days) | renewal."""
+    today = today or datetime.now(UTC).date()
     out = []
     for r in (assessment or {}).get("requirements") or []:
-        t, st = r["document_type"], r["status"]
+        t, st, until = r["document_type"], r["status"], r.get("valid_until")
         if only and t not in only:
             continue
-        reason = {"MISSING": "missing", "EXPIRED": f"expired on {_fmt(r.get('valid_until'))}",
-                  "UNKNOWN": "expiry date could not be read",
-                  "NOT_THIS_CUSTOMER": "the file on the Account belongs to another business"
-                  }.get(st)
-        if reason is None and only:
-            until = r.get("valid_until")
-            reason = f"renewal (valid until {_fmt(until)})" if until else "requested"
-        if reason:
-            out.append({"type": t, "label": label(t), "reason": reason})
+        days = (date.fromisoformat(until) - today).days if until else None
+        if st == "MISSING":
+            kind, reason = "missing", "not on file yet"
+        elif st == "NOT_THIS_CUSTOMER":
+            kind, reason = "wrong", "the file on the Account belongs to another business"
+        elif st == "UNKNOWN":
+            kind, reason = "unclear", "the expiry date could not be read; a clearer copy is needed"
+        elif st == "EXPIRED" or (days is not None and days < 0):
+            kind, reason = "expired", f"expired on {_fmt(until)}"
+        elif only and days is not None and days <= 60:
+            kind = "expiring"
+            reason = (f"expires on {_fmt(until)} ({'today' if days == 0 else f'in {days} days'})")
+        elif only:
+            kind, reason = "renewal", (f"valid until {_fmt(until)}; the renewed one is needed "
+                                       "when it is issued" if until else "requested")
+        else:
+            continue
+        out.append({"type": t, "label": label(t), "reason": reason, "kind": kind,
+                    "valid_until": until})
     return out
+
+
+def link_days(docs: list[dict], default: int = 14, today: date | None = None) -> int:
+    """Renewals: keep the link open until 30 days after the document expires (renewed permits
+    are often issued after the old one runs out), at most 120 days."""
+    today = today or datetime.now(UTC).date()
+    ends = [(date.fromisoformat(d["valid_until"]) - today).days + 30 for d in docs
+            if d.get("kind") in ("expiring", "renewal") and d.get("valid_until")]
+    return max([default, *[min(e, 120) for e in ends]])
 
 
 def _recipients(job: VerificationJob | None) -> dict:
@@ -73,33 +95,71 @@ def _first(name: str | None) -> str:
     return (name or "").strip().split(" ")[0].title() or "there"
 
 
+def _lines(docs: list[dict]) -> str:
+    return "\n".join(f"- {d['label']}: {d['reason']}" for d in docs) or "- (no documents listed)"
+
+
 def template(kind: str, account: str, number: str | None, docs: list[dict], to_name: str | None,
              reviewer: str, until: date) -> tuple[str, str]:
+    """Wording follows WHY the documents are asked for: renewals (expiring / expired) read as a
+    renewal reminder; missing / wrong / unclear documents as completing the account's file."""
     who = f"{account} ({number})" if number else account
-    items = "\n".join(f"- {d['label']} ({d['reason']})" for d in docs) or "- (no documents listed)"
+    renew = [d for d in docs if d.get("kind") in ("expiring", "renewal", "expired")]
+    need = [d for d in docs if d not in renew]
+    expired = any(d.get("kind") == "expired" for d in renew)
+    names = ", ".join(d["label"] for d in renew)
+    link_until = until.strftime("%d %b %Y")
+    sign = f"Thank you,\n{reviewer}\nRare Global Food - Accounts Team"
+
     if kind == "customer":
-        subject = f"Documents needed for your account: {account}"
-        body = (f"Dear {to_name or 'Customer'},\n\n"
-                "Thank you for doing business with Rare Global Food. To complete your account "
-                "requirements, please send us the following documents:\n\n"
-                f"{items}\n\n"
-                "You can upload them securely here (PDF or clear photos):\n"
-                f"{LINK_PLACEHOLDER}\n\n"
-                f"The link is valid until {until.strftime('%d %b %Y')}. If you have questions, "
-                "please reply to this email.\n\n"
-                f"Thank you,\n{reviewer}\nRare Global Food - Accounts Team")
+        greeting = f"Dear {to_name or 'Customer'},"
+        parts = [greeting, "", "Thank you for doing business with Rare Global Food."]
+        if renew:
+            parts += ["", ("Our records show that the following document has expired:" if expired
+                           and len(renew) == 1 else
+                           "Our records show that the following documents need to be renewed:"
+                           if len(renew) > 1 else
+                           "Our records show that the following document will expire soon:"),
+                      "", _lines(renew), "",
+                      "Please send us the renewed copy as soon as it is issued, so that we can "
+                      "keep your account up to date."]
+        if need:
+            parts += ["", "To complete your account requirements, please also send us:" if renew
+                      else "To complete your account requirements, please send us:",
+                      "", _lines(need)]
+        parts += ["", "You can upload them securely here (PDF or clear photos):",
+                  LINK_PLACEHOLDER, "",
+                  f"The link is valid until {link_until}. If you have questions, please reply to "
+                  "this email.", "", sign]
+        subject = (f"Document renewal for your account: {account}" if renew and not need else
+                   f"Documents needed for your account: {account}")
+        return subject, "\n".join(parts)
+
+    first = (to_name or "").strip().split(" ")[0].title() or "there"
+    parts = [f"Hello {first},"]
+    if renew:
+        parts += ["", (f"The {renew[0]['label']} of {who} {renew[0]['reason']}."
+                       if len(renew) == 1 else f"Documents of {who} need to be renewed:"),
+                  ]
+        if len(renew) > 1:
+            parts += ["", _lines(renew)]
+        parts += ["", ("Please ask the customer for the renewed document now; the account keeps "
+                       "running on an expired document until it is replaced." if expired else
+                       "Please ask the customer for the renewed document, so it is on file "
+                       "before the current one expires.")]
+    if need:
+        parts += ["", (f"{who} also needs:" if renew else
+                       f"To complete the verification of {who}, we need the following "
+                       "documents from the customer:"), "", _lines(need)]
+    parts += ["", "Upload the documents here (PDF or clear photos):", LINK_PLACEHOLDER, "",
+              "Or attach them to the Account in Zoho CRM and click Verify Account. "
+              f"The upload link is valid until {link_until}.", "", sign]
+    if renew and not need:
+        subject = (f"Expired document to renew: {names} - {account}" if expired else
+                   f"Renewal needed: {names} - {account}")
     else:
         subject = f"Documents needed: {account}"
-        body = (f"Hello {_first(to_name)},\n\n"
-                f"To complete the verification of {who}, we need the following documents from "
-                "the customer:\n\n"
-                f"{items}\n\n"
-                "Please collect them and upload them here (PDF or clear photos):\n"
-                f"{LINK_PLACEHOLDER}\n\n"
-                "You can also attach them to the Account in Zoho CRM and click Verify Account. "
-                f"The link is valid until {until.strftime('%d %b %Y')}.\n\n"
-                f"Thank you,\n{reviewer}\nRare Global Food - Accounts Team")
-    return subject, body
+    return subject, "\n".join(parts)
 
 
 def draft(db: Session, account_id: str, kind: str, reviewer: str,
@@ -114,13 +174,14 @@ def draft(db: Session, account_id: str, kind: str, reviewer: str,
     snap = job.account_snapshot or {}
     account = snap.get("Account_Name") or account_id
     number = snap.get("Inventory_Customer_Number") or job.customer_number
-    until = (datetime.now(UTC) + timedelta(days=request_days)).date()
+    days = link_days(docs, request_days)
+    until = (datetime.now(UTC) + timedelta(days=days)).date()
     subject, body = template(kind, account, number, docs, to.get("name"), reviewer, until)
     cc = [e for e in [rec["owner"].get("email") if kind == "customer" else None] if e]
     return {"account_id": account_id, "account_name": account, "customer_number": number,
             "recipient_kind": kind, "recipients": rec, "to": to.get("email") or "",
             "cc": ", ".join(cc), "subject": subject, "body": body, "documents": docs,
-            "placeholder": LINK_PLACEHOLDER}
+            "placeholder": LINK_PLACEHOLDER, "link_days": days}
 
 
 def _html(text: str) -> str:
@@ -137,7 +198,8 @@ def _emails(value: str | None) -> list[str]:
 
 def create_and_send(db: Session, mailer, settings, *, account_id: str, recipient_kind: str,
                     to: str, cc: str | None, subject: str, body: str, documents: list[dict],
-                    reviewer: str, review_id: str | None = None) -> DocumentRequest:
+                    reviewer: str, review_id: str | None = None,
+                    days: int | None = None) -> DocumentRequest:
     recipients = _emails(to)
     if not recipients:
         raise RequestError("Enter a valid recipient email")
@@ -160,9 +222,11 @@ def create_and_send(db: Session, mailer, settings, *, account_id: str, recipient
         review_id=review_uuid, recipient_kind=recipient_kind, recipient_email=", ".join(recipients),
         cc=", ".join(_emails(cc)) or None, subject=subject.strip()[:255], body=body,
         documents=[{"type": d["type"], "label": d.get("label") or label(d["type"]),
-                    "reason": d.get("reason") or "requested"} for d in documents],
+                    "reason": d.get("reason") or "requested",
+                    "kind": d.get("kind") or "missing"} for d in documents],
         uploads=[], status="Requested", requested_by=reviewer,
-        expires_at=utcnow() + timedelta(days=int(getattr(settings, "request_link_days", 14))))
+        expires_at=utcnow() + timedelta(days=max(1, min(int(
+            days or getattr(settings, "request_link_days", 14)), 120))))
     base = (getattr(settings, "dashboard_url", "") or "").rstrip("/")
     link = f"{base}/upload/{req.token}"
     text = body.replace(LINK_PLACEHOLDER, link) if LINK_PLACEHOLDER in body else \
