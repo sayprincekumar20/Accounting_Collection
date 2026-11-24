@@ -36,6 +36,7 @@ class DocumentIn(BaseModel):
     type: str
     label: str | None = None
     reason: str | None = None
+    kind: str | None = None
 
 
 class RequestIn(BaseModel):
@@ -47,6 +48,7 @@ class RequestIn(BaseModel):
     body: str
     documents: list[DocumentIn]
     review_id: str | None = None
+    link_days: int | None = None
 
 
 @router.get("/draft")
@@ -67,7 +69,7 @@ def send(body: RequestIn, x_reviewer: str | None = Header(None),
         db, GmailClient.from_settings(s), s, account_id=body.account_id,
         recipient_kind=body.recipient_kind, to=body.to, cc=body.cc, subject=body.subject,
         body=body.body, documents=[d.model_dump() for d in body.documents], reviewer=who,
-        review_id=body.review_id))
+        review_id=body.review_id, days=body.link_days))
     base = (s.dashboard_url or "").rstrip("/")
     return svc.view(req, f"{base}/upload/{req.token}")
 

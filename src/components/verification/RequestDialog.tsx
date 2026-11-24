@@ -67,6 +67,7 @@ export function RequestDialog({
           body,
           documents: docs,
           review_id: reviewId,
+          link_days: d?.link_days,
         }),
       });
       setLink(res.link);
@@ -107,8 +108,8 @@ export function RequestDialog({
         {link ? (
           <div className="mt-4 space-y-3">
             <p className="rounded-lg border border-success/30 bg-success/10 p-3 text-sm">
-              Sent to {to}. The upload link is valid for 14 days; uploaded files are attached to the
-              Account in Zoho and the account is verified again.
+              Sent to {to}. The upload link is valid for {d?.link_days ?? 14} days; uploaded files
+              are attached to the Account in Zoho and the account is verified again.
             </p>
             <div className="flex gap-2">
               <input readOnly value={link} className={field} aria-label="Upload link" />
