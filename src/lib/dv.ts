@@ -73,6 +73,18 @@ export interface ReviewDetail extends ReviewSummary {
   values_compared: boolean;
   activate_account: boolean;
   activated: boolean | null;
+  /** every value read from each document (latest verification) */
+  extracted?: ExtractedDocument[];
+}
+
+export interface ExtractedDocument {
+  file: string | null;
+  document_type: string | null;
+  document: string;
+  validity: string | null;
+  valid_until: string | null;
+  fields: { name: string; value: string; confidence: number | null; check: string | null }[];
+  other_fields: { label: string | null; value: string | null }[];
 }
 
 export const OPEN_STATUSES: ReviewStatus[] = ["Pending Review", "In Review"];

@@ -22,7 +22,9 @@ import {
   setReviewerName,
   STATUS_TONE,
   when,
+  day,
   type ActivationCheck,
+  type ExtractedDocument,
   type ReviewDetail,
   type ReviewRow,
 } from "@/lib/dv";
@@ -265,6 +267,10 @@ function ReviewPage() {
         </Panel>
       </div>
 
+      <div className="mt-4">
+        <ExtractedValues documents={review.extracted ?? []} />
+      </div>
+
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)]">
         <Panel
           title="Proposed changes"
@@ -325,6 +331,76 @@ function ReviewPage() {
         }}
       />
     </AppShell>
+  );
+}
+
+function ExtractedValues({ documents }: { documents: ExtractedDocument[] }) {
+  const total = documents.reduce((n, d) => n + d.fields.length + d.other_fields.length, 0);
+  return (
+    <Panel
+      title="Values read from the documents"
+      description={`${documents.length} document${documents.length === 1 ? "" : "s"} · ${total} values`}
+    >
+      <details className="group px-4 py-3">
+        <summary className="cursor-pointer select-none text-sm font-semibold text-primary">
+          <span className="group-open:hidden">Show all values</span>
+          <span className="hidden group-open:inline">Hide values</span>
+        </summary>
+        {!documents.length ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            No values were read (no readable document, or a review from before this section).
+          </p>
+        ) : null}
+        <div className="mt-3 space-y-4">
+          {documents.map((d, i) => (
+            <div key={`${d.file}-${i}`} className="rounded-lg border border-border">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2">
+                <p className="text-sm font-semibold">{d.document}</p>
+                <p className="text-xs text-muted-foreground">
+                  {d.file || "—"}
+                  {d.valid_until ? ` · valid until ${day(d.valid_until)}` : ""}
+                  {d.validity ? ` · ${d.validity.replace(/_/g, " ").toLowerCase()}` : ""}
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[560px] text-sm">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                      <th className="px-3 py-2 font-semibold">Field</th>
+                      <th className="px-3 py-2 font-semibold">Value on the document</th>
+                      <th className="px-3 py-2 font-semibold">Confidence</th>
+                      <th className="px-3 py-2 font-semibold">OCR check</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {d.fields.map((f) => (
+                      <tr key={f.name}>
+                        <td className="px-3 py-2 text-muted-foreground">{f.name}</td>
+                        <td className="px-3 py-2 font-medium break-words">{f.value}</td>
+                        <td className="px-3 py-2 tabular-nums">
+                          {f.confidence != null ? Number(f.confidence).toFixed(2) : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {f.check ? f.check.replace(/_/g, " ").toLowerCase() : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                    {d.other_fields.map((o, j) => (
+                      <tr key={`other-${j}`}>
+                        <td className="px-3 py-2 text-muted-foreground">{o.label || "Other"}</td>
+                        <td className="px-3 py-2 font-medium break-words">{o.value}</td>
+                        <td className="px-3 py-2">—</td>
+                        <td className="px-3 py-2 text-xs">—</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+      </details>
+    </Panel>
   );
 }
 

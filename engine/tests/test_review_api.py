@@ -131,3 +131,14 @@ def test_expiry_endpoint_lists_documents_and_counts(setup):
     only = api.get("/v1/expiry?state=Valid", headers=KEY).json()["items"]
     assert all(i["state"] == "Valid" for i in only)
     assert api.get("/v1/expiry", headers={"X-API-Key": "wrong"}).status_code == 401
+
+
+def test_review_includes_every_value_read_from_the_documents(setup):
+    api, review, _ = setup
+    detail = api.get(f"/v1/reviews/{review.id}", headers=KEY).json()
+    docs = {d["document_type"]: d for d in detail["extracted"]}
+    assert {"BIR_2303", "DTI_BN_CERT", "MAYORS_PERMIT"} <= set(docs)
+    bir = {f["name"]: f for f in docs["BIR_2303"]["fields"]}
+    assert bir["TIN"]["value"] == "123-456-789-00000"
+    assert bir["TIN"]["confidence"] is not None and bir["TIN"]["check"]
+    assert docs["BIR_2303"]["document"].startswith("BIR")
