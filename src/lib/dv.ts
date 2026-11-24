@@ -73,6 +73,18 @@ export interface ReviewDetail extends ReviewSummary {
   values_compared: boolean;
   activate_account: boolean;
   activated: boolean | null;
+  /** every value read from each document (latest verification) */
+  extracted?: ExtractedDocument[];
+}
+
+export interface ExtractedDocument {
+  file: string | null;
+  document_type: string | null;
+  document: string;
+  validity: string | null;
+  valid_until: string | null;
+  fields: { name: string; value: string; confidence: number | null; check: string | null }[];
+  other_fields: { label: string | null; value: string | null }[];
 }
 
 export const OPEN_STATUSES: ReviewStatus[] = ["Pending Review", "In Review"];
@@ -199,4 +211,27 @@ export function day(value: string | null) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+export interface RequestDoc {
+  type: string;
+  label: string;
+  reason: string;
+}
+
+export interface RequestDraft {
+  account_id: string;
+  account_name: string;
+  customer_number: string | null;
+  recipient_kind: "owner" | "customer";
+  recipients: {
+    owner: { name: string | null; email: string | null };
+    customer: { name: string | null; email: string | null } | null;
+  };
+  to: string;
+  cc: string;
+  subject: string;
+  body: string;
+  documents: RequestDoc[];
+  placeholder: string;
 }

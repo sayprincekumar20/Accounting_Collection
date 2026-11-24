@@ -20,6 +20,12 @@ export const isStaticAsset = (path: string) =>
   !path.startsWith("/api/") &&
   /\.(js|css|map|png|jpe?g|svg|ico|webp|gif|woff2?|ttf|txt|json)$/i.test(path);
 
+// Document request upload page (customer or Account Owner, no login): only the page and its three engine
+// calls, only with a well-formed code; the engine checks the code (unguessable, expires) on every call.
+const UPLOAD_PAGE = /^\/upload\/[A-Za-z0-9_-]{30,64}$/;
+const UPLOAD_API = /^\/api\/upload\/[A-Za-z0-9_-]{30,64}(\/(files|submit))?$/;
+export const isUploadPath = (path: string) => UPLOAD_PAGE.test(path) || UPLOAD_API.test(path);
+
 function isProviderMediaFetch(request: Request, path: string) {
   return (
     (request.method === "GET" || request.method === "HEAD") &&
@@ -77,6 +83,7 @@ export async function handleAuth(request: Request): Promise<Response | null> {
     });
   }
   if (PUBLIC_PATHS.has(path) || isStaticAsset(path)) return null;
+  if (isUploadPath(path)) return null;
 
   if (await isValidSession(readCookie(request, SESSION_COOKIE), cfg)) return null;
 

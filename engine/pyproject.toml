@@ -24,6 +24,7 @@ dependencies = [
   "pytesseract>=0.3.10",
   "openpyxl>=3.1",
   "pyjwt[crypto]>=2.8",   # Google service-account login for the Sheets log
+  "python-multipart>=0.0.9",  # file uploads on the document request page
 ]
 
 [project.optional-dependencies]

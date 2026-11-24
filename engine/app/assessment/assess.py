@@ -440,7 +440,14 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
                            "fields": {k: (v or {}).get("value") for k, v in d.fields.items()
                                       if (v or {}).get("value") not in (None, "")},
                            "other_fields": [{"label": o.get("label"), "value": o.get("value")}
-                                            for o in d.other_fields]} for d in docs],
+                                            for o in d.other_fields],
+                           # value, confidence and OCR check per field, for the review screen
+                           "field_details": {k: {"value": (v or {}).get("value"),
+                                                 "confidence": (v or {}).get("confidence"),
+                                                 "grounding": (v or {}).get("grounding")}
+                                             for k, v in d.fields.items()
+                                             if (v or {}).get("value") not in (None, "")}}
+                          for d in docs],
         "documents": [{"file": d.file_name, "type": d.document_type,
                        "validity": d.validity_status, "valid_until": d.valid_until,
                        "critical_issues": [i["code"] for i in d.issues

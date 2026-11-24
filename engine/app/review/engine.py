@@ -259,11 +259,39 @@ def _writable(row: dict) -> tuple[bool, str | None]:
     return True, None
 
 
-def detail_view(r: Review) -> dict:
+_FIELD_NAMES = {"tin": "TIN", "sec_registration_no": "SEC registration no.",
+                "dti_bn_no": "DTI business name no.", "bir_rdo": "BIR RDO"}
+
+
+def _field_name(key: str) -> str:
+    return _FIELD_NAMES.get(key, key.replace("_", " ").strip().capitalize())
+
+
+def extracted_view(assessment: dict | None) -> list[dict]:
+    """Every value read from each document (latest verification), for the review screen."""
+    from app.assessment.alerts import label
+    out = []
+    for d in (assessment or {}).get("document_data") or []:
+        details = d.get("field_details") or {k: {"value": v} for k, v in
+                                               (d.get("fields") or {}).items()}
+        out.append({
+            "file": d.get("file"), "document_type": d.get("type"),
+            "document": label(d.get("type")) if d.get("type") else "Document",
+            "validity": d.get("validity"), "valid_until": d.get("valid_until"),
+            "fields": [{"name": _field_name(k), "value": str(v.get("value")),
+                        "confidence": v.get("confidence"), "check": v.get("grounding")}
+                       for k, v in details.items()],
+            "other_fields": [o for o in d.get("other_fields") or [] if o.get("value")],
+        })
+    return out
+
+
+def detail_view(r: Review, assessment: dict | None = None) -> dict:
     rows = [{**row, "writable": _writable(row)[0], "not_writable_reason": _writable(row)[1]}
             for row in r.rows]
     return {**summary_view(r), "job_id": str(r.job_id), "summary": r.summary, "rows": rows,
             "pages": [{k: v for k, v in p.items() if k != "key"}
                       for p in ([] if r.images_purged else r.pages)],
             "reviewer_notes": r.reviewer_notes, "values_compared": r.values_compared,
-            "activate_account": r.activate_account, "activated": r.activated}
+            "activate_account": r.activate_account, "activated": r.activated,
+            "extracted": extracted_view(assessment)}

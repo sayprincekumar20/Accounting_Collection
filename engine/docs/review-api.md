@@ -76,3 +76,17 @@ export async function onRequest({ request, env, data }) {      // Pages Function
   });
 }
 ```
+
+
+## Document requests (Nov 2026)
+
+| Method | Path | Use |
+| --- | --- | --- |
+| GET | /v1/requests/draft?account_id&recipient=owner/customer&documents=TYPE,... | Pre-filled email: recipients (Account Owner, Accounting or primary contact), subject, body with {{upload_link}}, documents needed (missing, expired, unclear; or the ones listed) |
+| POST | /v1/requests (X-Reviewer) | Send the edited email by Gmail with the secure link; closes the review (review_id) as Waiting for Documents |
+| GET | /v1/requests?account_id | Requests sent |
+| GET | /public/requests/{token} | Upload page (no key): company name and checklist only |
+| POST | /public/requests/{token}/files | One file (multipart: document_type, file); PDF, images, Word; up to 25 MB; attached to the Account in Zoho |
+| POST | /public/requests/{token}/submit | Verify the account again |
+
+Links last REQUEST_LINK_DAYS (14); the dashboard serves the page at /upload/<token> without login.

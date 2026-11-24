@@ -64,7 +64,10 @@ def list_reviews(status: str | None = Query(None, description="e.g. Pending Revi
 
 @router.get("/{review_id}")
 def get_review(review_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
-    return engine.detail_view(_review(review_id, db))
+    from app.db.models import JobAssessment
+    r = _review(review_id, db)
+    row = db.get(JobAssessment, r.job_id)
+    return engine.detail_view(r, row.assessment if row else None)
 
 
 @router.get("/{review_id}/pages/{n}", response_class=Response)

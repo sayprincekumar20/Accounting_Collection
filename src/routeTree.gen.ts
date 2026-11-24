@@ -38,6 +38,7 @@ import { Route as ApiContactNowRouteImport } from './routes/api/contact-now'
 import { Route as ApiContactsToFixRouteImport } from './routes/api/contacts-to-fix'
 import { Route as ApiDailyRunLogsRouteImport } from './routes/api/daily-run-logs'
 import { Route as ApiDvExpiryRouteImport } from './routes/api/dv-expiry'
+import { Route as ApiDvRequestsRouteImport } from './routes/api/dv-requests'
 import { Route as ApiDvReviewsRouteImport } from './routes/api/dv-reviews'
 import { Route as ApiEscalationsRouteImport } from './routes/api/escalations'
 import { Route as ApiGmailAttachmentRouteImport } from './routes/api/gmail-attachment'
@@ -65,6 +66,7 @@ import { Route as ApiWhatsappTemplateRouteImport } from './routes/api/whatsapp-t
 import { Route as ApiWorklistRouteImport } from './routes/api/worklist'
 import { Route as ClientsIndexRouteImport } from './routes/clients.index'
 import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
+import { Route as UploadTokenRouteImport } from './routes/upload.$token'
 import { Route as VerificationIndexRouteImport } from './routes/verification.index'
 import { Route as VerificationReviewIdRouteImport } from './routes/verification.$reviewId'
 import { Route as VerificationExpiryRouteImport } from './routes/verification.expiry'
@@ -74,11 +76,15 @@ import { Route as ApiAssistantContactListRouteImport } from './routes/api/assist
 import { Route as ApiAssistantHomeRouteImport } from './routes/api/assistant.home'
 import { Route as ApiAssistantListMatchRouteImport } from './routes/api/assistant.list-match'
 import { Route as ApiAssistantListWarmRouteImport } from './routes/api/assistant.list-warm'
+import { Route as ApiDvRequestsDraftRouteImport } from './routes/api/dv-requests.draft'
 import { Route as ApiDvReviewsReviewIdRouteImport } from './routes/api/dv-reviews.$reviewId'
 import { Route as ApiOutboundMediaTokenRouteImport } from './routes/api/outbound-media.$token'
 import { Route as ApiReminderPreviewRouteImport } from './routes/api/reminder.preview'
 import { Route as ApiReminderSendRouteImport } from './routes/api/reminder.send'
+import { Route as ApiUploadTokenRouteImport } from './routes/api/upload.$token'
 import { Route as ApiDvReviewsReviewIdActionRouteImport } from './routes/api/dv-reviews.$reviewId.$action'
+import { Route as ApiUploadTokenFilesRouteImport } from './routes/api/upload.$token.files'
+import { Route as ApiUploadTokenSubmitRouteImport } from './routes/api/upload.$token.submit'
 import { Route as ApiDvReviewsReviewIdPagesNRouteImport } from './routes/api/dv-reviews.$reviewId.pages.$n'
 import { Route as ApiDvReviewsReviewIdRowsRowIdRouteImport } from './routes/api/dv-reviews.$reviewId.rows.$rowId'
 
@@ -227,6 +233,11 @@ const ApiDvExpiryRoute = ApiDvExpiryRouteImport.update({
   path: '/api/dv-expiry',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDvRequestsRoute = ApiDvRequestsRouteImport.update({
+  id: '/api/dv-requests',
+  path: '/api/dv-requests',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDvReviewsRoute = ApiDvReviewsRouteImport.update({
   id: '/api/dv-reviews',
   path: '/api/dv-reviews',
@@ -363,6 +374,11 @@ const ClientsClientIdRoute = ClientsClientIdRouteImport.update({
   path: '/clients/$clientId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UploadTokenRoute = UploadTokenRouteImport.update({
+  id: '/upload/$token',
+  path: '/upload/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VerificationIndexRoute = VerificationIndexRouteImport.update({
   id: '/verification/',
   path: '/verification/',
@@ -408,6 +424,11 @@ const ApiAssistantListWarmRoute = ApiAssistantListWarmRouteImport.update({
   path: '/api/assistant/list-warm',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDvRequestsDraftRoute = ApiDvRequestsDraftRouteImport.update({
+  id: '/draft',
+  path: '/draft',
+  getParentRoute: () => ApiDvRequestsRoute,
+} as any)
 const ApiDvReviewsReviewIdRoute = ApiDvReviewsReviewIdRouteImport.update({
   id: '/$reviewId',
   path: '/$reviewId',
@@ -428,12 +449,27 @@ const ApiReminderSendRoute = ApiReminderSendRouteImport.update({
   path: '/api/reminder/send',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiUploadTokenRoute = ApiUploadTokenRouteImport.update({
+  id: '/api/upload/$token',
+  path: '/api/upload/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDvReviewsReviewIdActionRoute =
   ApiDvReviewsReviewIdActionRouteImport.update({
     id: '/$action',
     path: '/$action',
     getParentRoute: () => ApiDvReviewsReviewIdRoute,
   } as any)
+const ApiUploadTokenFilesRoute = ApiUploadTokenFilesRouteImport.update({
+  id: '/files',
+  path: '/files',
+  getParentRoute: () => ApiUploadTokenRoute,
+} as any)
+const ApiUploadTokenSubmitRoute = ApiUploadTokenSubmitRouteImport.update({
+  id: '/submit',
+  path: '/submit',
+  getParentRoute: () => ApiUploadTokenRoute,
+} as any)
 const ApiDvReviewsReviewIdPagesNRoute =
   ApiDvReviewsReviewIdPagesNRouteImport.update({
     id: '/pages/$n',
@@ -477,6 +513,7 @@ export interface FileRoutesByFullPath {
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/dv-expiry': typeof ApiDvExpiryRoute
+  '/api/dv-requests': typeof ApiDvRequestsRouteWithChildren
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
@@ -503,6 +540,7 @@ export interface FileRoutesByFullPath {
   '/api/whatsapp-template': typeof ApiWhatsappTemplateRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
+  '/upload/$token': typeof UploadTokenRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
   '/verification/expiry': typeof VerificationExpiryRoute
   '/clients/': typeof ClientsIndexRoute
@@ -513,11 +551,15 @@ export interface FileRoutesByFullPath {
   '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/assistant/list-match': typeof ApiAssistantListMatchRoute
   '/api/assistant/list-warm': typeof ApiAssistantListWarmRoute
+  '/api/dv-requests/draft': typeof ApiDvRequestsDraftRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/reminder/preview': typeof ApiReminderPreviewRoute
   '/api/reminder/send': typeof ApiReminderSendRoute
+  '/api/upload/$token': typeof ApiUploadTokenRouteWithChildren
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
+  '/api/upload/$token/files': typeof ApiUploadTokenFilesRoute
+  '/api/upload/$token/submit': typeof ApiUploadTokenSubmitRoute
   '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
   '/api/dv-reviews/$reviewId/rows/$rowId': typeof ApiDvReviewsReviewIdRowsRowIdRoute
 }
@@ -551,6 +593,7 @@ export interface FileRoutesByTo {
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/dv-expiry': typeof ApiDvExpiryRoute
+  '/api/dv-requests': typeof ApiDvRequestsRouteWithChildren
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
@@ -577,6 +620,7 @@ export interface FileRoutesByTo {
   '/api/whatsapp-template': typeof ApiWhatsappTemplateRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
+  '/upload/$token': typeof UploadTokenRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
   '/verification/expiry': typeof VerificationExpiryRoute
   '/clients': typeof ClientsIndexRoute
@@ -587,11 +631,15 @@ export interface FileRoutesByTo {
   '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/assistant/list-match': typeof ApiAssistantListMatchRoute
   '/api/assistant/list-warm': typeof ApiAssistantListWarmRoute
+  '/api/dv-requests/draft': typeof ApiDvRequestsDraftRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/reminder/preview': typeof ApiReminderPreviewRoute
   '/api/reminder/send': typeof ApiReminderSendRoute
+  '/api/upload/$token': typeof ApiUploadTokenRouteWithChildren
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
+  '/api/upload/$token/files': typeof ApiUploadTokenFilesRoute
+  '/api/upload/$token/submit': typeof ApiUploadTokenSubmitRoute
   '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
   '/api/dv-reviews/$reviewId/rows/$rowId': typeof ApiDvReviewsReviewIdRowsRowIdRoute
 }
@@ -626,6 +674,7 @@ export interface FileRoutesById {
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
   '/api/dv-expiry': typeof ApiDvExpiryRoute
+  '/api/dv-requests': typeof ApiDvRequestsRouteWithChildren
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
   '/api/escalations': typeof ApiEscalationsRoute
   '/api/gmail-attachment': typeof ApiGmailAttachmentRoute
@@ -652,6 +701,7 @@ export interface FileRoutesById {
   '/api/whatsapp-template': typeof ApiWhatsappTemplateRoute
   '/api/worklist': typeof ApiWorklistRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
+  '/upload/$token': typeof UploadTokenRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
   '/verification/expiry': typeof VerificationExpiryRoute
   '/clients/': typeof ClientsIndexRoute
@@ -662,11 +712,15 @@ export interface FileRoutesById {
   '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/assistant/list-match': typeof ApiAssistantListMatchRoute
   '/api/assistant/list-warm': typeof ApiAssistantListWarmRoute
+  '/api/dv-requests/draft': typeof ApiDvRequestsDraftRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/reminder/preview': typeof ApiReminderPreviewRoute
   '/api/reminder/send': typeof ApiReminderSendRoute
+  '/api/upload/$token': typeof ApiUploadTokenRouteWithChildren
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
+  '/api/upload/$token/files': typeof ApiUploadTokenFilesRoute
+  '/api/upload/$token/submit': typeof ApiUploadTokenSubmitRoute
   '/api/dv-reviews/$reviewId/pages/$n': typeof ApiDvReviewsReviewIdPagesNRoute
   '/api/dv-reviews/$reviewId/rows/$rowId': typeof ApiDvReviewsReviewIdRowsRowIdRoute
 }
@@ -702,6 +756,7 @@ export interface FileRouteTypes {
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
     | '/api/dv-expiry'
+    | '/api/dv-requests'
     | '/api/dv-reviews'
     | '/api/escalations'
     | '/api/gmail-attachment'
@@ -728,6 +783,7 @@ export interface FileRouteTypes {
     | '/api/whatsapp-template'
     | '/api/worklist'
     | '/clients/$clientId'
+    | '/upload/$token'
     | '/verification/$reviewId'
     | '/verification/expiry'
     | '/clients/'
@@ -738,11 +794,15 @@ export interface FileRouteTypes {
     | '/api/assistant/home'
     | '/api/assistant/list-match'
     | '/api/assistant/list-warm'
+    | '/api/dv-requests/draft'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
     | '/api/reminder/preview'
     | '/api/reminder/send'
+    | '/api/upload/$token'
     | '/api/dv-reviews/$reviewId/$action'
+    | '/api/upload/$token/files'
+    | '/api/upload/$token/submit'
     | '/api/dv-reviews/$reviewId/pages/$n'
     | '/api/dv-reviews/$reviewId/rows/$rowId'
   fileRoutesByTo: FileRoutesByTo
@@ -776,6 +836,7 @@ export interface FileRouteTypes {
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
     | '/api/dv-expiry'
+    | '/api/dv-requests'
     | '/api/dv-reviews'
     | '/api/escalations'
     | '/api/gmail-attachment'
@@ -802,6 +863,7 @@ export interface FileRouteTypes {
     | '/api/whatsapp-template'
     | '/api/worklist'
     | '/clients/$clientId'
+    | '/upload/$token'
     | '/verification/$reviewId'
     | '/verification/expiry'
     | '/clients'
@@ -812,11 +874,15 @@ export interface FileRouteTypes {
     | '/api/assistant/home'
     | '/api/assistant/list-match'
     | '/api/assistant/list-warm'
+    | '/api/dv-requests/draft'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
     | '/api/reminder/preview'
     | '/api/reminder/send'
+    | '/api/upload/$token'
     | '/api/dv-reviews/$reviewId/$action'
+    | '/api/upload/$token/files'
+    | '/api/upload/$token/submit'
     | '/api/dv-reviews/$reviewId/pages/$n'
     | '/api/dv-reviews/$reviewId/rows/$rowId'
   id:
@@ -850,6 +916,7 @@ export interface FileRouteTypes {
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
     | '/api/dv-expiry'
+    | '/api/dv-requests'
     | '/api/dv-reviews'
     | '/api/escalations'
     | '/api/gmail-attachment'
@@ -876,6 +943,7 @@ export interface FileRouteTypes {
     | '/api/whatsapp-template'
     | '/api/worklist'
     | '/clients/$clientId'
+    | '/upload/$token'
     | '/verification/$reviewId'
     | '/verification/expiry'
     | '/clients/'
@@ -886,11 +954,15 @@ export interface FileRouteTypes {
     | '/api/assistant/home'
     | '/api/assistant/list-match'
     | '/api/assistant/list-warm'
+    | '/api/dv-requests/draft'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
     | '/api/reminder/preview'
     | '/api/reminder/send'
+    | '/api/upload/$token'
     | '/api/dv-reviews/$reviewId/$action'
+    | '/api/upload/$token/files'
+    | '/api/upload/$token/submit'
     | '/api/dv-reviews/$reviewId/pages/$n'
     | '/api/dv-reviews/$reviewId/rows/$rowId'
   fileRoutesById: FileRoutesById
@@ -925,6 +997,7 @@ export interface RootRouteChildren {
   ApiContactsToFixRoute: typeof ApiContactsToFixRoute
   ApiDailyRunLogsRoute: typeof ApiDailyRunLogsRoute
   ApiDvExpiryRoute: typeof ApiDvExpiryRoute
+  ApiDvRequestsRoute: typeof ApiDvRequestsRouteWithChildren
   ApiDvReviewsRoute: typeof ApiDvReviewsRouteWithChildren
   ApiEscalationsRoute: typeof ApiEscalationsRoute
   ApiGmailAttachmentRoute: typeof ApiGmailAttachmentRoute
@@ -951,6 +1024,7 @@ export interface RootRouteChildren {
   ApiWhatsappTemplateRoute: typeof ApiWhatsappTemplateRoute
   ApiWorklistRoute: typeof ApiWorklistRoute
   ClientsClientIdRoute: typeof ClientsClientIdRoute
+  UploadTokenRoute: typeof UploadTokenRoute
   VerificationReviewIdRoute: typeof VerificationReviewIdRoute
   VerificationExpiryRoute: typeof VerificationExpiryRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
@@ -964,6 +1038,7 @@ export interface RootRouteChildren {
   ApiOutboundMediaTokenRoute: typeof ApiOutboundMediaTokenRoute
   ApiReminderPreviewRoute: typeof ApiReminderPreviewRoute
   ApiReminderSendRoute: typeof ApiReminderSendRoute
+  ApiUploadTokenRoute: typeof ApiUploadTokenRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -1171,6 +1246,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDvExpiryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dv-requests': {
+      id: '/api/dv-requests'
+      path: '/api/dv-requests'
+      fullPath: '/api/dv-requests'
+      preLoaderRoute: typeof ApiDvRequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dv-reviews': {
       id: '/api/dv-reviews'
       path: '/api/dv-reviews'
@@ -1360,6 +1442,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientsClientIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/upload/$token': {
+      id: '/upload/$token'
+      path: '/upload/$token'
+      fullPath: '/upload/$token'
+      preLoaderRoute: typeof UploadTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/verification/': {
       id: '/verification/'
       path: '/verification'
@@ -1423,6 +1512,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAssistantListWarmRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dv-requests/draft': {
+      id: '/api/dv-requests/draft'
+      path: '/draft'
+      fullPath: '/api/dv-requests/draft'
+      preLoaderRoute: typeof ApiDvRequestsDraftRouteImport
+      parentRoute: typeof ApiDvRequestsRoute
+    }
     '/api/dv-reviews/$reviewId': {
       id: '/api/dv-reviews/$reviewId'
       path: '/$reviewId'
@@ -1451,12 +1547,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiReminderSendRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/upload/$token': {
+      id: '/api/upload/$token'
+      path: '/api/upload/$token'
+      fullPath: '/api/upload/$token'
+      preLoaderRoute: typeof ApiUploadTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dv-reviews/$reviewId/$action': {
       id: '/api/dv-reviews/$reviewId/$action'
       path: '/$action'
       fullPath: '/api/dv-reviews/$reviewId/$action'
       preLoaderRoute: typeof ApiDvReviewsReviewIdActionRouteImport
       parentRoute: typeof ApiDvReviewsReviewIdRoute
+    }
+    '/api/upload/$token/files': {
+      id: '/api/upload/$token/files'
+      path: '/files'
+      fullPath: '/api/upload/$token/files'
+      preLoaderRoute: typeof ApiUploadTokenFilesRouteImport
+      parentRoute: typeof ApiUploadTokenRoute
+    }
+    '/api/upload/$token/submit': {
+      id: '/api/upload/$token/submit'
+      path: '/submit'
+      fullPath: '/api/upload/$token/submit'
+      preLoaderRoute: typeof ApiUploadTokenSubmitRouteImport
+      parentRoute: typeof ApiUploadTokenRoute
     }
     '/api/dv-reviews/$reviewId/pages/$n': {
       id: '/api/dv-reviews/$reviewId/pages/$n'
@@ -1474,6 +1591,18 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface ApiDvRequestsRouteChildren {
+  ApiDvRequestsDraftRoute: typeof ApiDvRequestsDraftRoute
+}
+
+const ApiDvRequestsRouteChildren: ApiDvRequestsRouteChildren = {
+  ApiDvRequestsDraftRoute: ApiDvRequestsDraftRoute,
+}
+
+const ApiDvRequestsRouteWithChildren = ApiDvRequestsRoute._addFileChildren(
+  ApiDvRequestsRouteChildren,
+)
 
 interface ApiDvReviewsReviewIdRouteChildren {
   ApiDvReviewsReviewIdActionRoute: typeof ApiDvReviewsReviewIdActionRoute
@@ -1500,6 +1629,20 @@ const ApiDvReviewsRouteChildren: ApiDvReviewsRouteChildren = {
 
 const ApiDvReviewsRouteWithChildren = ApiDvReviewsRoute._addFileChildren(
   ApiDvReviewsRouteChildren,
+)
+
+interface ApiUploadTokenRouteChildren {
+  ApiUploadTokenFilesRoute: typeof ApiUploadTokenFilesRoute
+  ApiUploadTokenSubmitRoute: typeof ApiUploadTokenSubmitRoute
+}
+
+const ApiUploadTokenRouteChildren: ApiUploadTokenRouteChildren = {
+  ApiUploadTokenFilesRoute: ApiUploadTokenFilesRoute,
+  ApiUploadTokenSubmitRoute: ApiUploadTokenSubmitRoute,
+}
+
+const ApiUploadTokenRouteWithChildren = ApiUploadTokenRoute._addFileChildren(
+  ApiUploadTokenRouteChildren,
 )
 
 const rootRouteChildren: RootRouteChildren = {
@@ -1532,6 +1675,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiContactsToFixRoute: ApiContactsToFixRoute,
   ApiDailyRunLogsRoute: ApiDailyRunLogsRoute,
   ApiDvExpiryRoute: ApiDvExpiryRoute,
+  ApiDvRequestsRoute: ApiDvRequestsRouteWithChildren,
   ApiDvReviewsRoute: ApiDvReviewsRouteWithChildren,
   ApiEscalationsRoute: ApiEscalationsRoute,
   ApiGmailAttachmentRoute: ApiGmailAttachmentRoute,
@@ -1558,6 +1702,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWhatsappTemplateRoute: ApiWhatsappTemplateRoute,
   ApiWorklistRoute: ApiWorklistRoute,
   ClientsClientIdRoute: ClientsClientIdRoute,
+  UploadTokenRoute: UploadTokenRoute,
   VerificationReviewIdRoute: VerificationReviewIdRoute,
   VerificationExpiryRoute: VerificationExpiryRoute,
   ClientsIndexRoute: ClientsIndexRoute,
@@ -1571,6 +1716,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOutboundMediaTokenRoute: ApiOutboundMediaTokenRoute,
   ApiReminderPreviewRoute: ApiReminderPreviewRoute,
   ApiReminderSendRoute: ApiReminderSendRoute,
+  ApiUploadTokenRoute: ApiUploadTokenRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

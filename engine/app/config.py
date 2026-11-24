@@ -93,6 +93,7 @@ class Settings(BaseSettings):
     new_file_scan_weekday: int = 0           # within N days that have new files (0 = Monday)
     zoho_crm_web_url: str = ""               # e.g. https://crm.zoho.com/crm/org824163551 (links)
     dashboard_url: str = ""                  # e.g. https://accounting.rareglobalfood.com (links)
+    request_link_days: int = 14              # document request upload links stay valid N days
     # Emails (company Gmail, same mailbox as the dashboard): to the person who clicked Verify
     # Account, CC the Account owner; expiry reminders to the owner, CC the last requester.
     gmail_business_email: str = ""
