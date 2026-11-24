@@ -45,7 +45,9 @@ def needed_documents(assessment: dict | None, only: list[str] | None = None) -> 
         if only and t not in only:
             continue
         reason = {"MISSING": "missing", "EXPIRED": f"expired on {_fmt(r.get('valid_until'))}",
-                  "UNKNOWN": "expiry date could not be read"}.get(st)
+                  "UNKNOWN": "expiry date could not be read",
+                  "NOT_THIS_CUSTOMER": "the file on the Account belongs to another business"
+                  }.get(st)
         if reason is None and only:
             until = r.get("valid_until")
             reason = f"renewal (valid until {_fmt(until)})" if until else "requested"
@@ -255,10 +257,13 @@ def submit(db: Session, req: DocumentRequest, enqueue) -> dict:
         raise RequestError("Upload at least one document first")
     if req.status == "Submitted":
         return {"status": "Submitted"}
+    last, _ = latest(db, req.account_id)    # the result goes to who verified it, CC the owner
+    who = ({"id": last.requested_by_user_id, "email": last.requested_by_email}
+           if last and last.requested_by_email else None)
     job, created = create_or_get_active_job(db, JobCreate(
         account_id=req.account_id, customer_number=req.customer_number or None,
         reason="Documents uploaded through the request link", document_status="YES",
-        source="api"))
+        source="api", requested_by=who))
     if created:
         enqueue(str(job.id))
     req.status, req.job_id, req.submitted_at = "Submitted", job.id, utcnow()
@@ -266,3 +271,56 @@ def submit(db: Session, req: DocumentRequest, enqueue) -> dict:
                  job.id, {"request_id": str(req.id)})
     db.commit()
     return {"status": "Submitted"}
+
+
+
+def resend(db: Session, mailer, req: DocumentRequest, reminder: bool = False) -> None:
+    """Send the request email again (same text and link); 'Reminder:' in front when automatic."""
+    if mailer is None:
+        raise RequestError("Email is not configured on the engine (GMAIL_ settings)")
+    if req.status not in ("Requested", "Partly received"):
+        raise RequestError(f"This request is {req.status.lower()}")
+    subject = f"Reminder: {req.subject}" if reminder else req.subject
+    if not mailer.send(_emails(req.recipient_email), _emails(req.cc), subject, req.body,
+                       _html(req.body)):
+        raise RequestError("The email could not be sent (see the engine log)")
+    record_event(db, "DOCUMENTS_REQUEST_RESENT", f"{subject} to {req.recipient_email}", None,
+                 {"request_id": str(req.id), "reminder": reminder})
+    db.commit()
+
+
+def follow_up(db: Session, mailer, enqueue, now: datetime | None = None,
+              check_after_hours: int = 24, remind_after_days: int = 3) -> dict:
+    """Scheduler: (1) uploads but no 'Send for checking' for 24 h -> verify anyway;
+    (2) nothing uploaded after 3 days -> one reminder to the recipient; (3) expire old links."""
+    from app.db.models import Notification
+    now = now or datetime.now(UTC)
+    done = {"checked": 0, "reminded": 0, "expired": 0}
+    open_ = db.scalars(select(DocumentRequest).where(
+        DocumentRequest.status.in_(("Requested", "Partly received")))).all()
+    for req in open_:
+        expires = req.expires_at if req.expires_at.tzinfo else req.expires_at.replace(tzinfo=UTC)
+        if now > expires:
+            req.status = "Expired"
+            done["expired"] += 1
+            continue
+        if req.uploads:
+            last = max(datetime.fromisoformat(u["at"]) for u in req.uploads)
+            last = last if last.tzinfo else last.replace(tzinfo=UTC)
+            if now - last >= timedelta(hours=check_after_hours):
+                submit(db, req, enqueue)
+                done["checked"] += 1
+            continue
+        created = req.created_at if req.created_at.tzinfo else req.created_at.replace(tzinfo=UTC)
+        ref = f"request-reminder|{req.id}"
+        if mailer and now - created >= timedelta(days=remind_after_days) and not db.scalar(
+                select(Notification).where(Notification.kind == "request",
+                                           Notification.ref == ref)):
+            try:
+                resend(db, mailer, req, reminder=True)
+                db.add(Notification(kind="request", ref=ref, account_id=req.account_id))
+                done["reminded"] += 1
+            except RequestError:
+                pass
+    db.commit()
+    return done

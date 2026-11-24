@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { VerificationTabs } from "@/components/verification/VerificationTabs";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Panel, RefreshButton, StatCard } from "@/components/collections/Bits";
@@ -17,26 +18,6 @@ const CARDS = [
   { id: "Expiring in 30 days", hint: "First reminder sent", tone: "default" as const },
   { id: "Valid", hint: "More than 30 days left", tone: "default" as const },
 ];
-
-export function VerificationTabs({ active }: { active: "reviews" | "expiry" }) {
-  const base = "rounded-lg px-4 py-2 text-sm font-semibold";
-  return (
-    <div className="mb-5 inline-flex gap-1 rounded-xl border border-border bg-card p-1">
-      <Link
-        to="/verification"
-        className={`${base} ${active === "reviews" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-      >
-        Reviews
-      </Link>
-      <Link
-        to="/verification/expiry"
-        className={`${base} ${active === "expiry" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-      >
-        Document expiry
-      </Link>
-    </div>
-  );
-}
 
 function ExpiryPage() {
   const { data, isLoading, isFetching, error, refetch } = useQuery({

@@ -205,6 +205,8 @@ def format_requirements(requirements: list[dict]) -> str:
             "NO_EXPIRY": ("✓", "valid (" + (r.get("valid_until_source")
                                              or "no expiry date") + ")"),
             "NOT_YET_VALID": ("✗", "not yet valid"),
+            "NOT_THIS_CUSTOMER": ("✗", "NOT THIS CUSTOMER (" + (r.get("identity_note")
+                                                               or "another business") + ")"),
         }.get(status, ("?", "expiry date unknown"))
         file = f" - {short_name(r['file'])}" if r.get("file") else ""
         lines.append(f"{mark} {_short(r['document_type'])}: {text}{file}")
@@ -270,7 +272,8 @@ def review_status(assessment: dict) -> str:
                   and p.get("auto_apply_status") != "APPLIED"]
     if actionable:
         return "Pending Review"
-    if any(r["status"] in ("MISSING", "EXPIRED") for r in assessment["requirements"]):
+    if any(r["status"] in ("MISSING", "EXPIRED", "NOT_THIS_CUSTOMER")
+           for r in assessment["requirements"]):
         return "Waiting for Documents"
     return "Applied"
 

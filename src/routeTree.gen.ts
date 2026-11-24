@@ -70,6 +70,7 @@ import { Route as UploadTokenRouteImport } from './routes/upload.$token'
 import { Route as VerificationIndexRouteImport } from './routes/verification.index'
 import { Route as VerificationReviewIdRouteImport } from './routes/verification.$reviewId'
 import { Route as VerificationExpiryRouteImport } from './routes/verification.expiry'
+import { Route as VerificationRequestsRouteImport } from './routes/verification.requests'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant.chat'
 import { Route as ApiAssistantClientErrorRouteImport } from './routes/api/assistant.client-error'
 import { Route as ApiAssistantContactListRouteImport } from './routes/api/assistant.contact-list'
@@ -82,6 +83,7 @@ import { Route as ApiOutboundMediaTokenRouteImport } from './routes/api/outbound
 import { Route as ApiReminderPreviewRouteImport } from './routes/api/reminder.preview'
 import { Route as ApiReminderSendRouteImport } from './routes/api/reminder.send'
 import { Route as ApiUploadTokenRouteImport } from './routes/api/upload.$token'
+import { Route as ApiDvRequestsRequestIdResendRouteImport } from './routes/api/dv-requests.$requestId.resend'
 import { Route as ApiDvReviewsReviewIdActionRouteImport } from './routes/api/dv-reviews.$reviewId.$action'
 import { Route as ApiUploadTokenFilesRouteImport } from './routes/api/upload.$token.files'
 import { Route as ApiUploadTokenSubmitRouteImport } from './routes/api/upload.$token.submit'
@@ -394,6 +396,11 @@ const VerificationExpiryRoute = VerificationExpiryRouteImport.update({
   path: '/verification/expiry',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerificationRequestsRoute = VerificationRequestsRouteImport.update({
+  id: '/verification/requests',
+  path: '/verification/requests',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
   id: '/api/assistant/chat',
   path: '/api/assistant/chat',
@@ -454,6 +461,12 @@ const ApiUploadTokenRoute = ApiUploadTokenRouteImport.update({
   path: '/api/upload/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDvRequestsRequestIdResendRoute =
+  ApiDvRequestsRequestIdResendRouteImport.update({
+    id: '/$requestId/resend',
+    path: '/$requestId/resend',
+    getParentRoute: () => ApiDvRequestsRoute,
+  } as any)
 const ApiDvReviewsReviewIdActionRoute =
   ApiDvReviewsReviewIdActionRouteImport.update({
     id: '/$action',
@@ -543,6 +556,7 @@ export interface FileRoutesByFullPath {
   '/upload/$token': typeof UploadTokenRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
   '/verification/expiry': typeof VerificationExpiryRoute
+  '/verification/requests': typeof VerificationRequestsRoute
   '/clients/': typeof ClientsIndexRoute
   '/verification/': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
@@ -557,6 +571,7 @@ export interface FileRoutesByFullPath {
   '/api/reminder/preview': typeof ApiReminderPreviewRoute
   '/api/reminder/send': typeof ApiReminderSendRoute
   '/api/upload/$token': typeof ApiUploadTokenRouteWithChildren
+  '/api/dv-requests/$requestId/resend': typeof ApiDvRequestsRequestIdResendRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/upload/$token/files': typeof ApiUploadTokenFilesRoute
   '/api/upload/$token/submit': typeof ApiUploadTokenSubmitRoute
@@ -623,6 +638,7 @@ export interface FileRoutesByTo {
   '/upload/$token': typeof UploadTokenRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
   '/verification/expiry': typeof VerificationExpiryRoute
+  '/verification/requests': typeof VerificationRequestsRoute
   '/clients': typeof ClientsIndexRoute
   '/verification': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
@@ -637,6 +653,7 @@ export interface FileRoutesByTo {
   '/api/reminder/preview': typeof ApiReminderPreviewRoute
   '/api/reminder/send': typeof ApiReminderSendRoute
   '/api/upload/$token': typeof ApiUploadTokenRouteWithChildren
+  '/api/dv-requests/$requestId/resend': typeof ApiDvRequestsRequestIdResendRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/upload/$token/files': typeof ApiUploadTokenFilesRoute
   '/api/upload/$token/submit': typeof ApiUploadTokenSubmitRoute
@@ -704,6 +721,7 @@ export interface FileRoutesById {
   '/upload/$token': typeof UploadTokenRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
   '/verification/expiry': typeof VerificationExpiryRoute
+  '/verification/requests': typeof VerificationRequestsRoute
   '/clients/': typeof ClientsIndexRoute
   '/verification/': typeof VerificationIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
@@ -718,6 +736,7 @@ export interface FileRoutesById {
   '/api/reminder/preview': typeof ApiReminderPreviewRoute
   '/api/reminder/send': typeof ApiReminderSendRoute
   '/api/upload/$token': typeof ApiUploadTokenRouteWithChildren
+  '/api/dv-requests/$requestId/resend': typeof ApiDvRequestsRequestIdResendRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/upload/$token/files': typeof ApiUploadTokenFilesRoute
   '/api/upload/$token/submit': typeof ApiUploadTokenSubmitRoute
@@ -786,6 +805,7 @@ export interface FileRouteTypes {
     | '/upload/$token'
     | '/verification/$reviewId'
     | '/verification/expiry'
+    | '/verification/requests'
     | '/clients/'
     | '/verification/'
     | '/api/assistant/chat'
@@ -800,6 +820,7 @@ export interface FileRouteTypes {
     | '/api/reminder/preview'
     | '/api/reminder/send'
     | '/api/upload/$token'
+    | '/api/dv-requests/$requestId/resend'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/upload/$token/files'
     | '/api/upload/$token/submit'
@@ -866,6 +887,7 @@ export interface FileRouteTypes {
     | '/upload/$token'
     | '/verification/$reviewId'
     | '/verification/expiry'
+    | '/verification/requests'
     | '/clients'
     | '/verification'
     | '/api/assistant/chat'
@@ -880,6 +902,7 @@ export interface FileRouteTypes {
     | '/api/reminder/preview'
     | '/api/reminder/send'
     | '/api/upload/$token'
+    | '/api/dv-requests/$requestId/resend'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/upload/$token/files'
     | '/api/upload/$token/submit'
@@ -946,6 +969,7 @@ export interface FileRouteTypes {
     | '/upload/$token'
     | '/verification/$reviewId'
     | '/verification/expiry'
+    | '/verification/requests'
     | '/clients/'
     | '/verification/'
     | '/api/assistant/chat'
@@ -960,6 +984,7 @@ export interface FileRouteTypes {
     | '/api/reminder/preview'
     | '/api/reminder/send'
     | '/api/upload/$token'
+    | '/api/dv-requests/$requestId/resend'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/upload/$token/files'
     | '/api/upload/$token/submit'
@@ -1027,6 +1052,7 @@ export interface RootRouteChildren {
   UploadTokenRoute: typeof UploadTokenRoute
   VerificationReviewIdRoute: typeof VerificationReviewIdRoute
   VerificationExpiryRoute: typeof VerificationExpiryRoute
+  VerificationRequestsRoute: typeof VerificationRequestsRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
   VerificationIndexRoute: typeof VerificationIndexRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
@@ -1470,6 +1496,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerificationExpiryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/verification/requests': {
+      id: '/verification/requests'
+      path: '/verification/requests'
+      fullPath: '/verification/requests'
+      preLoaderRoute: typeof VerificationRequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/assistant/chat': {
       id: '/api/assistant/chat'
       path: '/api/assistant/chat'
@@ -1554,6 +1587,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiUploadTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dv-requests/$requestId/resend': {
+      id: '/api/dv-requests/$requestId/resend'
+      path: '/$requestId/resend'
+      fullPath: '/api/dv-requests/$requestId/resend'
+      preLoaderRoute: typeof ApiDvRequestsRequestIdResendRouteImport
+      parentRoute: typeof ApiDvRequestsRoute
+    }
     '/api/dv-reviews/$reviewId/$action': {
       id: '/api/dv-reviews/$reviewId/$action'
       path: '/$action'
@@ -1594,10 +1634,12 @@ declare module '@tanstack/react-router' {
 
 interface ApiDvRequestsRouteChildren {
   ApiDvRequestsDraftRoute: typeof ApiDvRequestsDraftRoute
+  ApiDvRequestsRequestIdResendRoute: typeof ApiDvRequestsRequestIdResendRoute
 }
 
 const ApiDvRequestsRouteChildren: ApiDvRequestsRouteChildren = {
   ApiDvRequestsDraftRoute: ApiDvRequestsDraftRoute,
+  ApiDvRequestsRequestIdResendRoute: ApiDvRequestsRequestIdResendRoute,
 }
 
 const ApiDvRequestsRouteWithChildren = ApiDvRequestsRoute._addFileChildren(
@@ -1705,6 +1747,7 @@ const rootRouteChildren: RootRouteChildren = {
   UploadTokenRoute: UploadTokenRoute,
   VerificationReviewIdRoute: VerificationReviewIdRoute,
   VerificationExpiryRoute: VerificationExpiryRoute,
+  VerificationRequestsRoute: VerificationRequestsRoute,
   ClientsIndexRoute: ClientsIndexRoute,
   VerificationIndexRoute: VerificationIndexRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,

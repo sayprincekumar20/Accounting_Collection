@@ -54,6 +54,8 @@ def document_facts(assessment: dict | None) -> dict:
                     for r in reqs if r["status"] == "EXPIRED"],
         "unclear": [f"{label(r['document_type'])} - expiry date could not be read"
                     for r in reqs if r["status"] == "UNKNOWN"],
+        "wrong": [f"{label(r['document_type'])} - {r.get('identity_note') or 'another business'}"
+                  for r in reqs if r["status"] == "NOT_THIS_CUSTOMER"],
         "checks_failed": [f"{c['label']}: {c['detail']}"
                           for c in a.get("activation_checks") or [] if c["status"] == "FAIL"],
         "checks_total": len(a.get("activation_checks") or []),
@@ -64,6 +66,8 @@ def document_facts(assessment: dict | None) -> dict:
 
 def _document_sections(facts: dict) -> list:
     out = []
+    if facts.get("wrong"):
+        out.append(("Documents of another business - not accepted", facts["wrong"], "alert"))
     if facts.get("expired"):
         out.append(("Expired documents - renewal needed", facts["expired"], "alert"))
     if facts.get("missing"):

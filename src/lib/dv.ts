@@ -235,3 +235,26 @@ export interface RequestDraft {
   documents: RequestDoc[];
   placeholder: string;
 }
+
+export interface DocumentRequestItem {
+  id: string;
+  account_id: string;
+  account_name: string;
+  customer_number: string | null;
+  status: "Requested" | "Partly received" | "Submitted" | "Expired";
+  recipient_kind: "owner" | "customer";
+  recipient_email: string;
+  requested_by: string | null;
+  documents: { type: string; label: string; reason: string; received: boolean }[];
+  uploads: { type: string; file: string; at: string }[];
+  created_at: string | null;
+  expires_at: string | null;
+  link: string | null;
+}
+
+export const REQUEST_TONE: Record<string, string> = {
+  Requested: "bg-warning/15 text-warning",
+  "Partly received": "bg-primary/10 text-primary",
+  Submitted: "bg-success/12 text-success",
+  Expired: "bg-muted text-muted-foreground",
+};

@@ -78,7 +78,27 @@ def list_requests(account_id: str | None = None, limit: int = Query(100, le=500)
     q = select(DocumentRequest).order_by(DocumentRequest.created_at.desc()).limit(limit)
     if account_id:
         q = q.where(DocumentRequest.account_id == account_id)
-    return {"items": [svc.view(r) for r in db.scalars(q)]}
+    base = (get_settings().dashboard_url or "").rstrip("/")
+    return {"items": [svc.view(r, f"{base}/upload/{r.token}"
+                               if r.status in ("Requested", "Partly received") else None)
+                      for r in db.scalars(q)]}
+
+
+@router.post("/{request_id}/resend")
+def resend(request_id: str, x_reviewer: str | None = Header(None),
+           db: Session = Depends(get_db)) -> dict:
+    import uuid
+
+    from app.notify.gmail import GmailClient
+    _reviewer(x_reviewer)
+    try:
+        req = db.get(DocumentRequest, uuid.UUID(request_id))
+    except ValueError:
+        req = None
+    if req is None:
+        raise HTTPException(404, "Unknown request")
+    _guard(lambda: svc.resend(db, GmailClient.from_settings(get_settings()), req))
+    return svc.view(req)
 
 
 @public.get("/{token}")
@@ -88,13 +108,22 @@ def page(token: str, db: Session = Depends(get_db)) -> dict:
 
 @public.post("/{token}/files")
 async def add_file(token: str, document_type: str = Form(...), file: UploadFile = File(...),
+                   enqueue: Callable[[str], None] = Depends(get_enqueuer),
                    db: Session = Depends(get_db)) -> dict:
     from app.zoho.factory import get_zoho_client
     s = get_settings()
     data = await file.read(s.max_file_bytes + 1)
-    return _guard(lambda: svc.upload(db, get_zoho_client(), svc.by_token(db, token),
-                                     document_type, file.filename or "document", data,
-                                     file.content_type or "", s.max_file_bytes))
+
+    def go():
+        req = svc.by_token(db, token)
+        result = svc.upload(db, get_zoho_client(), req, document_type,
+                            file.filename or "document", data, file.content_type or "",
+                            s.max_file_bytes)
+        if result["complete"]:        # every requested document is in: check right away
+            svc.submit(db, req, enqueue)
+            result["submitted"] = True
+        return result
+    return _guard(go)
 
 
 @public.post("/{token}/submit")
