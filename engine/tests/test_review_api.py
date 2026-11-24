@@ -142,3 +142,9 @@ def test_review_includes_every_value_read_from_the_documents(setup):
     assert bir["TIN"]["value"] == "123-456-789-00000"
     assert bir["TIN"]["confidence"] is not None and bir["TIN"]["check"]
     assert docs["BIR_2303"]["document"].startswith("BIR")
+
+
+def test_review_shows_the_channel(setup):
+    api, review, _ = setup
+    detail = api.get(f"/v1/reviews/{review.id}", headers=KEY).json()
+    assert "channel" in detail and "channel_rule" in detail

@@ -109,6 +109,10 @@ def status_decision(assessment: dict, current_status: str | None, threshold: flo
     if blocked:
         return "NO_CHANGE", "Unresolved document conflicts on: " + ", ".join(blocked)
     facts = assessment.get("facts", {})
+    wet = assessment.get("channel_rule") == "WET_MARKET"
+    if wet and not assessment.get("identity_confirmed"):
+        return "NO_CHANGE", ("Wet Market: no document could be confirmed as this customer's "
+                             "(name or TIN); a person must check.")
     # Identity to confirm: the owner for sole proprietors, the registered (corporate) name for
     # corporations/partnerships, which have no owner on their documents.
     corporate = assessment.get("business_form") in ("CORPORATION", "PARTNERSHIP")
@@ -116,7 +120,7 @@ def status_decision(assessment: dict, current_status: str | None, threshold: flo
     zoho_field = {"owner_name": "Owner_Name", "registered_name": "Invoice_Company_Name",
                   "tin": "Tax_Identification_Number_TIN"}
     matched_in_zoho = {p["zoho_field"] for p in assessment["proposals"] if p["action"] == "MATCH"}
-    for attribute in (identity, "tin"):
+    for attribute in (() if wet else (identity, "tin")):    # Wet Market: identity above
         best = max((f.get("confidence") or 0 for f in facts.get(attribute, [])), default=0)
         if not facts.get(attribute):
             return "NO_CHANGE", f"No {attribute} found on the documents; a person must check."
@@ -147,6 +151,9 @@ def status_decision(assessment: dict, current_status: str | None, threshold: flo
                  + (f" (still to collect: {', '.join(missing)})" if missing else ""))
     if is_active:
         return "ALREADY_ACTIVE", f"{docs_text}; account already Active."
+    if wet:
+        return "ACTIVATE", (f"Wet Market rule: {docs_text[0].lower()}{docs_text[1:]} of this "
+                            "customer; COD, contact, invoice name and billing address checked.")
     return "ACTIVATE", (f"{docs_text}; owner and TIN confirmed; COD, Accounting contact, TIN, "
                         "invoice name and billing address checked.")
 

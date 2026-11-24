@@ -245,11 +245,14 @@ def test_cod_spellings():
     assert not is_cod("Net 30") and not is_cod("CODE 7") and not is_cod(None)
 
 
-def test_accounting_contact_needs_name_mobile_and_real_email():
-    bad = {**ACCOUNTING, "email": "maria at juanmeat"}
+def test_accounting_contact_needs_a_name_and_a_mobile_or_an_email():
+    bad = {**ACCOUNTING, "email": "maria at juanmeat", "mobile": None, "phone": None}
     a = assess({**SNAPSHOT, "_contacts": [bad]}, [bir(), dti(), permit()], TODAY)
     c = checks_of(a)["accounting_contact"]
-    assert c["status"] == "FAIL" and "email in a valid format" in c["detail"]
+    assert c["status"] == "FAIL" and "or an email in a valid format" in c["detail"]
+    mobile_only = {**ACCOUNTING, "email": None}                  # rules-1.5: mobile is enough
+    c = checks_of(assess({**SNAPSHOT, "_contacts": [mobile_only]}, [bir()], TODAY))
+    assert c["accounting_contact"]["status"] == "PASS"
     entered = {**ACCOUNTING, "email": "fakeemail@gmail.com"}   # format ok: accepted as given
     c = checks_of(assess({**SNAPSHOT, "_contacts": [entered]}, [bir()], TODAY))
     assert c["accounting_contact"]["status"] == "PASS"
@@ -270,7 +273,7 @@ def test_primary_contact_counts_too():
 
 
 def test_mobile_must_be_a_philippine_mobile():
-    landline = {**ACCOUNTING, "mobile": "(02) 8123 4567"}
+    landline = {**ACCOUNTING, "mobile": "(02) 8123 4567", "email": None}
     c = checks_of(assess({**SNAPSHOT, "_contacts": [landline]}, [bir()], TODAY))
     assert c["accounting_contact"]["status"] == "FAIL"
     assert "Philippine format" in c["accounting_contact"]["detail"]
@@ -414,3 +417,65 @@ def test_unconfirmed_document_still_counts_but_is_flagged():
     req = next(r for r in a["requirements"] if r["document_type"] == "BIR_2303")
     assert req["status"] == "VALID" and req["identity"] == "UNCONFIRMED"
     assert any(x["code"] == "DOCUMENT_UNCONFIRMED" for x in build_alerts(a, TODAY))
+
+
+
+# ---- rules-1.5: contact with a mobile or an email; Channel; Wet Market ---------------------
+WET = {**SNAPSHOT, "Channel": "General Trade - Wet Market",
+       "Account_Name": "(CAVITE WET MARKET) RHAINHEART MEATSHOP",
+       "Invoice_Company_Name": "RHAINHEART MEAT SHOP", "Credit_Terms": "Cash On Delivery",
+       "Billing_Street": "810 MOLINA ST., CARIDAD", "Billing_City": "CAVITE CITY",
+       "Tax_Identification_Number_TIN": None,
+       "_contacts": [{"name": "WARREN OMATANG", "mobile": "639608451481", "email": None,
+                      "primary": True, "roles": {}}]}
+
+
+def _wet_permit():
+    return permit(owner="WARREN OMATANG", business="RHAINHEART MEAT SHOP")
+
+
+def test_primary_contact_with_only_a_mobile_passes():
+    c = checks_of(assess(WET, [_wet_permit()], TODAY))["accounting_contact"]
+    assert c["status"] == "PASS" and "WARREN OMATANG" in c["detail"]
+    assert "+63 960 845 1481" in c["detail"] and "(primary contact)" in c["detail"]
+
+
+def test_wet_market_one_document_and_filled_fields_activate():
+    from app.assessment.alerts import status_decision
+    a = assess(WET, [_wet_permit()], TODAY)                  # only a Mayor's permit, no TIN
+    assert a["channel"] == "General Trade - Wet Market" and a["channel_rule"] == "WET_MARKET"
+    checks = checks_of(a)
+    assert {k: c["status"] for k, c in checks.items()} == {k: "PASS" for k in checks}
+    assert checks["tin"]["detail"] == "no TIN (not required for Wet Market)"
+    assert "matching not required" in checks["invoice_name"]["detail"]
+    assert a["recommendation"] == "ACTIVE"
+    decision, why = status_decision(a, "Inactive", 0.95)
+    assert decision == "ACTIVATE" and why.startswith("Wet Market rule")
+
+
+def test_wet_market_barangay_clearance_alone_counts():
+    from tests.test_assessment import DocInput, f
+    brgy = DocInput("brgy", "brgy.jpg", "BARANGAY_CLEARANCE",
+                    {"business_name": f("RHAINHEART MEAT SHOP")}, "VALID", "2026-12-31")
+    a = assess(WET, [brgy], TODAY)
+    assert a["recommendation"] == "ACTIVE"
+
+
+def test_wet_market_still_needs_cod_contact_and_filled_fields():
+    a = assess({**WET, "Invoice_Company_Name": None}, [_wet_permit()], TODAY)
+    assert checks_of(a)["invoice_name"]["status"] in ("FAIL", "AFTER_UPDATE")
+    b = assess({**WET, "Credit_Terms": "Net 30"}, [_wet_permit()], TODAY)
+    assert b["recommendation"] == "MANUAL_REVIEW"
+
+
+def test_wet_market_tin_on_the_documents_must_still_match():
+    other = {**WET, "Tax_Identification_Number_TIN": "111-222-333-00000"}
+    a = assess(other, [bir(tin="999-888-777-00000", name="WARREN OMATANG",
+                           trade="RHAINHEART MEAT SHOP")], TODAY)
+    assert a["recommendation"] == "MANUAL_REVIEW"
+
+
+def test_other_channels_keep_the_full_checks():
+    a = assess({**SNAPSHOT, "Channel": "Key Accounts - Food Service"}, [bir()], TODAY)
+    assert a["channel"] == "Key Accounts - Food Service" and a["channel_rule"] is None
+    assert checks_of(a)["invoice_name"]["label"] == "Invoice Company Name matches the documents"

@@ -5,7 +5,7 @@ import re
 
 # rules-1.0 (2026-10-22): approved by the business = rules-draft-1 unchanged, plus the
 # "Corporation" value in Type of Business Organization.
-RULES_VERSION = "rules-1.4"
+RULES_VERSION = "rules-1.5"
 # rules-1.2 (2026-10-28): activation also needs Payment Terms = COD, an Accounting contact with
 # name, mobile and email, and TIN / Invoice Company Name / Billing Address matching the documents.
 # rules-1.1 (2026-10-22): no assumed expiry dates. A document without a printed expiry date is
@@ -125,3 +125,32 @@ def ph_mobile(value) -> str | None:
     if len(digits) != 10 or not digits.startswith("9"):
         return None
     return f"+63 {digits[:3]} {digits[3:6]} {digits[6:]}"
+
+
+# rules-1.5 (2026-11-24): the Account's Channel is recorded on every assessment (channel-based
+# document rules come next). Channel "General Trade - Wet Market": any one valid business
+# document of this customer is enough; TIN only checked when there is one; Invoice Company Name
+# and Billing Address only need to be filled. All channels: the contact needs a name and a PH
+# mobile OR an email.
+WET_MARKET_CHANNELS = {"GENERAL TRADE - WET MARKET"}
+WET_MARKET_DOCUMENTS = ("BIR_2303", "DTI_BN_CERT", "SEC_CERT", "MAYORS_PERMIT",
+                        "BARANGAY_CLEARANCE", "FOOD_SAFETY_PERMIT")
+
+
+def channel_of(snapshot: dict | None) -> str | None:
+    snap = snapshot or {}
+    value = snap.get("Channel")
+    if value in (None, "", "-None-"):
+        value = next((v for k, v in snap.items() if str(k).lower() == "channel"), None)
+    if isinstance(value, dict):
+        value = value.get("name") or value.get("display_value")
+    return str(value).strip() if value not in (None, "", "-None-") else None
+
+
+def _norm_channel(value: str | None) -> str:
+    text = re.sub(r"\s+", " ", (value or "").upper())
+    return re.sub(r"\s*[-\u2013\u2014]\s*", " - ", text).strip()
+
+
+def is_wet_market(channel: str | None) -> bool:
+    return _norm_channel(channel) in WET_MARKET_CHANNELS

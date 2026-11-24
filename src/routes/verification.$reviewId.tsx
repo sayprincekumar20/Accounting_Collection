@@ -98,7 +98,7 @@ function ReviewPage() {
   return (
     <AppShell
       title={review.account_name || review.account_id}
-      subtitle={`${review.number} · ${review.customer_number || "no customer number"} · requested by ${review.requested_by || "—"} on ${when(review.created_at)}${review.summary.request_reason ? ` · reason: ${review.summary.request_reason}` : ""}`}
+      subtitle={`${review.number} · ${review.customer_number || "no customer number"}${review.channel ? ` · ${review.channel}` : ""} · requested by ${review.requested_by || "—"} on ${when(review.created_at)}${review.summary.request_reason ? ` · reason: ${review.summary.request_reason}` : ""}`}
       actions={<RefreshButton isFetching={isFetching} onRefresh={() => refetch()} />}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -119,6 +119,11 @@ function ReviewPage() {
           >
             Recommendation: {recommendationLabel(review.recommendation)}
           </span>
+          {review.channel_rule === "WET_MARKET" ? (
+            <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+              Wet Market rule
+            </span>
+          ) : null}
           {review.reviewer ? (
             <span className="text-xs text-muted-foreground">Reviewer: {review.reviewer}</span>
           ) : null}

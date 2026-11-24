@@ -123,6 +123,7 @@ function ExpiryPage() {
                         <p className="text-xs text-muted-foreground">
                           {i.customer_number || "—"}
                           {i.account_owner ? ` · ${i.account_owner}` : ""}
+                          {i.channel ? ` · ${i.channel}` : ""}
                         </p>
                       </td>
                       <td className="px-4 py-3">
