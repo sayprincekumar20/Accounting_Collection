@@ -80,10 +80,26 @@ def build_alerts(assessment: dict, today: date) -> list[dict]:
                                "message": f"{d['file']}: {code}",
                                "action": "Check the document"})
     for d in assessment.get("not_extracted", []) + assessment.get("skipped_documents", []):
+        why = d.get("error") or d.get("detail") or d["status"]
+        why = str(why).replace("File was not readable: ", "")
         alerts.append({"severity": "WARNING", "code": "UNREADABLE_DOCUMENT",
                        "document_type": None,
-                       "message": f"Could not read {d['file']} ({d['status']})",
-                       "action": "Ask for a clearer photo or a supported file type"})
+                       "message": f"Could not read {d['file']}: {why}",
+                       "action": "Ask for a clearer photo (flat, in good light) or a PDF"})
+    for d in assessment.get("document_data", []):
+        for issue in d.get("issues") or []:
+            if issue.get("code") == "READ_BY_AI_ONLY":
+                alerts.append({"severity": "INFO", "code": "READ_BY_AI_ONLY",
+                               "document_type": d.get("type"),
+                               "message": f"{d['file']}: {issue['message']}",
+                               "action": "Compare the values with the photo"})
+            elif issue.get("code") == "NOT_A_BUSINESS_DOCUMENT":
+                alerts.append({"severity": "INFO", "code": "NOT_A_BUSINESS_DOCUMENT",
+                               "document_type": None,
+                               "message": f"{d['file']}: not recognised as a business "
+                                          "document; ignored",
+                               "action": "Nothing, unless it is a document: then ask for a "
+                                         "clearer photo"})
     review = [p["zoho_field"] for p in assessment["proposals"]
               if p["action"] in ("HOLD", "REVIEW_CONFLICT", "NO_PICKLIST_VALUE", "DIFFERS")
               or (p["action"] in ("FILL", "CORRECT") and p.get("needs_attention"))]

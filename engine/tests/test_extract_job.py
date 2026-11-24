@@ -76,3 +76,29 @@ def test_unreadable_file_is_skipped(db, settings):
     fake = FakeVision(VALUES, "DTI_BN_CERT")
     extract_job(db, job, storage, fake, today=date(2026, 10, 6))
     assert db.query(DocumentExtraction).one().status == "SKIPPED" and not fake.calls
+
+
+def test_photo_the_ocr_cannot_read_gets_an_ai_second_look(db, settings):
+    """A photo of a permit plate (angled, little text): OCR says UNREADABLE, the AI reads it;
+    the values go to a reviewer (READ_BY_AI_ONLY), they are never confirmed by OCR."""
+    import numpy as np
+    from PIL import Image
+    storage = LocalStorage(settings.storage_local_dir)
+    rng = np.random.default_rng(1)
+    photo = Image.fromarray(rng.integers(0, 255, (1600, 1200, 3), dtype=np.uint8))
+    job, _ = _job(db, storage, sd.to_bytes(photo))
+    fake = FakeVision(VALUES, "DTI_BN_CERT")
+    extract_job(db, job, storage, fake, today=date(2026, 10, 6))
+    row = db.query(DocumentExtraction).one()
+    assert fake.calls and row.status == "EXTRACTED"
+    assert any(i["code"] == "READ_BY_AI_ONLY" for i in row.issues)
+
+
+def test_skip_reason_is_kept():
+    from app.assessment.alerts import build_alerts
+    a = {"requirements": [], "proposals": [], "cross_document": [], "documents": [],
+         "not_extracted": [{"file": "x.jpg", "status": "SKIPPED",
+                            "error": "File was not readable: the file could not be opened"}]}
+    alert = next(x for x in build_alerts(a, date(2026, 10, 6))
+                 if x["code"] == "UNREADABLE_DOCUMENT")
+    assert alert["message"] == "Could not read x.jpg: the file could not be opened"

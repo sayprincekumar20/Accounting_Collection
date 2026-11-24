@@ -530,6 +530,9 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
         "facts": {a: [asdict(f) for f in fs] for a, fs in facts.items() if fs},
         # Everything read from every file, as JSON: the fields and every other labelled item.
         "document_data": [{"file": d.file_name, "type": d.document_type,
+                           "issues": [i for i in (d.issues or []) if isinstance(i, dict)
+                                      and i.get("code") in ("READ_BY_AI_ONLY",
+                                                            "NOT_A_BUSINESS_DOCUMENT")],
                            "validity": d.validity_status, "valid_until": d.valid_until,
                            "valid_until_source": valid_until_source(d),
                            "fields": {k: (v or {}).get("value") for k, v in d.fields.items()
