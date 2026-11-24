@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { SkeletonRows } from "@/components/collections/Skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { VerificationTabs } from "@/routes/verification.expiry";
+import { VerificationTabs } from "@/components/verification/VerificationTabs";
 import { Panel, RefreshButton, StatCard } from "@/components/collections/Bits";
 import {
   dvRequest,

@@ -52,6 +52,14 @@ def run_due(now: float, last: dict, settings, client, enqueue, notifier=None) ->
             with session_scope() as db:
                 log.info("Weekly new-file scan: %s",
                          scan_for_new_files(db, client, settings, enqueue, manila.date()))
+    if now - last.get("doc_requests", 0) >= 600:       # every 10 minutes
+        last["doc_requests"] = now
+        from app.notify.gmail import GmailClient
+        from app.review.requests import follow_up
+        with session_scope() as db:
+            done = follow_up(db, GmailClient.from_settings(settings), enqueue)
+        if any(done.values()):
+            log.info("Document requests: %s", done)
     if settings.engine_reviews and last.get("purge_day") != manila.date():
         last["purge_day"] = manila.date()
         with session_scope() as db:

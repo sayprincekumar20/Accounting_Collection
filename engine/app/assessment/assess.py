@@ -188,6 +188,84 @@ def cross_check(facts: dict[str, list[Fact]]) -> list[dict]:
     return results
 
 
+_IDENTITY = ("tin", "registered_name", "business_name", "owner_name")
+
+
+def document_identity(docs: list[DocInput], facts: dict[str, list[Fact]],
+                      snap: dict) -> dict[str, tuple[str, str | None]]:
+    """Does each document belong to THIS customer? {document_id: (verdict, reason)}
+    MATCH      its TIN equals the Account's, or a name on it matches the Account / Invoice Company
+               / Owner Name, or it agrees with a document that does
+    OTHER      its TIN differs from the Account's, or its TIN / owner differs from a matching
+               document: documents of another business
+    CONFLICT   documents disagree on TIN / owner and none matches the Account: cannot tell which
+    UNCONFIRMED nothing on it can be compared with the Account (no TIN in Zoho, names differ)"""
+    from app.assessment.matching import match_business, match_person, match_tin
+    zoho_tin = snap.get("Tax_Identification_Number_TIN")
+    account_names = [snap.get("Account_Name"), snap.get("Invoice_Company_Name")]
+    owner = snap.get("Owner_Name")
+    per_doc: dict[str, dict[str, list[str]]] = {d.document_id: {} for d in docs}
+    for attr in _IDENTITY:
+        for f in facts.get(attr, []):
+            per_doc.setdefault(f.document_id, {}).setdefault(attr, []).append(str(f.value))
+
+    def names_of(v):
+        return v.get("registered_name", []) + v.get("business_name", [])
+
+    verdict: dict[str, tuple[str, str | None]] = {}
+    for d in docs:
+        v = per_doc.get(d.document_id, {})
+        tins = v.get("tin", [])
+        if zoho_tin and any(match_tin(t, zoho_tin, ignore_branch=True) == DIFFERENT for t in tins):
+            verdict[d.document_id] = ("OTHER", f"TIN {tins[0]} differs from the Account's TIN "
+                                               f"{zoho_tin}")
+        elif zoho_tin and any(match_tin(t, zoho_tin, ignore_branch=True) == SAME for t in tins):
+            verdict[d.document_id] = ("MATCH", None)
+        elif any(match_business(n, a) in (SAME, LIKELY_SAME)
+                 for n in names_of(v) for a in account_names if a) or (
+                owner and any(match_person(o, owner) in (SAME, LIKELY_SAME)
+                              for o in v.get("owner_name", []))):
+            verdict[d.document_id] = ("MATCH", None)
+    # documents that agree with a matching document match too; those that conflict are OTHER
+    anchors = [per_doc.get(i, {}) for i, (x, _) in verdict.items() if x == "MATCH"]
+
+    def conflict(a: dict, b: dict) -> str | None:
+        for t in a.get("tin", []):
+            for u in b.get("tin", []):
+                if match_tin(t, u, ignore_branch=True) == DIFFERENT:
+                    return f"TIN {t} differs from {u}"
+        for o in a.get("owner_name", []):
+            for p in b.get("owner_name", []):
+                if match_person(o, p) == DIFFERENT:
+                    return f"owner {o} differs from {p}"
+        return None
+
+    def agrees(a: dict, b: dict) -> bool:
+        return any(match_tin(t, u, ignore_branch=True) == SAME
+                   for t in a.get("tin", []) for u in b.get("tin", [])) or any(
+            match_business(n, m) in (SAME, LIKELY_SAME) for n in names_of(a) for m in names_of(b))
+
+    for d in docs:
+        if d.document_id in verdict:
+            continue
+        v = per_doc.get(d.document_id, {})
+        clash = next((c for a in anchors if (c := conflict(v, a))), None)
+        if clash:
+            verdict[d.document_id] = ("OTHER", f"{clash} on a document of this customer")
+        elif anchors and any(agrees(v, a) for a in anchors):
+            verdict[d.document_id] = ("MATCH", None)
+        else:
+            others = [per_doc.get(o.document_id, {}) for o in docs
+                      if o.document_id != d.document_id]
+            clash = next((c for o in others if (c := conflict(v, o))), None)
+            verdict[d.document_id] = (
+                ("CONFLICT", f"documents of different businesses ({clash}); none matches "
+                             "the Account") if clash else
+                ("UNCONFIRMED", "no TIN in Zoho to compare, and the names on it do not match "
+                                "the Account") if v else ("UNCONFIRMED", None))
+    return verdict
+
+
 def _best(facts: list[Fact]) -> Fact | None:
     """First source in preference order whose value is reasonably confident."""
     good = [f for f in facts if (f.confidence or 0) >= policy.MIN_CONFIDENCE_FOR_PROPOSAL]
@@ -382,17 +460,23 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
     by_type: dict[str, list[DocInput]] = {}
     for d in docs:
         by_type.setdefault(d.document_type, []).append(d)
+    identity = document_identity(docs, facts, snap)
     requirements = []
     for doc_type in required:
         candidates = sorted(by_type.get(doc_type, []), key=lambda d: (
+            identity.get(d.document_id, ("UNCONFIRMED",))[0] in ("MATCH", "UNCONFIRMED"),
             d.validity_status in ("VALID", "NO_EXPIRY"), _named_for(d), d.valid_until or ""),
             reverse=True)
         best = candidates[0] if candidates else None
-        status = "MISSING" if best is None else (best.validity_status or "UNKNOWN")
+        who, why = identity.get(best.document_id, ("UNCONFIRMED", None)) if best else (None, None)
+        status = ("MISSING" if best is None else
+                  "NOT_THIS_CUSTOMER" if who in ("OTHER", "CONFLICT") else
+                  (best.validity_status or "UNKNOWN"))
         requirements.append({"document_type": doc_type, "status": status,
                              "file": best.file_name if best else None,
                              "valid_until": best.valid_until if best else None,
-                             "valid_until_source": valid_until_source(best) if best else None})
+                             "valid_until_source": valid_until_source(best) if best else None,
+                             "identity": who, "identity_note": why})
 
     # File attachments for empty fileupload fields
     for doc_type, zoho_field in policy.FILE_FIELDS.items():
@@ -571,7 +655,10 @@ def _recommend(checks, requirements, docs) -> tuple[str, list[str]]:
             values = " vs ".join(f"{v['value']} ({v['type']})" for v in c["values"])
             reasons_review.append(f"Documents disagree on {c['attribute']}: {values}")
     for r in requirements:
-        if r["status"] == "MISSING":
+        if r["status"] == "NOT_THIS_CUSTOMER":
+            reasons_review.append(f"Required document of another business: {r['document_type']} "
+                                  f"({r.get('identity_note') or 'does not match the Account'})")
+        elif r["status"] == "MISSING":
             (to_collect if any_one else reasons_review).append(
                 f"Required document missing: {r['document_type']}")
         elif r["status"] == "UNKNOWN" and r["document_type"] in EXPIRING_DOCUMENTS:

@@ -30,6 +30,20 @@ def build_alerts(assessment: dict, today: date) -> list[dict]:
     alerts = []
     for r in assessment["requirements"]:
         doc = label(r["document_type"])
+        if r["status"] == "NOT_THIS_CUSTOMER":
+            alerts.append({"severity": "CRITICAL", "code": "DOCUMENT_NOT_THIS_CUSTOMER",
+                           "document_type": r["document_type"],
+                           "message": f"{doc} does not belong to this customer: "
+                                      + (r.get("identity_note")
+                                         or "it does not match the Account"),
+                           "action": f"Remove the wrong file and collect this customer's {doc}"})
+        elif r.get("identity") == "UNCONFIRMED" and r.get("identity_note") and r["status"] in (
+                "VALID", "NO_EXPIRY"):
+            alerts.append({"severity": "WARNING", "code": "DOCUMENT_UNCONFIRMED",
+                           "document_type": r["document_type"],
+                           "message": f"{doc}: could not confirm it belongs to this customer "
+                                      f"({r['identity_note']})",
+                           "action": "Compare the name and TIN on it with the Account"})
         if r["status"] == "MISSING":
             alerts.append({"severity": "WARNING", "code": "MISSING_DOCUMENT",
                            "document_type": r["document_type"],

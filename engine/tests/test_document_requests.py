@@ -148,3 +148,52 @@ def test_send_needs_a_recipient_and_documents(env):
                                                      "documents": [{"type": "BIR_2303"}]})
     assert r.status_code == 409
     assert Review is not None
+
+
+def _send(api, documents=None):
+    d = api.get(f"/v1/requests/draft?account_id={ACC}", headers=KEY).json()
+    body = {**{k: d[k] for k in ("to", "subject", "body")}, "account_id": ACC,
+            "documents": documents or d["documents"]}
+    return api.post("/v1/requests", headers=KEY, json=body).json()
+
+
+def test_uploading_every_requested_document_starts_the_check(env, db):
+    api, _, _, _, queued = env
+    sent = _send(api)
+    token = sent["link"].rsplit("/", 1)[1]
+    for t in ("DTI_BN_CERT", "MAYORS_PERMIT"):
+        r = api.post(f"/public/requests/{token}/files", data={"document_type": t},
+                     files={"file": (f"{t}.pdf", b"%PDF", "application/pdf")}).json()
+    assert r["complete"] and r["submitted"] and len(queued) == 1
+    job = db.query(VerificationJob).order_by(VerificationJob.created_at.desc()).first()
+    assert job.requested_by_email == "rep@example.com"     # result to who verified it
+
+
+def test_follow_up_checks_after_24_hours_and_reminds_once_after_3_days(env, db):
+    from datetime import UTC, datetime, timedelta
+
+    from app.review.requests import follow_up
+    api, _, mailer, _, queued = env
+    partly = _send(api)
+    waiting = _send(api)
+    token = partly["link"].rsplit("/", 1)[1]
+    api.post(f"/public/requests/{token}/files", data={"document_type": "DTI_BN_CERT"},
+             files={"file": ("dti.pdf", b"%PDF", "application/pdf")})
+    later = datetime.now(UTC) + timedelta(days=4)
+    done = follow_up(db, mailer, queued.append, later)
+    assert done["checked"] == 1 and done["reminded"] == 1 and len(queued) == 1
+    reminder = mailer.sent[-1]
+    assert reminder["subject"].startswith("Reminder: ") and waiting["link"] in reminder["text"]
+    again = follow_up(db, mailer, queued.append, later + timedelta(hours=1))
+    assert again["reminded"] == 0                          # only one reminder
+    expired = follow_up(db, mailer, queued.append, later + timedelta(days=20))
+    assert expired["expired"] == 1
+
+
+def test_list_shows_links_of_open_requests_and_resend(env):
+    api, _, mailer, *_ = env
+    sent = _send(api)
+    items = api.get(f"/v1/requests?account_id={ACC}", headers=KEY).json()["items"]
+    assert items[0]["link"] == sent["link"] and items[0]["status"] == "Requested"
+    r = api.post(f"/v1/requests/{sent['id']}/resend", headers=KEY)
+    assert r.status_code == 200 and len(mailer.sent) == 2

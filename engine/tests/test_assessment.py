@@ -357,3 +357,60 @@ def test_only_an_expired_document_with_correct_values_is_activated_with_an_alert
     assert a["recommendation"] == "ACTIVE"
     alerts = build_alerts(a, TODAY)
     assert any(x["code"] == "EXPIRED_DOCUMENT" and x["severity"] == "CRITICAL" for x in alerts)
+
+
+# ---- whose documents are these? (DV-17: documents of other customers uploaded) ----------
+def _bir_of(doc_id, tin, name):
+    d = bir(tin=tin, name=name, trade=name, ttype="DOMESTIC CORPORATION",
+            address="LT 7 BLK 4 MARIAN ROAD PARANAQUE CITY")
+    d.document_id, d.file_name = doc_id, f"{doc_id}.jpg"
+    return d
+
+
+def test_documents_of_other_customers_are_not_counted():
+    from app.assessment.alerts import build_alerts
+    snap = {**SNAPSHOT, "Account_Name": "Zoho test Comp",
+            "Invoice_Company_Name": "SPENCER FOODS CORPORATION"}
+    docs = [_bir_of("bluemantle", "007-246-103-000", "BLUEMANTLE INDUSTRIES INC."),
+            _bir_of("smmega", "646-908-137-00000", "SMMEGA FOOD INC.")]
+    a = assess(snap, docs, TODAY)
+    req = next(r for r in a["requirements"] if r["document_type"] == "BIR_2303")
+    assert req["status"] == "NOT_THIS_CUSTOMER" and req["identity"] == "CONFLICT"
+    assert "none matches the Account" in req["identity_note"]
+    assert a["recommendation"] == "MANUAL_REVIEW"
+    assert any("Required document of another business: BIR_2303" in r for r in a["reasons"])
+    alerts = build_alerts(a, TODAY)
+    assert any(x["code"] == "DOCUMENT_NOT_THIS_CUSTOMER" and x["severity"] == "CRITICAL"
+               for x in alerts)
+
+
+def test_tin_different_from_the_account_is_another_business():
+    snap = {**SNAPSHOT, "Tax_Identification_Number_TIN": "123-456-789-00000"}
+    other = _bir_of("other", "999-888-777-00000", "JUAN MEAT SHOP")
+    req = next(r for r in assess(snap, [other, dti(), permit()], TODAY)["requirements"]
+               if r["document_type"] == "BIR_2303")
+    assert req["status"] == "NOT_THIS_CUSTOMER" and req["identity"] == "OTHER"
+    assert "differs from the Account's TIN" in req["identity_note"]
+
+
+def test_the_customers_own_document_wins_over_another_customers():
+    mine = bir()                                         # JUAN'S MEAT SHOP, matches the Account
+    other = _bir_of("other", "999-888-777-00000", "BLUEMANTLE INDUSTRIES INC.")
+    a = assess(SNAPSHOT, [other, mine, dti(), permit()], TODAY)
+    req = next(r for r in a["requirements"] if r["document_type"] == "BIR_2303")
+    assert req["status"] == "VALID" and req["file"] == "bir.jpg" and req["identity"] == "MATCH"
+
+
+def test_matching_documents_are_unchanged():
+    a = assess(SNAPSHOT, [bir(), dti(), permit()], TODAY)
+    assert {r["identity"] for r in a["requirements"]} == {"MATCH"}
+    assert a["recommendation"] == "ACTIVE"
+
+
+def test_unconfirmed_document_still_counts_but_is_flagged():
+    from app.assessment.alerts import build_alerts
+    snap = {**SNAPSHOT, "Account_Name": "BRAND X STORE", "Invoice_Company_Name": None}
+    a = assess(snap, [_bir_of("b", "123-456-789-00000", "SOMETHING ELSE TRADING")], TODAY)
+    req = next(r for r in a["requirements"] if r["document_type"] == "BIR_2303")
+    assert req["status"] == "VALID" and req["identity"] == "UNCONFIRMED"
+    assert any(x["code"] == "DOCUMENT_UNCONFIRMED" for x in build_alerts(a, TODAY))
