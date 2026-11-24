@@ -42,6 +42,23 @@ def extraction_version(provider: VisionProvider) -> str:
     return f"{EXTRACTION_PROMPT_VERSION}|{provider.name}:{provider.model}|{PIPELINE_VERSION}"
 
 
+def _has_picture(storage: Storage, key: str | None) -> bool:
+    """A real photo has contrast; an empty page (white, black, one colour) does not. Blank pages
+    are not worth an AI call."""
+    if not key:
+        return False
+    try:
+        import io
+
+        import numpy as np
+        from PIL import Image
+        img = Image.open(io.BytesIO(storage.get(key))).convert("L")
+        img.thumbnail((400, 400))
+        return float(np.asarray(img).std()) > 8.0
+    except Exception:  # noqa: BLE001 - when in doubt, no second look
+        return False
+
+
 def extract_file(db: Session, storage: Storage, sha256: str, provider: VisionProvider,
                  today: date) -> DocumentExtraction:
     version = extraction_version(provider)
@@ -51,8 +68,18 @@ def extract_file(db: Session, storage: Storage, sha256: str, provider: VisionPro
 
     reading = db.get(FileReading, (sha256, PIPELINE_VERSION))
     row = existing or DocumentExtraction(sha256=sha256, extraction_version=version)
-    if reading is None or reading.status != "READ":
-        row.status, row.error = "SKIPPED", "File was not readable"
+    pages = db.scalars(select(FilePage).where(
+        FilePage.sha256 == sha256, FilePage.pipeline_version == PIPELINE_VERSION)
+        .order_by(FilePage.page_number)).all() if reading is not None else []
+    # Second look: a photo the OCR could not read (angled, metal plate, low light) still has its
+    # page images; the vision model reads them. Its values cannot be confirmed by OCR, so they go
+    # to a reviewer and are never written automatically.
+    second_look = (reading is not None and reading.status == "UNREADABLE"
+                   and any(_has_picture(storage, p.image_key) for p in pages))
+    if reading is None or (reading.status != "READ" and not second_look):
+        reason = (reading.error if reading is not None and reading.error else
+                  "the file could not be opened or read")
+        row.status, row.error = "SKIPPED", f"File was not readable: {reason}"[:1000]
         db.merge(row)
         db.flush()
         return row
@@ -70,17 +97,15 @@ def extract_file(db: Session, storage: Storage, sha256: str, provider: VisionPro
         db.flush()
         return row
 
-    pages = db.scalars(select(FilePage).where(
-        FilePage.sha256 == sha256, FilePage.pipeline_version == PIPELINE_VERSION)
-        .order_by(FilePage.page_number)).all()
     inputs = [PageInput(storage.get(p.image_key), p.grounding_text, p.quality_label)
-              for p in pages if p.quality_label != "UNREADABLE"]
+              for p in pages if second_look or p.quality_label != "UNREADABLE"]
     try:
         result = extract_document(inputs, reading.document_type or "OTHER", provider, today)
     except TransientExtractionError:
         raise  # worker retries the job later
     except ExtractionError as exc:
-        row.status, row.error = "FAILED", str(exc)[:1000]
+        row.status, row.error = "FAILED", (("Photo too poor for OCR and the AI could not read "
+                                            "it either: ") if second_look else "") + str(exc)[:900]
         row.expected_type = reading.document_type
         db.merge(row)
         db.flush()
@@ -91,7 +116,18 @@ def extract_file(db: Session, storage: Storage, sha256: str, provider: VisionPro
     row.document_type = result.document_type
     row.fields = {k: asdict(v) for k, v in result.fields.items()}
     row.other_fields = result.other_fields
-    row.issues = result.issues
+    row.issues = list(result.issues or [])
+    if second_look:
+        reasons = sorted({r for p in pages for r in (p.quality_reasons or [])})
+        row.issues.append({"code": "READ_BY_AI_ONLY", "severity": "INFO",
+                           "message": "Photo too poor for OCR (" + (", ".join(reasons) or
+                                                                     "little readable text")
+                                      + "); read by the AI only: compare the values with "
+                                        "the photo"})
+    if result.document_type in (None, "OTHER") and not any(
+            (v.value if hasattr(v, "value") else None) for v in result.fields.values()):
+        row.issues.append({"code": "NOT_A_BUSINESS_DOCUMENT", "severity": "INFO",
+                           "message": "Not recognised as a business document"})
     row.validity_status, row.valid_until = result.validity_status, result.valid_until
     row.model, row.calls, row.seconds = result.model, result.calls, result.seconds
     row.input_tokens, row.output_tokens = result.input_tokens, result.output_tokens
