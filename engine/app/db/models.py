@@ -333,3 +333,32 @@ class Review(Base):
                                                  onupdate=utcnow)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     images_purged: Mapped[bool] = mapped_column(default=False)
+
+
+class DocumentRequest(Base):
+    """Documents requested from the Account Owner or the customer, with a secure upload link
+    (accounting.rareglobalfood.com/upload/<token>). Uploads go to the Account's attachments in
+    Zoho, then the account is verified again.
+    status: Requested | Partly received | Submitted | Expired"""
+
+    __tablename__ = "document_requests"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    account_id: Mapped[str] = mapped_column(String(32), index=True)
+    account_name: Mapped[str | None] = mapped_column(String(255))
+    customer_number: Mapped[str | None] = mapped_column(String(64))
+    review_id: Mapped[uuid.UUID | None] = mapped_column()
+    recipient_kind: Mapped[str] = mapped_column(String(20))          # owner | customer
+    recipient_email: Mapped[str] = mapped_column(String(255))
+    cc: Mapped[str | None] = mapped_column(String(500))
+    subject: Mapped[str] = mapped_column(String(255))
+    body: Mapped[str] = mapped_column(Text)
+    documents: Mapped[list] = mapped_column(JSON)                    # [{type, label, reason}]
+    uploads: Mapped[list] = mapped_column(JSON, default=list)        # [{type, file, at, zoho_id}]
+    status: Mapped[str] = mapped_column(String(30), default="Requested", index=True)
+    requested_by: Mapped[str | None] = mapped_column(String(255))
+    job_id: Mapped[uuid.UUID | None] = mapped_column()               # verification started
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

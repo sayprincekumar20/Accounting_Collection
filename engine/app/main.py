@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api import expiry, health, jobs, reviews
+from app.api import expiry, health, jobs, requests, reviews
 from app.config import get_settings
 from app.logging import setup_logging
 
@@ -20,6 +20,8 @@ def create_app() -> FastAPI:
     app.include_router(jobs.router)
     app.include_router(reviews.router)
     app.include_router(expiry.router)
+    app.include_router(requests.router)
+    app.include_router(requests.public)
     origins = [o.strip() for o in settings.dashboard_origins.split(",") if o.strip()]
     if origins:   # only when the dashboard calls the engine from the browser
         from fastapi.middleware.cors import CORSMiddleware

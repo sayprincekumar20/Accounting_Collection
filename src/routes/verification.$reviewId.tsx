@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, CheckCircle2, Clock3, ExternalLink, XCircle } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { RequestDialog } from "@/components/verification/RequestDialog";
 import { Panel, RefreshButton } from "@/components/collections/Bits";
 import {
   Dialog,
@@ -320,9 +321,25 @@ function ReviewPage() {
           await refresh();
         }}
       />
+      {dialog === "request-documents" ? (
+        <RequestDialog
+          accountId={review.account_id}
+          reviewId={review.id}
+          onClose={async () => {
+            setDialog(null);
+            await refresh();
+          }}
+          onSent={() =>
+            setMessage({
+              tone: "ok",
+              text: "Documents requested by email; the review now waits for the documents.",
+            })
+          }
+        />
+      ) : null}
       <CloseDialog
         reviewId={review.id}
-        kind={dialog === "reject" || dialog === "request-documents" ? dialog : null}
+        kind={dialog === "reject" ? dialog : null}
         onClose={() => setDialog(null)}
         onDone={async (text) => {
           setDialog(null);

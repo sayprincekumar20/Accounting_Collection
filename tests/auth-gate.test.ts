@@ -111,3 +111,19 @@ describe("login configured", () => {
     expect(r?.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=/i);
   });
 });
+
+describe("document request upload page (no login)", () => {
+  const code = "aB3_dE6-gH9iJ2kL5mN8oP1qR4sT7uV0wX3yZ6";
+  it("opens only the page and its three engine calls with a well-formed code", async () => {
+    const { isUploadPath } = await import("../src/lib/auth-gate");
+    expect(isUploadPath(`/upload/${code}`)).toBe(true);
+    expect(isUploadPath(`/api/upload/${code}`)).toBe(true);
+    expect(isUploadPath(`/api/upload/${code}/files`)).toBe(true);
+    expect(isUploadPath(`/api/upload/${code}/submit`)).toBe(true);
+    expect(isUploadPath("/upload/short")).toBe(false);
+    expect(isUploadPath(`/api/upload/${code}/other`)).toBe(false);
+    expect(isUploadPath(`/api/dv-requests`)).toBe(false);
+    expect(isUploadPath(`/verification`)).toBe(false);
+    expect(isUploadPath(`/upload/${code}/../../verification`)).toBe(false);
+  });
+});

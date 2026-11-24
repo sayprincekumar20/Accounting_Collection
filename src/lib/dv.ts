@@ -212,3 +212,26 @@ export function day(value: string | null) {
     year: "numeric",
   });
 }
+
+export interface RequestDoc {
+  type: string;
+  label: string;
+  reason: string;
+}
+
+export interface RequestDraft {
+  account_id: string;
+  account_name: string;
+  customer_number: string | null;
+  recipient_kind: "owner" | "customer";
+  recipients: {
+    owner: { name: string | null; email: string | null };
+    customer: { name: string | null; email: string | null } | null;
+  };
+  to: string;
+  cc: string;
+  subject: string;
+  body: string;
+  documents: RequestDoc[];
+  placeholder: string;
+}

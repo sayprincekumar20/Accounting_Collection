@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { Panel, RefreshButton, StatCard } from "@/components/collections/Bits";
+import { RequestDialog } from "@/components/verification/RequestDialog";
 import { day, dvRequest, EXPIRY_TONE, when, type ExpiryItem } from "@/lib/dv";
 
 export const Route = createFileRoute("/verification/expiry")({
@@ -49,6 +50,7 @@ function ExpiryPage() {
   const items = data?.items ?? [];
   const [filter, setFilter] = useState<string>("ALL");
   const [q, setQ] = useState("");
+  const [renew, setRenew] = useState<ExpiryItem | null>(null);
   const visible = items.filter(
     (i) =>
       (filter === "ALL" || i.state === filter) &&
@@ -127,6 +129,9 @@ function ExpiryPage() {
                     <th className="px-4 py-2.5 font-semibold">Status</th>
                     <th className="px-4 py-2.5 font-semibold">Reminders</th>
                     <th className="px-4 py-2.5 font-semibold">Verified</th>
+                    <th className="px-4 py-2.5 font-semibold">
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -182,6 +187,17 @@ function ExpiryPage() {
                           </Link>
                         ) : null}
                       </td>
+                      <td className="px-4 py-3">
+                        {i.state !== "No expiry date" ? (
+                          <button
+                            type="button"
+                            onClick={() => setRenew(i)}
+                            className="whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold hover:bg-muted"
+                          >
+                            Request renewal
+                          </button>
+                        ) : null}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -189,6 +205,14 @@ function ExpiryPage() {
             </div>
           ) : null}
         </Panel>
+        {renew ? (
+          <RequestDialog
+            accountId={renew.account_id}
+            documents={[renew.document_type]}
+            title={`Request renewal: ${renew.document}`}
+            onClose={() => setRenew(null)}
+          />
+        ) : null}
         <p className="mt-3 text-xs text-muted-foreground">
           Renewed a document? Attach it to the Account in Zoho CRM and click Verify Account; the new
           date replaces the old one. New files are also picked up by the weekly check.
