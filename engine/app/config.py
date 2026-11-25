@@ -94,6 +94,9 @@ class Settings(BaseSettings):
     zoho_crm_web_url: str = ""               # e.g. https://crm.zoho.com/crm/org824163551 (links)
     dashboard_url: str = ""                  # e.g. https://accounting.rareglobalfood.com (links)
     request_link_days: int = 14              # document request upload links stay valid N days
+    # Zoho workflow "Customer Status changed to Active": skip when the account was verified in
+    # the last N hours (the engine's own activation always follows a verification)
+    workflow_skip_hours: int = 24
     # Emails (company Gmail, same mailbox as the dashboard): to the person who clicked Verify
     # Account, CC the Account owner; expiry reminders to the owner, CC the last requester.
     gmail_business_email: str = ""

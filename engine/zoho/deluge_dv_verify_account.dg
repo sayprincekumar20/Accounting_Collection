@@ -130,7 +130,12 @@ string standalone.dv_verify_account(String account_id, String reason, String use
 	payload.put("attachment_count",count);
 	payload.put("requested_by",requested_by);
 	payload.put("requested_at",now_text);
-	payload.put("source","crm_button");
+	source = "crm_button";
+	if(ifnull(reason,"") == "Customer Status changed to Active")
+	{
+		source = "workflow";
+	}
+	payload.put("source",source);
 	payload.put("account",rec);
 	payload.put("attachments",attachments);
 	payload.put("notes",notes);

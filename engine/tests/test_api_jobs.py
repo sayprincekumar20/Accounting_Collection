@@ -73,3 +73,32 @@ def test_get_job(api):
     assert resp.json()["documents"] == []
     assert resp.json()["reported_attachment_count"] == 3
     assert resp.json()["requested_by_email"] == "reviewer@example.com"
+
+
+def test_workflow_trigger_skips_an_account_verified_in_the_last_24_hours(api, db):
+    """The engine's own activation (or a repeated Zoho trigger) must not start a second check."""
+    from app.db.models import JobStatus, VerificationJob
+    first = api.post("/v1/jobs", json=payload(), headers=HEADERS)          # Verify Account
+    job = db.get(VerificationJob, __import__("uuid").UUID(first.json()["job_id"]))
+    job.status = JobStatus.ASSESSED                                          # done, activated
+    db.commit()
+    again = api.post("/v1/jobs", json=payload(source="workflow",
+                                              reason="Customer Status changed to Active"),
+                     headers=HEADERS)
+    assert again.status_code == 200 and again.json()["created"] is False
+    assert "Verified recently" in again.json()["message"] and len(api.queued) == 1
+
+
+def test_workflow_trigger_checks_an_account_not_verified_recently(api):
+    resp = api.post("/v1/jobs", json=payload(source="workflow"), headers=HEADERS)
+    assert resp.status_code == 202 and resp.json()["created"] is True and len(api.queued) == 1
+
+
+def test_button_is_never_skipped(api, db):
+    from app.db.models import JobStatus, VerificationJob
+    first = api.post("/v1/jobs", json=payload(), headers=HEADERS)
+    job = db.get(VerificationJob, __import__("uuid").UUID(first.json()["job_id"]))
+    job.status = JobStatus.ASSESSED
+    db.commit()
+    again = api.post("/v1/jobs", json=payload(), headers=HEADERS)            # a person clicks
+    assert again.status_code == 202 and len(api.queued) == 2
