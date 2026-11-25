@@ -1,3 +1,18 @@
+## Verify automatically when an account becomes Active (Nov 2026)
+
+1. Update the standalone function dv_verify_account with deluge_dv_verify_account.dg (one change:
+   the reason "Customer Status changed to Active" is sent as source "workflow").
+2. Setup > Automation > Workflow Rules > Create Rule: Module Accounts, name
+   "Verify when Active".
+   - When: On a record action > Create or Edit, "when a specific field is modified" > Customer
+     Status (leave "repeat whenever edited" off); Condition: Customer Status is Active.
+   - Instant action: Function > New Function > Write your own: name dv_verify_on_activation,
+     argument accId = Accounts - Account Id; paste deluge_dv_verify_on_activation.dg; Save.
+   - Save the rule.
+3. The engine skips a workflow request when the account was verified in the last 24 hours
+   (WORKFLOW_SKIP_HOURS): its own activation never starts a second check. COD and
+   documents are checked by dv_verify_account as for the button.
+
 # "Verify Account" button - PULL MODE (recommended: no public address needed)
 
 The button only marks the Account; the engine (local Docker or a server) asks Zoho every

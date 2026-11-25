@@ -1,0 +1,5 @@
+void automation.dv_verify_on_activation(String accId)
+{
+answer = standalone.dv_verify_account(accId,"Customer Status changed to Active","","",Map());
+info answer;
+}

@@ -139,3 +139,19 @@ def test_batch_jobs_are_quiet(db, settings):
         enabled = True
         mailer = None
     assert notify_engine_review(db, db.get(Review, review.id), N()) is None   # no emails
+
+
+def test_next_batch_takes_the_next_accounts_never_the_same(db, settings):
+    zoho, queued = Zoho(5), []
+    first = svc.start(db, zoho, WET, 2, "Prince")
+    svc.advance(db, queued.append)
+    jobs = db.query(VerificationJob).order_by(VerificationJob.created_at).all()
+    _finish(db, settings, jobs[0], [bir()])
+    jobs[1].status = JobStatus.NO_DOCUMENTS                 # nothing attached: still checked
+    db.commit()
+    assert svc.report(db, first)["status"] == "Completed"
+    assert svc.overview(db, zoho, WET)["left"] == 3
+    second = svc.start(db, zoho, WET, 2, "Prince")
+    firsts = {i.account_id for i in db.query(BatchItem).filter_by(batch_id=first.id)}
+    seconds = {i.account_id for i in db.query(BatchItem).filter_by(batch_id=second.id)}
+    assert firsts.isdisjoint(seconds) and len(seconds) == 2

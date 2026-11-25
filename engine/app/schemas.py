@@ -42,7 +42,7 @@ class JobCreate(BaseModel):
                                          description="Number of files the button counted")
     requested_by: RequestedBy | None = None
     requested_at: datetime | None = None
-    source: Literal["crm_button", "manual", "schedule", "api", "batch"] = "crm_button"
+    source: Literal["crm_button", "manual", "schedule", "api", "batch", "workflow"] = "crm_button"
     # Optional data the button already read in Zoho (saves the engine 3 API calls):
     account: dict[str, Any] | None = Field(
         default=None, description="Account record as returned by zoho.crm.getRecordById")
