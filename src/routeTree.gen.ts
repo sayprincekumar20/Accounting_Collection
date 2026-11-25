@@ -37,6 +37,7 @@ import { Route as ApiContactApprovalsRouteImport } from './routes/api/contact-ap
 import { Route as ApiContactNowRouteImport } from './routes/api/contact-now'
 import { Route as ApiContactsToFixRouteImport } from './routes/api/contacts-to-fix'
 import { Route as ApiDailyRunLogsRouteImport } from './routes/api/daily-run-logs'
+import { Route as ApiDvBatchesRouteImport } from './routes/api/dv-batches'
 import { Route as ApiDvExpiryRouteImport } from './routes/api/dv-expiry'
 import { Route as ApiDvRequestsRouteImport } from './routes/api/dv-requests'
 import { Route as ApiDvReviewsRouteImport } from './routes/api/dv-reviews'
@@ -69,6 +70,7 @@ import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
 import { Route as UploadTokenRouteImport } from './routes/upload.$token'
 import { Route as VerificationIndexRouteImport } from './routes/verification.index'
 import { Route as VerificationReviewIdRouteImport } from './routes/verification.$reviewId'
+import { Route as VerificationBatchesRouteImport } from './routes/verification.batches'
 import { Route as VerificationExpiryRouteImport } from './routes/verification.expiry'
 import { Route as VerificationRequestsRouteImport } from './routes/verification.requests'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant.chat'
@@ -77,12 +79,14 @@ import { Route as ApiAssistantContactListRouteImport } from './routes/api/assist
 import { Route as ApiAssistantHomeRouteImport } from './routes/api/assistant.home'
 import { Route as ApiAssistantListMatchRouteImport } from './routes/api/assistant.list-match'
 import { Route as ApiAssistantListWarmRouteImport } from './routes/api/assistant.list-warm'
+import { Route as ApiDvBatchesSplatRouteImport } from './routes/api/dv-batches.$'
 import { Route as ApiDvRequestsDraftRouteImport } from './routes/api/dv-requests.draft'
 import { Route as ApiDvReviewsReviewIdRouteImport } from './routes/api/dv-reviews.$reviewId'
 import { Route as ApiOutboundMediaTokenRouteImport } from './routes/api/outbound-media.$token'
 import { Route as ApiReminderPreviewRouteImport } from './routes/api/reminder.preview'
 import { Route as ApiReminderSendRouteImport } from './routes/api/reminder.send'
 import { Route as ApiUploadTokenRouteImport } from './routes/api/upload.$token'
+import { Route as VerificationBatchesBatchIdRouteImport } from './routes/verification.batches.$batchId'
 import { Route as ApiDvRequestsRequestIdResendRouteImport } from './routes/api/dv-requests.$requestId.resend'
 import { Route as ApiDvReviewsReviewIdActionRouteImport } from './routes/api/dv-reviews.$reviewId.$action'
 import { Route as ApiUploadTokenFilesRouteImport } from './routes/api/upload.$token.files'
@@ -228,6 +232,11 @@ const ApiContactsToFixRoute = ApiContactsToFixRouteImport.update({
 const ApiDailyRunLogsRoute = ApiDailyRunLogsRouteImport.update({
   id: '/api/daily-run-logs',
   path: '/api/daily-run-logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDvBatchesRoute = ApiDvBatchesRouteImport.update({
+  id: '/api/dv-batches',
+  path: '/api/dv-batches',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDvExpiryRoute = ApiDvExpiryRouteImport.update({
@@ -391,6 +400,11 @@ const VerificationReviewIdRoute = VerificationReviewIdRouteImport.update({
   path: '/verification/$reviewId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerificationBatchesRoute = VerificationBatchesRouteImport.update({
+  id: '/verification/batches',
+  path: '/verification/batches',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VerificationExpiryRoute = VerificationExpiryRouteImport.update({
   id: '/verification/expiry',
   path: '/verification/expiry',
@@ -431,6 +445,11 @@ const ApiAssistantListWarmRoute = ApiAssistantListWarmRouteImport.update({
   path: '/api/assistant/list-warm',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDvBatchesSplatRoute = ApiDvBatchesSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => ApiDvBatchesRoute,
+} as any)
 const ApiDvRequestsDraftRoute = ApiDvRequestsDraftRouteImport.update({
   id: '/draft',
   path: '/draft',
@@ -461,6 +480,12 @@ const ApiUploadTokenRoute = ApiUploadTokenRouteImport.update({
   path: '/api/upload/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerificationBatchesBatchIdRoute =
+  VerificationBatchesBatchIdRouteImport.update({
+    id: '/$batchId',
+    path: '/$batchId',
+    getParentRoute: () => VerificationBatchesRoute,
+  } as any)
 const ApiDvRequestsRequestIdResendRoute =
   ApiDvRequestsRequestIdResendRouteImport.update({
     id: '/$requestId/resend',
@@ -525,6 +550,7 @@ export interface FileRoutesByFullPath {
   '/api/contact-now': typeof ApiContactNowRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
+  '/api/dv-batches': typeof ApiDvBatchesRouteWithChildren
   '/api/dv-expiry': typeof ApiDvExpiryRoute
   '/api/dv-requests': typeof ApiDvRequestsRouteWithChildren
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
@@ -555,6 +581,7 @@ export interface FileRoutesByFullPath {
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/upload/$token': typeof UploadTokenRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
+  '/verification/batches': typeof VerificationBatchesRouteWithChildren
   '/verification/expiry': typeof VerificationExpiryRoute
   '/verification/requests': typeof VerificationRequestsRoute
   '/clients/': typeof ClientsIndexRoute
@@ -565,12 +592,14 @@ export interface FileRoutesByFullPath {
   '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/assistant/list-match': typeof ApiAssistantListMatchRoute
   '/api/assistant/list-warm': typeof ApiAssistantListWarmRoute
+  '/api/dv-batches/$': typeof ApiDvBatchesSplatRoute
   '/api/dv-requests/draft': typeof ApiDvRequestsDraftRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/reminder/preview': typeof ApiReminderPreviewRoute
   '/api/reminder/send': typeof ApiReminderSendRoute
   '/api/upload/$token': typeof ApiUploadTokenRouteWithChildren
+  '/verification/batches/$batchId': typeof VerificationBatchesBatchIdRoute
   '/api/dv-requests/$requestId/resend': typeof ApiDvRequestsRequestIdResendRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/upload/$token/files': typeof ApiUploadTokenFilesRoute
@@ -607,6 +636,7 @@ export interface FileRoutesByTo {
   '/api/contact-now': typeof ApiContactNowRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
+  '/api/dv-batches': typeof ApiDvBatchesRouteWithChildren
   '/api/dv-expiry': typeof ApiDvExpiryRoute
   '/api/dv-requests': typeof ApiDvRequestsRouteWithChildren
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
@@ -637,6 +667,7 @@ export interface FileRoutesByTo {
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/upload/$token': typeof UploadTokenRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
+  '/verification/batches': typeof VerificationBatchesRouteWithChildren
   '/verification/expiry': typeof VerificationExpiryRoute
   '/verification/requests': typeof VerificationRequestsRoute
   '/clients': typeof ClientsIndexRoute
@@ -647,12 +678,14 @@ export interface FileRoutesByTo {
   '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/assistant/list-match': typeof ApiAssistantListMatchRoute
   '/api/assistant/list-warm': typeof ApiAssistantListWarmRoute
+  '/api/dv-batches/$': typeof ApiDvBatchesSplatRoute
   '/api/dv-requests/draft': typeof ApiDvRequestsDraftRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/reminder/preview': typeof ApiReminderPreviewRoute
   '/api/reminder/send': typeof ApiReminderSendRoute
   '/api/upload/$token': typeof ApiUploadTokenRouteWithChildren
+  '/verification/batches/$batchId': typeof VerificationBatchesBatchIdRoute
   '/api/dv-requests/$requestId/resend': typeof ApiDvRequestsRequestIdResendRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/upload/$token/files': typeof ApiUploadTokenFilesRoute
@@ -690,6 +723,7 @@ export interface FileRoutesById {
   '/api/contact-now': typeof ApiContactNowRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
+  '/api/dv-batches': typeof ApiDvBatchesRouteWithChildren
   '/api/dv-expiry': typeof ApiDvExpiryRoute
   '/api/dv-requests': typeof ApiDvRequestsRouteWithChildren
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
@@ -720,6 +754,7 @@ export interface FileRoutesById {
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/upload/$token': typeof UploadTokenRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
+  '/verification/batches': typeof VerificationBatchesRouteWithChildren
   '/verification/expiry': typeof VerificationExpiryRoute
   '/verification/requests': typeof VerificationRequestsRoute
   '/clients/': typeof ClientsIndexRoute
@@ -730,12 +765,14 @@ export interface FileRoutesById {
   '/api/assistant/home': typeof ApiAssistantHomeRoute
   '/api/assistant/list-match': typeof ApiAssistantListMatchRoute
   '/api/assistant/list-warm': typeof ApiAssistantListWarmRoute
+  '/api/dv-batches/$': typeof ApiDvBatchesSplatRoute
   '/api/dv-requests/draft': typeof ApiDvRequestsDraftRoute
   '/api/dv-reviews/$reviewId': typeof ApiDvReviewsReviewIdRouteWithChildren
   '/api/outbound-media/$token': typeof ApiOutboundMediaTokenRoute
   '/api/reminder/preview': typeof ApiReminderPreviewRoute
   '/api/reminder/send': typeof ApiReminderSendRoute
   '/api/upload/$token': typeof ApiUploadTokenRouteWithChildren
+  '/verification/batches/$batchId': typeof VerificationBatchesBatchIdRoute
   '/api/dv-requests/$requestId/resend': typeof ApiDvRequestsRequestIdResendRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/upload/$token/files': typeof ApiUploadTokenFilesRoute
@@ -774,6 +811,7 @@ export interface FileRouteTypes {
     | '/api/contact-now'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
+    | '/api/dv-batches'
     | '/api/dv-expiry'
     | '/api/dv-requests'
     | '/api/dv-reviews'
@@ -804,6 +842,7 @@ export interface FileRouteTypes {
     | '/clients/$clientId'
     | '/upload/$token'
     | '/verification/$reviewId'
+    | '/verification/batches'
     | '/verification/expiry'
     | '/verification/requests'
     | '/clients/'
@@ -814,12 +853,14 @@ export interface FileRouteTypes {
     | '/api/assistant/home'
     | '/api/assistant/list-match'
     | '/api/assistant/list-warm'
+    | '/api/dv-batches/$'
     | '/api/dv-requests/draft'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
     | '/api/reminder/preview'
     | '/api/reminder/send'
     | '/api/upload/$token'
+    | '/verification/batches/$batchId'
     | '/api/dv-requests/$requestId/resend'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/upload/$token/files'
@@ -856,6 +897,7 @@ export interface FileRouteTypes {
     | '/api/contact-now'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
+    | '/api/dv-batches'
     | '/api/dv-expiry'
     | '/api/dv-requests'
     | '/api/dv-reviews'
@@ -886,6 +928,7 @@ export interface FileRouteTypes {
     | '/clients/$clientId'
     | '/upload/$token'
     | '/verification/$reviewId'
+    | '/verification/batches'
     | '/verification/expiry'
     | '/verification/requests'
     | '/clients'
@@ -896,12 +939,14 @@ export interface FileRouteTypes {
     | '/api/assistant/home'
     | '/api/assistant/list-match'
     | '/api/assistant/list-warm'
+    | '/api/dv-batches/$'
     | '/api/dv-requests/draft'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
     | '/api/reminder/preview'
     | '/api/reminder/send'
     | '/api/upload/$token'
+    | '/verification/batches/$batchId'
     | '/api/dv-requests/$requestId/resend'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/upload/$token/files'
@@ -938,6 +983,7 @@ export interface FileRouteTypes {
     | '/api/contact-now'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
+    | '/api/dv-batches'
     | '/api/dv-expiry'
     | '/api/dv-requests'
     | '/api/dv-reviews'
@@ -968,6 +1014,7 @@ export interface FileRouteTypes {
     | '/clients/$clientId'
     | '/upload/$token'
     | '/verification/$reviewId'
+    | '/verification/batches'
     | '/verification/expiry'
     | '/verification/requests'
     | '/clients/'
@@ -978,12 +1025,14 @@ export interface FileRouteTypes {
     | '/api/assistant/home'
     | '/api/assistant/list-match'
     | '/api/assistant/list-warm'
+    | '/api/dv-batches/$'
     | '/api/dv-requests/draft'
     | '/api/dv-reviews/$reviewId'
     | '/api/outbound-media/$token'
     | '/api/reminder/preview'
     | '/api/reminder/send'
     | '/api/upload/$token'
+    | '/verification/batches/$batchId'
     | '/api/dv-requests/$requestId/resend'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/upload/$token/files'
@@ -1021,6 +1070,7 @@ export interface RootRouteChildren {
   ApiContactNowRoute: typeof ApiContactNowRoute
   ApiContactsToFixRoute: typeof ApiContactsToFixRoute
   ApiDailyRunLogsRoute: typeof ApiDailyRunLogsRoute
+  ApiDvBatchesRoute: typeof ApiDvBatchesRouteWithChildren
   ApiDvExpiryRoute: typeof ApiDvExpiryRoute
   ApiDvRequestsRoute: typeof ApiDvRequestsRouteWithChildren
   ApiDvReviewsRoute: typeof ApiDvReviewsRouteWithChildren
@@ -1051,6 +1101,7 @@ export interface RootRouteChildren {
   ClientsClientIdRoute: typeof ClientsClientIdRoute
   UploadTokenRoute: typeof UploadTokenRoute
   VerificationReviewIdRoute: typeof VerificationReviewIdRoute
+  VerificationBatchesRoute: typeof VerificationBatchesRouteWithChildren
   VerificationExpiryRoute: typeof VerificationExpiryRoute
   VerificationRequestsRoute: typeof VerificationRequestsRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
@@ -1263,6 +1314,13 @@ declare module '@tanstack/react-router' {
       path: '/api/daily-run-logs'
       fullPath: '/api/daily-run-logs'
       preLoaderRoute: typeof ApiDailyRunLogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dv-batches': {
+      id: '/api/dv-batches'
+      path: '/api/dv-batches'
+      fullPath: '/api/dv-batches'
+      preLoaderRoute: typeof ApiDvBatchesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/dv-expiry': {
@@ -1489,6 +1547,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerificationReviewIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/verification/batches': {
+      id: '/verification/batches'
+      path: '/verification/batches'
+      fullPath: '/verification/batches'
+      preLoaderRoute: typeof VerificationBatchesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/verification/expiry': {
       id: '/verification/expiry'
       path: '/verification/expiry'
@@ -1545,6 +1610,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAssistantListWarmRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dv-batches/$': {
+      id: '/api/dv-batches/$'
+      path: '/$'
+      fullPath: '/api/dv-batches/$'
+      preLoaderRoute: typeof ApiDvBatchesSplatRouteImport
+      parentRoute: typeof ApiDvBatchesRoute
+    }
     '/api/dv-requests/draft': {
       id: '/api/dv-requests/draft'
       path: '/draft'
@@ -1586,6 +1658,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/upload/$token'
       preLoaderRoute: typeof ApiUploadTokenRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/verification/batches/$batchId': {
+      id: '/verification/batches/$batchId'
+      path: '/$batchId'
+      fullPath: '/verification/batches/$batchId'
+      preLoaderRoute: typeof VerificationBatchesBatchIdRouteImport
+      parentRoute: typeof VerificationBatchesRoute
     }
     '/api/dv-requests/$requestId/resend': {
       id: '/api/dv-requests/$requestId/resend'
@@ -1632,6 +1711,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ApiDvBatchesRouteChildren {
+  ApiDvBatchesSplatRoute: typeof ApiDvBatchesSplatRoute
+}
+
+const ApiDvBatchesRouteChildren: ApiDvBatchesRouteChildren = {
+  ApiDvBatchesSplatRoute: ApiDvBatchesSplatRoute,
+}
+
+const ApiDvBatchesRouteWithChildren = ApiDvBatchesRoute._addFileChildren(
+  ApiDvBatchesRouteChildren,
+)
+
 interface ApiDvRequestsRouteChildren {
   ApiDvRequestsDraftRoute: typeof ApiDvRequestsDraftRoute
   ApiDvRequestsRequestIdResendRoute: typeof ApiDvRequestsRequestIdResendRoute
@@ -1672,6 +1763,17 @@ const ApiDvReviewsRouteChildren: ApiDvReviewsRouteChildren = {
 const ApiDvReviewsRouteWithChildren = ApiDvReviewsRoute._addFileChildren(
   ApiDvReviewsRouteChildren,
 )
+
+interface VerificationBatchesRouteChildren {
+  VerificationBatchesBatchIdRoute: typeof VerificationBatchesBatchIdRoute
+}
+
+const VerificationBatchesRouteChildren: VerificationBatchesRouteChildren = {
+  VerificationBatchesBatchIdRoute: VerificationBatchesBatchIdRoute,
+}
+
+const VerificationBatchesRouteWithChildren =
+  VerificationBatchesRoute._addFileChildren(VerificationBatchesRouteChildren)
 
 interface ApiUploadTokenRouteChildren {
   ApiUploadTokenFilesRoute: typeof ApiUploadTokenFilesRoute
@@ -1716,6 +1818,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiContactNowRoute: ApiContactNowRoute,
   ApiContactsToFixRoute: ApiContactsToFixRoute,
   ApiDailyRunLogsRoute: ApiDailyRunLogsRoute,
+  ApiDvBatchesRoute: ApiDvBatchesRouteWithChildren,
   ApiDvExpiryRoute: ApiDvExpiryRoute,
   ApiDvRequestsRoute: ApiDvRequestsRouteWithChildren,
   ApiDvReviewsRoute: ApiDvReviewsRouteWithChildren,
@@ -1746,6 +1849,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClientsClientIdRoute: ClientsClientIdRoute,
   UploadTokenRoute: UploadTokenRoute,
   VerificationReviewIdRoute: VerificationReviewIdRoute,
+  VerificationBatchesRoute: VerificationBatchesRouteWithChildren,
   VerificationExpiryRoute: VerificationExpiryRoute,
   VerificationRequestsRoute: VerificationRequestsRoute,
   ClientsIndexRoute: ClientsIndexRoute,

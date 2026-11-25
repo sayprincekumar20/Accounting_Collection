@@ -90,3 +90,24 @@ export async function onRequest({ request, env, data }) {      // Pages Function
 | POST | /public/requests/{token}/submit | Verify the account again |
 
 Links last REQUEST_LINK_DAYS (14); the dashboard serves the page at /upload/<token> without login.
+
+
+## Batch check (Nov 2026)
+
+Active accounts of one channel, verified quietly in batches (default 20): no status change, no
+emails, nothing written to Zoho. The scheduler keeps 2 accounts of the running batch in progress.
+
+| Method | Path | Use |
+| --- | --- | --- |
+| GET | /v1/batches/channels | Channel picklist values |
+| GET | /v1/batches/overview?channel= | Active accounts, checked (last 12 months), left |
+| GET / POST | /v1/batches | List; start (channel, size) with X-Reviewer; one batch at a time |
+| GET | /v1/batches/{id} | Report: progress, summary, one row per account with results |
+| POST | /v1/batches/{id}/pause, resume, complete | Control (complete: unstarted accounts stay left) |
+| POST | /v1/batches/{id}/items/{item}/retry | Check a failed account again |
+| POST | /v1/batches/spot-check/{review_id} | Correct / Not correct (+ note) |
+| GET | /v1/reviews?batch_id= | Reviews of a batch; each review has batch navigation |
+
+Reviews of batch accounts: Pending Review only when a decision is needed (another business,
+unreadable, unconfirmed, conflicts, field changes); otherwise No Action. Missing / expired documents
+are requested from the batch report. Document expiry fills from every account read.

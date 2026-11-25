@@ -333,6 +333,7 @@ class Review(Base):
                                                  onupdate=utcnow)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     images_purged: Mapped[bool] = mapped_column(default=False)
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(index=True)   # batch check this came from
 
 
 class DocumentRequest(Base):
@@ -362,3 +363,42 @@ class DocumentRequest(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class BatchRun(Base):
+    """Batch check: Active accounts of one channel, verified quietly (no status change, no
+    emails, nothing written to Zoho). status: Running | Paused | Completed"""
+
+    __tablename__ = "batch_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    number: Mapped[int] = mapped_column(BigInteger, unique=True)
+    channel: Mapped[str] = mapped_column(String(120), index=True)
+    size: Mapped[int] = mapped_column()
+    status: Mapped[str] = mapped_column(String(20), default="Running", index=True)
+    created_by: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class BatchItem(Base):
+    """One account of a batch. status: Waiting | Checking | Done | No documents | Failed"""
+
+    __tablename__ = "batch_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    batch_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("batch_runs.id", ondelete="CASCADE"),
+                                                index=True)
+    position: Mapped[int] = mapped_column()
+    account_id: Mapped[str] = mapped_column(String(32), index=True)
+    account_name: Mapped[str | None] = mapped_column(String(255))
+    customer_number: Mapped[str | None] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(20), default="Waiting")
+    job_id: Mapped[uuid.UUID | None] = mapped_column()
+    review_id: Mapped[uuid.UUID | None] = mapped_column()
+    result: Mapped[dict | None] = mapped_column(JSON)
+    spot_check: Mapped[str | None] = mapped_column(String(20))       # Correct | Not correct
+    spot_note: Mapped[str | None] = mapped_column(Text)
+    spot_by: Mapped[str | None] = mapped_column(String(255))
+    spot_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

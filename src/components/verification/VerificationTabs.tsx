@@ -1,7 +1,11 @@
 import { Link } from "@tanstack/react-router";
 
 /** Reviews | Document expiry | Document requests, at the top of the Document Verification pages. */
-export function VerificationTabs({ active }: { active: "reviews" | "expiry" | "requests" }) {
+export function VerificationTabs({
+  active,
+}: {
+  active: "reviews" | "expiry" | "requests" | "batches";
+}) {
   const base = "rounded-lg px-4 py-2 text-sm font-semibold";
   const tab = (on: boolean) =>
     `${base} ${on ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`;
@@ -15,6 +19,9 @@ export function VerificationTabs({ active }: { active: "reviews" | "expiry" | "r
       </Link>
       <Link to="/verification/requests" className={tab(active === "requests")}>
         Document requests
+      </Link>
+      <Link to="/verification/batches" className={tab(active === "batches")}>
+        Batch check
       </Link>
     </div>
   );

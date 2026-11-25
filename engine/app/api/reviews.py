@@ -49,9 +49,12 @@ def _guard(fn):
 
 @router.get("")
 def list_reviews(status: str | None = Query(None, description="e.g. Pending Review, or 'open'"),
-                 account_id: str | None = None, limit: int = Query(50, le=200),
+                 account_id: str | None = None, batch_id: uuid.UUID | None = None,
+                 limit: int = Query(50, le=200),
                  offset: int = 0, db: Session = Depends(get_db)) -> dict:
     q = select(Review)
+    if batch_id:
+        q = q.where(Review.batch_id == batch_id)
     if status == "open":
         q = q.where(Review.status.in_(engine.OPEN))
     elif status:
@@ -65,9 +68,11 @@ def list_reviews(status: str | None = Query(None, description="e.g. Pending Revi
 @router.get("/{review_id}")
 def get_review(review_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     from app.db.models import JobAssessment
+    from app.review.batches import navigation
     r = _review(review_id, db)
     row = db.get(JobAssessment, r.job_id)
-    return engine.detail_view(r, row.assessment if row else None)
+    return {**engine.detail_view(r, row.assessment if row else None),
+            "batch": navigation(db, r)}
 
 
 @router.get("/{review_id}/pages/{n}", response_class=Response)
