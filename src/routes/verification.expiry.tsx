@@ -259,7 +259,7 @@ function CustomerGroup({
               onClick={() => onRenew(dated)}
               className="whitespace-nowrap rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold hover:bg-muted"
             >
-              Request renewal
+              {dated.length > 1 ? `Request renewal (${dated.length})` : "Request renewal"}
             </button>
           ) : null}
         </span>
@@ -316,7 +316,7 @@ function CustomerGroup({
                     )}
                   </td>
                   <td className="py-2 text-right">
-                    {d.state !== "No expiry date" ? (
+                    {d.state !== "No expiry date" && dated.length > 1 ? (
                       <button
                         type="button"
                         onClick={() => onRenew([d])}
