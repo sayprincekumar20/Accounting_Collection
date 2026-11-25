@@ -171,6 +171,10 @@ def draft(db: Session, account_id: str, kind: str, reviewer: str,
     kind = "customer" if kind == "customer" and rec["customer"] else "owner"
     to = rec["customer"] if kind == "customer" else rec["owner"]
     docs = needed_documents(assessment, only)
+    # renewal requests: the account's other needed documents (missing, another business's,
+    # unreadable, expired) per its rules, offered as optional additions (not selected)
+    optional = ([d for d in needed_documents(assessment, None)
+                 if d["type"] not in {x["type"] for x in docs}] if only else [])
     snap = job.account_snapshot or {}
     account = snap.get("Account_Name") or account_id
     number = snap.get("Inventory_Customer_Number") or job.customer_number
@@ -181,7 +185,8 @@ def draft(db: Session, account_id: str, kind: str, reviewer: str,
     return {"account_id": account_id, "account_name": account, "customer_number": number,
             "recipient_kind": kind, "recipients": rec, "to": to.get("email") or "",
             "cc": ", ".join(cc), "subject": subject, "body": body, "documents": docs,
-            "placeholder": LINK_PLACEHOLDER, "link_days": days}
+            "placeholder": LINK_PLACEHOLDER, "link_days": days,
+            "optional_documents": optional}
 
 
 def _html(text: str) -> str:

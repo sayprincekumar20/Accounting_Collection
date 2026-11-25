@@ -260,6 +260,8 @@ export interface RequestDraft {
   placeholder: string;
   /** days the upload link stays open (renewals: until 30 days after expiry) */
   link_days?: number;
+  /** renewals: the account's other needed documents, offered as optional additions */
+  optional_documents?: RequestDoc[];
 }
 
 export interface DocumentRequestItem {

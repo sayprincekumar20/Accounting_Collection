@@ -237,3 +237,18 @@ def test_expired_wording_and_customer_version():
                              date(2026, 12, 8))
     assert subject == "Document renewal for your account: GDRM"
     assert "following document has expired" in body and "keep your account up to date" in body
+
+
+def test_renewal_offers_the_missing_documents_as_optional(env):
+    api, *_ = env
+    d = api.get(f"/v1/requests/draft?account_id={ACC}&documents=BIR_2303", headers=KEY).json()
+    assert [x["type"] for x in d["documents"]] == ["BIR_2303"]          # only the renewal
+    assert {x["type"] for x in d["optional_documents"]} == {"DTI_BN_CERT", "MAYORS_PERMIT"}
+    assert "DTI" not in d["body"]                                       # not added by default
+    both = api.get(f"/v1/requests/draft?account_id={ACC}&documents=BIR_2303,DTI_BN_CERT",
+                   headers=KEY).json()
+    assert {x["type"] for x in both["documents"]} == {"BIR_2303", "DTI_BN_CERT"}
+    assert "also needs:" in both["body"] and "not on file yet" in both["body"]
+    assert [x["type"] for x in both["optional_documents"]] == ["MAYORS_PERMIT"]
+    full = api.get(f"/v1/requests/draft?account_id={ACC}", headers=KEY).json()
+    assert full["optional_documents"] == []                 # Request documents: all ticked
