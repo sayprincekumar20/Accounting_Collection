@@ -58,14 +58,21 @@ def active_accounts(client, channel: str) -> list[dict]:
 
 # ------------------------------------------------------------------ overview / start
 def _checked(db: Session, account_ids: list[str], today: datetime) -> set[str]:
+    """Checked in the last 12 months: assessed (batch or Verify Account), or found with no
+    documents (asking for documents is the next step, not checking again). Failed checks and
+    accounts in an unfinished batch are not 'checked'."""
     if not account_ids:
         return set()
     since = today - timedelta(days=CHECK_AGAIN_DAYS)
-    rows = db.execute(select(VerificationJob.account_id)
-                      .join(JobAssessment, JobAssessment.job_id == VerificationJob.id)
-                      .where(VerificationJob.account_id.in_(account_ids),
-                             JobAssessment.created_at >= since)).all()
-    return {r[0] for r in rows}
+    assessed = db.execute(select(VerificationJob.account_id)
+                          .join(JobAssessment, JobAssessment.job_id == VerificationJob.id)
+                          .where(VerificationJob.account_id.in_(account_ids),
+                                 JobAssessment.created_at >= since)).all()
+    empty = db.execute(select(VerificationJob.account_id)
+                       .where(VerificationJob.account_id.in_(account_ids),
+                              VerificationJob.status == JobStatus.NO_DOCUMENTS,
+                              VerificationJob.created_at >= since)).all()
+    return {r[0] for r in assessed} | {r[0] for r in empty}
 
 
 def overview(db: Session, client, channel: str) -> dict:
