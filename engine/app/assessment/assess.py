@@ -148,10 +148,28 @@ def collect_facts(docs: list[DocInput]) -> dict[str, list[Fact]]:
             label, value = str(o.get("label", "")), str(o.get("value", "")).strip()
             attribute = ("email" if _EMAIL_LABEL.search(label) and "@" in value else
                          "phone" if _PHONE_LABEL.search(label) and _phone_key(value) else None)
-            if attribute:
+            if attribute and not is_own_contact(attribute, value):
                 facts[attribute].append(Fact(attribute, value, d.document_id, d.file_name,
                                              d.document_type, f"other: {label}", None, 0.8))
     return facts
+
+
+def is_own_contact(attribute: str, value) -> bool:
+    """Rare Global Food's own phone or email (e.g. on its form's letterhead)."""
+    text = str(value or "").strip().lower()
+    if attribute == "email":
+        return any(text.endswith("@" + d) or text.endswith("." + d)
+                   for d in policy.OWN_EMAIL_DOMAINS)
+    digits = re.sub(r"\D", "", text)
+    return any(digits.endswith(p) for p in policy.OWN_PHONES) if digits else False
+
+
+def _customer_contact(facts: list[Fact], attribute: str) -> list[Fact]:
+    """Phone / email the customer wrote in its own form fields (not letterheads or other items
+    printed on permits), and never Rare Global Food's own."""
+    return [f for f in facts if f.document_type in policy.CONTACT_SOURCE_TYPES
+            and not str(f.source_field or "").startswith("other:")
+            and not is_own_contact(attribute, f.value)]
 
 
 def cross_check(facts: dict[str, list[Fact]]) -> list[dict]:
@@ -429,13 +447,16 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
 
     # Contact details -> Zoho (fill only; a different value is shown, never overwritten)
     # (Contact_Person is "Bank Contact Person" in this org's Accounts: not a target.)
+    # rules-1.5: only from the customer's own form (Customer Information Sheet / credit
+    # application fields), never another document's printed numbers or Rare Global Food's own
     for attribute, zoho_field, matcher in (
             ("email", "Email", _MATCHERS["email"]), ("phone", "Phone", _MATCHERS["phone"])):
-        chosen = _best(facts[attribute])
+        own = _customer_contact(facts[attribute], attribute)
+        chosen = _best(own)
         if chosen:
             p = _compare_field(zoho_field, snap.get(zoho_field), chosen, chosen.value,
                                lambda a, b, m=matcher: m(a, b) or DIFFERENT,
-                               facts[attribute], False, allow_correct=False)
+                               own, False, allow_correct=False)
             if p:
                 proposals.append(p)
 
