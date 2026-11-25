@@ -13,7 +13,7 @@ export function RequestDialog({
   onSent,
 }: {
   accountId: string;
-  reviewId?: string;
+  reviewId?: string | undefined;
   documents?: string[];
   title?: string;
   onClose: () => void;

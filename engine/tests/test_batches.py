@@ -155,3 +155,25 @@ def test_next_batch_takes_the_next_accounts_never_the_same(db, settings):
     firsts = {i.account_id for i in db.query(BatchItem).filter_by(batch_id=first.id)}
     seconds = {i.account_id for i in db.query(BatchItem).filter_by(batch_id=second.id)}
     assert firsts.isdisjoint(seconds) and len(seconds) == 2
+
+
+def test_account_with_no_documents_is_not_ok_and_can_be_requested(db, settings):
+    """Meatplus Trading Corp / V AND A: nothing to read is never OK."""
+    from app.review.requests import draft
+    zoho, queued = Zoho(1), []
+    batch = svc.start(db, zoho, WET, 20, "Prince")
+    svc.advance(db, queued.append)
+    job = db.query(VerificationJob).one()
+    job.status = JobStatus.NO_DOCUMENTS
+    job.account_snapshot = {**SNAPSHOT, "Account_Name": "MEATPLUS TRADING CORP",
+                            "Owner": {"name": "CARLA", "email": "carla@example.com"}}
+    db.commit()
+    rep = svc.report(db, batch)
+    r = rep["items"][0]["result"]
+    assert r["ok"] is False and r["no_documents"] is True and r["request"] is True
+    assert rep["summary"]["ok"] == 0 and rep["summary"]["no_documents"] == 1
+    d = draft(db, job.account_id, "owner", "Prince")          # no previous reading needed
+    assert {x["type"] for x in d["documents"]} == {"BIR_2303", "DTI_BN_CERT", "SEC_CERT",
+                                                    "MAYORS_PERMIT"}
+    assert "DTI (sole proprietor) or SEC (corporation)" in d["body"]
+    assert d["to"] == "carla@example.com"

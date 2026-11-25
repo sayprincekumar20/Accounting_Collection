@@ -156,6 +156,16 @@ function ReviewPage() {
               Approve…
             </button>
           </div>
+        ) : review.status !== "Applied" ? (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setDialog("request-documents")}
+              className="h-10 rounded-lg border border-border bg-card px-4 text-sm font-semibold hover:bg-muted"
+            >
+              Request documents
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -349,7 +359,7 @@ function ReviewPage() {
       {dialog === "request-documents" ? (
         <RequestDialog
           accountId={review.account_id}
-          reviewId={review.id}
+          reviewId={open ? review.id : undefined}
           onClose={async () => {
             setDialog(null);
             await refresh();

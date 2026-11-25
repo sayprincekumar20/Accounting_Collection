@@ -151,7 +151,8 @@ def create_problem_review(db: Session, job: VerificationJob, status: str,
                  "activation_checks": [], "rules_version": None,
                  "request_reason": job.reason},
         rows=[], pages=[], requested_by=job.requested_by_email, closed_at=utcnow(),
-        reviewer_notes=reason)
+        reviewer="System (no readable documents)" if status == "Waiting for Documents"
+        else "System (check failed)", reviewer_notes=reason)
     db.add(review)
     db.flush()
     record_event(db, "ENGINE_REVIEW_CREATED", f"DV-{review.number}: {status} - {reason}",
