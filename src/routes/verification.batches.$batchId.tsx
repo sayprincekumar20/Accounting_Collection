@@ -43,6 +43,9 @@ function Results({ i }: { i: BatchItemRow }) {
   return (
     <div>
       {r.ok ? <Chip tone="bg-success/12 text-success">OK</Chip> : null}
+      {r.no_documents ? (
+        <Chip tone="bg-destructive/12 text-destructive">No documents on the Account</Chip>
+      ) : null}
       {r.wrong.length ? (
         <Chip tone="bg-destructive/12 text-destructive">
           Another business: {r.wrong.join(", ")}
@@ -180,9 +183,10 @@ function BatchPage() {
             {note ? <p className="mt-2 text-sm">{note}</p> : null}
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="mt-4 grid gap-3 sm:grid-cols-4 lg:grid-cols-7">
             {[
               ["OK", s.ok],
+              ["No documents", s.no_documents],
               ["Missing documents", s.missing],
               ["Expired documents", s.expired],
               ["Expiring in 30 days", s.expiring],

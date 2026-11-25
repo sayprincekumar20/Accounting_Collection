@@ -28,13 +28,26 @@ def _fmt(iso: str | None) -> str:
     return date.fromisoformat(iso).strftime("%d %b %Y") if iso else ""
 
 
+# Account with no readable document yet: the business form is unknown, so ask for the basic set
+BASIC_SET = ("BIR_2303", "DTI_BN_CERT", "SEC_CERT", "MAYORS_PERMIT")
+
+
 def latest(db: Session, account_id: str) -> tuple[VerificationJob | None, dict | None]:
+    """The account's latest assessed check; else its latest check of any kind (e.g. no documents)
+    with a basic set of required documents, all missing."""
     row = db.execute(
         select(VerificationJob, JobAssessment)
         .join(JobAssessment, JobAssessment.job_id == VerificationJob.id)
         .where(VerificationJob.account_id == account_id)
         .order_by(JobAssessment.created_at.desc()).limit(1)).first()
-    return (row[0], row[1].assessment) if row else (None, None)
+    if row:
+        return row[0], row[1].assessment
+    job = db.scalar(select(VerificationJob).where(VerificationJob.account_id == account_id)
+                    .order_by(VerificationJob.created_at.desc()).limit(1))
+    if job is None:
+        return None, None
+    return job, {"requirements": [{"document_type": t, "status": "MISSING", "valid_until": None}
+                                  for t in BASIC_SET], "no_documents": True}
 
 
 def needed_documents(assessment: dict | None, only: list[str] | None = None,
@@ -49,7 +62,9 @@ def needed_documents(assessment: dict | None, only: list[str] | None = None,
             continue
         days = (date.fromisoformat(until) - today).days if until else None
         if st == "MISSING":
-            kind, reason = "missing", "not on file yet"
+            kind, reason = "missing", ("not on file yet" if t not in ("DTI_BN_CERT", "SEC_CERT")
+                                       or not (assessment or {}).get("no_documents") else
+                                       "DTI (sole proprietor) or SEC (corporation)")
         elif st == "NOT_THIS_CUSTOMER":
             kind, reason = "wrong", "the file on the Account belongs to another business"
         elif st == "UNKNOWN":

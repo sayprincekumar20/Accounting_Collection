@@ -289,6 +289,8 @@ export const REQUEST_TONE: Record<string, string> = {
 
 export interface BatchResult {
   documents: number;
+  /** nothing read: no files, or none could be downloaded */
+  no_documents?: boolean;
   missing: string[];
   expired: string[];
   expiring: string[];
@@ -329,6 +331,7 @@ export interface BatchHead {
 
 export interface BatchSummary {
   ok: number;
+  no_documents?: number;
   missing: number;
   expired: number;
   expiring: number;

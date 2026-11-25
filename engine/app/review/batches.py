@@ -122,7 +122,8 @@ def _item_state(job: VerificationJob | None) -> str:
     return "Checking"
 
 
-def result_of(assessment: dict | None, review: Review | None, today: date) -> dict:
+def result_of(assessment: dict | None, review: Review | None, today: date,
+              no_documents: bool = False) -> dict:
     a = assessment or {}
     reqs = a.get("requirements") or []
     alerts = build_alerts(a, today) if a else []
@@ -139,9 +140,12 @@ def result_of(assessment: dict | None, review: Review | None, today: date) -> di
         "needs_decision": bool(review and review.status in ("Pending Review", "In Review")),
         "recommendation": a.get("recommendation"),
     }
-    out["ok"] = not (out["missing"] or out["expired"] or out["wrong"] or out["unreadable"]
-                     or out["needs_decision"])
-    out["request"] = bool(out["missing"] or out["expired"] or out["wrong"] or out["expiring"])
+    # nothing read (no files, or none could be downloaded) is never OK: every document is needed
+    out["no_documents"] = no_documents or not out["documents"]
+    out["ok"] = not (out["no_documents"] or out["missing"] or out["expired"] or out["wrong"]
+                     or out["unreadable"] or out["needs_decision"])
+    out["request"] = bool(out["no_documents"] or out["missing"] or out["expired"]
+                          or out["wrong"] or out["expiring"])
     return out
 
 
@@ -161,7 +165,9 @@ def refresh(db: Session, batch: BatchRun, today: date | None = None) -> None:
                 review.batch_id = batch.id
             if state in TERMINAL:
                 row = db.get(JobAssessment, item.job_id)
-                item.result = result_of(row.assessment if row else None, review, today)
+                item.result = result_of(row.assessment if row else None, review, today,
+                                        no_documents=state in ("No documents", "Failed")
+                                        and row is None)
     items = db.scalars(select(BatchItem).where(BatchItem.batch_id == batch.id)).all()
     if batch.status == "Running" and items and all(i.status in TERMINAL for i in items):
         batch.status, batch.completed_at = "Completed", utcnow()
@@ -263,7 +269,12 @@ def report(db: Session, batch: BatchRun) -> dict:
     items = db.scalars(select(BatchItem).where(BatchItem.batch_id == batch.id)
                        .order_by(BatchItem.position)).all()
     res = [i.result or {} for i in items]
+    for r in res:   # results saved before this fix (same objects as the items'): complete them
+        if r and "no_documents" not in r:
+            r.update(result_of(None, None, date.today(), no_documents=True)
+                     if not r.get("documents") else {"no_documents": False})
     summary = {"ok": sum(1 for r in res if r.get("ok")),
+               "no_documents": sum(1 for r in res if r.get("no_documents")),
                "missing": sum(1 for r in res if r.get("missing")),
                "expired": sum(1 for r in res if r.get("expired")),
                "expiring": sum(len(r.get("expiring") or []) for r in res),
