@@ -21,7 +21,10 @@ export function RequestDialog({
 }) {
   const reviewer = typeof window !== "undefined" ? getReviewerName() : "";
   const [recipient, setRecipient] = useState<"owner" | "customer">("owner");
-  const only = documents?.length ? `&documents=${documents.join(",")}` : "";
+  // renewal: other missing documents the reviewer chose to add (none by default)
+  const [extra, setExtra] = useState<string[]>([]);
+  const requested = documents?.length ? [...documents, ...extra] : [];
+  const only = requested.length ? `&documents=${requested.join(",")}` : "";
   const draft = useQuery({
     queryKey: ["dv-request-draft", accountId, recipient, only],
     queryFn: () =>
@@ -184,6 +187,43 @@ export function RequestDialog({
                     <p className="text-sm text-muted-foreground">
                       Nothing is missing or expired on this account.
                     </p>
+                  ) : null}
+                  {d.optional_documents?.length ? (
+                    <div className="mb-2 rounded-lg border border-dashed border-border p-2">
+                      <label className="block text-xs font-semibold text-muted-foreground">
+                        Also request a missing document (optional)
+                        <select
+                          value=""
+                          onChange={(e) => e.target.value && setExtra([...extra, e.target.value])}
+                          className="mt-1 block h-9 w-full rounded-lg border border-border bg-background px-2 text-sm font-normal text-foreground"
+                        >
+                          <option value="">Add a document…</option>
+                          {d.optional_documents.map((o) => (
+                            <option key={o.type} value={o.type}>
+                              {o.label}: {o.reason}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Adding a document rewrites the email text below.
+                      </p>
+                    </div>
+                  ) : null}
+                  {extra.length ? (
+                    <div className="mb-2 flex flex-wrap gap-1.5">
+                      {extra.map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setExtra(extra.filter((x) => x !== t))}
+                          className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
+                          aria-label={`Remove ${d.documents.find((x) => x.type === t)?.label ?? t}`}
+                        >
+                          + {d.documents.find((x) => x.type === t)?.label ?? t} ✕
+                        </button>
+                      ))}
+                    </div>
                   ) : null}
                   <div className="space-y-1">
                     {d.documents.map((doc) => (
