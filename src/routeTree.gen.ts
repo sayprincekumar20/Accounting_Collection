@@ -37,7 +37,6 @@ import { Route as ApiContactApprovalsRouteImport } from './routes/api/contact-ap
 import { Route as ApiContactNowRouteImport } from './routes/api/contact-now'
 import { Route as ApiContactsToFixRouteImport } from './routes/api/contacts-to-fix'
 import { Route as ApiDailyRunLogsRouteImport } from './routes/api/daily-run-logs'
-import { Route as ApiDvBatchesRouteImport } from './routes/api/dv-batches'
 import { Route as ApiDvExpiryRouteImport } from './routes/api/dv-expiry'
 import { Route as ApiDvRequestsRouteImport } from './routes/api/dv-requests'
 import { Route as ApiDvReviewsRouteImport } from './routes/api/dv-reviews'
@@ -232,11 +231,6 @@ const ApiContactsToFixRoute = ApiContactsToFixRouteImport.update({
 const ApiDailyRunLogsRoute = ApiDailyRunLogsRouteImport.update({
   id: '/api/daily-run-logs',
   path: '/api/daily-run-logs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiDvBatchesRoute = ApiDvBatchesRouteImport.update({
-  id: '/api/dv-batches',
-  path: '/api/dv-batches',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDvExpiryRoute = ApiDvExpiryRouteImport.update({
@@ -446,9 +440,9 @@ const ApiAssistantListWarmRoute = ApiAssistantListWarmRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDvBatchesSplatRoute = ApiDvBatchesSplatRouteImport.update({
-  id: '/$',
-  path: '/$',
-  getParentRoute: () => ApiDvBatchesRoute,
+  id: '/api/dv-batches/$',
+  path: '/api/dv-batches/$',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDvRequestsDraftRoute = ApiDvRequestsDraftRouteImport.update({
   id: '/draft',
@@ -550,7 +544,6 @@ export interface FileRoutesByFullPath {
   '/api/contact-now': typeof ApiContactNowRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
-  '/api/dv-batches': typeof ApiDvBatchesRouteWithChildren
   '/api/dv-expiry': typeof ApiDvExpiryRoute
   '/api/dv-requests': typeof ApiDvRequestsRouteWithChildren
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
@@ -636,7 +629,6 @@ export interface FileRoutesByTo {
   '/api/contact-now': typeof ApiContactNowRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
-  '/api/dv-batches': typeof ApiDvBatchesRouteWithChildren
   '/api/dv-expiry': typeof ApiDvExpiryRoute
   '/api/dv-requests': typeof ApiDvRequestsRouteWithChildren
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
@@ -723,7 +715,6 @@ export interface FileRoutesById {
   '/api/contact-now': typeof ApiContactNowRoute
   '/api/contacts-to-fix': typeof ApiContactsToFixRoute
   '/api/daily-run-logs': typeof ApiDailyRunLogsRoute
-  '/api/dv-batches': typeof ApiDvBatchesRouteWithChildren
   '/api/dv-expiry': typeof ApiDvExpiryRoute
   '/api/dv-requests': typeof ApiDvRequestsRouteWithChildren
   '/api/dv-reviews': typeof ApiDvReviewsRouteWithChildren
@@ -811,7 +802,6 @@ export interface FileRouteTypes {
     | '/api/contact-now'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
-    | '/api/dv-batches'
     | '/api/dv-expiry'
     | '/api/dv-requests'
     | '/api/dv-reviews'
@@ -897,7 +887,6 @@ export interface FileRouteTypes {
     | '/api/contact-now'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
-    | '/api/dv-batches'
     | '/api/dv-expiry'
     | '/api/dv-requests'
     | '/api/dv-reviews'
@@ -983,7 +972,6 @@ export interface FileRouteTypes {
     | '/api/contact-now'
     | '/api/contacts-to-fix'
     | '/api/daily-run-logs'
-    | '/api/dv-batches'
     | '/api/dv-expiry'
     | '/api/dv-requests'
     | '/api/dv-reviews'
@@ -1070,7 +1058,6 @@ export interface RootRouteChildren {
   ApiContactNowRoute: typeof ApiContactNowRoute
   ApiContactsToFixRoute: typeof ApiContactsToFixRoute
   ApiDailyRunLogsRoute: typeof ApiDailyRunLogsRoute
-  ApiDvBatchesRoute: typeof ApiDvBatchesRouteWithChildren
   ApiDvExpiryRoute: typeof ApiDvExpiryRoute
   ApiDvRequestsRoute: typeof ApiDvRequestsRouteWithChildren
   ApiDvReviewsRoute: typeof ApiDvReviewsRouteWithChildren
@@ -1112,6 +1099,7 @@ export interface RootRouteChildren {
   ApiAssistantHomeRoute: typeof ApiAssistantHomeRoute
   ApiAssistantListMatchRoute: typeof ApiAssistantListMatchRoute
   ApiAssistantListWarmRoute: typeof ApiAssistantListWarmRoute
+  ApiDvBatchesSplatRoute: typeof ApiDvBatchesSplatRoute
   ApiOutboundMediaTokenRoute: typeof ApiOutboundMediaTokenRoute
   ApiReminderPreviewRoute: typeof ApiReminderPreviewRoute
   ApiReminderSendRoute: typeof ApiReminderSendRoute
@@ -1314,13 +1302,6 @@ declare module '@tanstack/react-router' {
       path: '/api/daily-run-logs'
       fullPath: '/api/daily-run-logs'
       preLoaderRoute: typeof ApiDailyRunLogsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/dv-batches': {
-      id: '/api/dv-batches'
-      path: '/api/dv-batches'
-      fullPath: '/api/dv-batches'
-      preLoaderRoute: typeof ApiDvBatchesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/dv-expiry': {
@@ -1612,10 +1593,10 @@ declare module '@tanstack/react-router' {
     }
     '/api/dv-batches/$': {
       id: '/api/dv-batches/$'
-      path: '/$'
+      path: '/api/dv-batches/$'
       fullPath: '/api/dv-batches/$'
       preLoaderRoute: typeof ApiDvBatchesSplatRouteImport
-      parentRoute: typeof ApiDvBatchesRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/dv-requests/draft': {
       id: '/api/dv-requests/draft'
@@ -1710,18 +1691,6 @@ declare module '@tanstack/react-router' {
     }
   }
 }
-
-interface ApiDvBatchesRouteChildren {
-  ApiDvBatchesSplatRoute: typeof ApiDvBatchesSplatRoute
-}
-
-const ApiDvBatchesRouteChildren: ApiDvBatchesRouteChildren = {
-  ApiDvBatchesSplatRoute: ApiDvBatchesSplatRoute,
-}
-
-const ApiDvBatchesRouteWithChildren = ApiDvBatchesRoute._addFileChildren(
-  ApiDvBatchesRouteChildren,
-)
 
 interface ApiDvRequestsRouteChildren {
   ApiDvRequestsDraftRoute: typeof ApiDvRequestsDraftRoute
@@ -1818,7 +1787,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiContactNowRoute: ApiContactNowRoute,
   ApiContactsToFixRoute: ApiContactsToFixRoute,
   ApiDailyRunLogsRoute: ApiDailyRunLogsRoute,
-  ApiDvBatchesRoute: ApiDvBatchesRouteWithChildren,
   ApiDvExpiryRoute: ApiDvExpiryRoute,
   ApiDvRequestsRoute: ApiDvRequestsRouteWithChildren,
   ApiDvReviewsRoute: ApiDvReviewsRouteWithChildren,
@@ -1860,6 +1828,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAssistantHomeRoute: ApiAssistantHomeRoute,
   ApiAssistantListMatchRoute: ApiAssistantListMatchRoute,
   ApiAssistantListWarmRoute: ApiAssistantListWarmRoute,
+  ApiDvBatchesSplatRoute: ApiDvBatchesSplatRoute,
   ApiOutboundMediaTokenRoute: ApiOutboundMediaTokenRoute,
   ApiReminderPreviewRoute: ApiReminderPreviewRoute,
   ApiReminderSendRoute: ApiReminderSendRoute,
