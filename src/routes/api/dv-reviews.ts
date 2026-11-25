@@ -8,7 +8,7 @@ export const Route = createFileRoute("/api/dv-reviews")({
       GET: async ({ request }) => {
         const src = new URL(request.url).searchParams;
         const q = new URLSearchParams();
-        for (const k of ["status", "account_id", "limit", "offset"]) {
+        for (const k of ["status", "account_id", "batch_id", "limit", "offset"]) {
           const v = src.get(k);
           if (v) q.set(k, v);
         }

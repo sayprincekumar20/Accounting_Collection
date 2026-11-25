@@ -78,6 +78,8 @@ export interface ReviewDetail extends ReviewSummary {
   /** the Account's Channel, and the channel rule applied (WET_MARKET) */
   channel?: string | null;
   channel_rule?: string | null;
+  /** batch check this review belongs to: position, previous / next account */
+  batch?: BatchNav | null;
 }
 
 export interface ExtractedDocument {
@@ -266,4 +268,80 @@ export const REQUEST_TONE: Record<string, string> = {
   "Partly received": "bg-primary/10 text-primary",
   Submitted: "bg-success/12 text-success",
   Expired: "bg-muted text-muted-foreground",
+};
+
+export interface BatchResult {
+  documents: number;
+  missing: string[];
+  expired: string[];
+  expiring: string[];
+  wrong: string[];
+  unreadable: number;
+  needs_decision: boolean;
+  recommendation: string | null;
+  ok: boolean;
+  request: boolean;
+}
+
+export interface BatchItemRow {
+  id: string;
+  position: number;
+  account_id: string;
+  account_name: string | null;
+  customer_number: string | null;
+  status: "Waiting" | "Checking" | "Done" | "No documents" | "Failed";
+  review_id: string | null;
+  result: BatchResult | null;
+  spot_check: "Correct" | "Not correct" | null;
+  spot_note: string | null;
+  spot_by: string | null;
+}
+
+export interface BatchHead {
+  id: string;
+  number: number;
+  channel: string;
+  status: "Running" | "Paused" | "Completed";
+  size: number;
+  done: number;
+  counts: Record<string, number>;
+  created_by: string | null;
+  created_at: string | null;
+  completed_at: string | null;
+}
+
+export interface BatchSummary {
+  ok: number;
+  missing: number;
+  expired: number;
+  expiring: number;
+  unreadable: number;
+  wrong: number;
+  needs_decision: number;
+  spot_checked: number;
+  spot_correct: number;
+}
+
+export interface BatchReport extends BatchHead {
+  summary: BatchSummary;
+  items: BatchItemRow[];
+}
+
+export interface BatchNav {
+  batch_id: string;
+  number: number;
+  channel: string;
+  position: number;
+  size: number;
+  previous: string | null;
+  next: string | null;
+  spot_check: string | null;
+  spot_note: string | null;
+  spot_by: string | null;
+}
+
+export const BATCH_TONE: Record<string, string> = {
+  Running: "bg-primary/10 text-primary",
+  Paused: "bg-warning/15 text-warning",
+  Completed: "bg-success/12 text-success",
 };

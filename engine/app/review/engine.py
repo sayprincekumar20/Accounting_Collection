@@ -56,6 +56,8 @@ def create_engine_review(db: Session, job: VerificationJob, storage: Storage,
              "comment": None, "outcome": None, "outcome_detail": None}
             for i, r in enumerate(rec.get(f["Proposed Changes"]) or [], 1)]
     status = rec.get(f["Review Status"]) or "Pending Review"
+    if job.source == "batch" and not needs_decision(row.assessment, rows):
+        status = "No Action"        # batch check: nothing to decide; still browsable
     snap = job.account_snapshot or {}
     review = Review(
         number=(db.scalar(select(func.max(Review.number))) or 0) + 1, job_id=job.id,
@@ -80,6 +82,28 @@ def create_engine_review(db: Session, job: VerificationJob, storage: Storage,
                  {"review_id": str(review.id), "pages": len(review.pages)})
     db.commit()
     return review
+
+
+BATCH_PROBLEMS = {"DOCUMENT_NOT_THIS_CUSTOMER", "DOCUMENT_UNCONFIRMED", "UNREADABLE_DOCUMENT",
+                  "READ_BY_AI_ONLY", "CONFLICT"}
+
+
+def needs_decision(assessment: dict, rows: list[dict]) -> bool:
+    """Batch check: a person must decide when a document is another business's, unreadable or
+    unconfirmed, documents conflict, or field changes wait for approval. Missing or expired
+    documents alone go through document requests."""
+    from datetime import date
+
+    from app.assessment.alerts import build_alerts
+    if any(r["status"] in ("NOT_THIS_CUSTOMER", "UNKNOWN")
+           for r in assessment.get("requirements") or []):
+        return True
+    alerts = build_alerts(assessment, date.today())
+    if any(a.get("code") in BATCH_PROBLEMS or a.get("code", "").startswith("CONFLICT")
+           for a in alerts):
+        return True
+    return any(r.get("action") in ("FILL", "CORRECT") and r.get("decision") == "Pending"
+               for r in rows)
 
 
 def _copy_pages(db, job, storage, review, max_images) -> list[dict]:
@@ -238,6 +262,7 @@ def summary_view(r: Review) -> dict:
             "status": r.status, "recommendation": r.recommendation,
             "checks_met": f"{sum(c['status'] == 'PASS' for c in checks)}/{len(checks)}"
             if checks else None,
+            "batch_id": str(r.batch_id) if r.batch_id else None,
             "rows_to_decide": sum(1 for x in r.rows if x["decision"] == "Pending"
                                   and x["action"] in ("FILL", "CORRECT", "REVIEW_CONFLICT",
                                                       "HOLD", "DIFFERS", "NO_PICKLIST_VALUE")),

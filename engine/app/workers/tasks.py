@@ -64,7 +64,7 @@ def _problem_review(job_id: uuid.UUID, status: str, reason: str) -> None:
             if job is None:
                 return
             review = create_problem_review(db, job, status, reason)
-            if s.notify_verifications:
+            if s.notify_verifications and job.source != "batch":
                 notify_problem(db, job, review, Notifier.from_settings(s))
     except Exception:  # noqa: BLE001 - reporting must never break the job handling
         log.exception("Problem review failed", extra={"job_id": str(job_id)})
@@ -153,8 +153,9 @@ def extract_documents(self, job_id: str) -> str:
             extract_job(db, job, build_storage(get_settings()), provider)
             assess_job(db, job, extraction_version(provider), manila_today())  # Phase 1D
             s = get_settings()
+            quiet = job.source == "batch"    # batch check: read and record only
             activation_mode = s.auto_activate_mode or s.auto_apply_mode
-            if s.auto_apply_mode != "off" or activation_mode != "off":
+            if not quiet and (s.auto_apply_mode != "off" or activation_mode != "off"):
                 client = get_zoho_client()
                 auto_apply_job(db, job, client, s.auto_apply_mode,
                                s.auto_apply_threshold, s.zoho_update_triggers,
@@ -164,12 +165,12 @@ def extract_documents(self, job_id: str) -> str:
                                activation_mode=activation_mode,
                                activator=lambda: activate_account(
                                    client, job.account_id, s, s.zoho_update_triggers))
-            if s.create_review_records:
+            if s.create_review_records and not quiet:
                 create_review_record(db, job, get_zoho_client(), build_storage(s),
                                      s.review_max_images)  # Phase 3
             if s.engine_reviews:   # review in the Accounts dashboard
                 create_engine_review(db, job, build_storage(s), s.review_max_images)
-            if s.notify_verifications:
+            if s.notify_verifications and not quiet:
                 try:  # Cliq message + Google Sheet rows; never fails the job
                     notify_verification(db, job, Notifier.from_settings(s), get_zoho_client())
                 except Exception:  # noqa: BLE001

@@ -52,6 +52,13 @@ def run_due(now: float, last: dict, settings, client, enqueue, notifier=None) ->
             with session_scope() as db:
                 log.info("Weekly new-file scan: %s",
                          scan_for_new_files(db, client, settings, enqueue, manila.date()))
+    if now - last.get("batches", 0) >= 30:             # batch check: keep 2 accounts going
+        last["batches"] = now
+        from app.review.batches import advance
+        with session_scope() as db:
+            done = advance(db, enqueue)
+        if done["started"]:
+            log.info("Batch check: %s", done)
     if now - last.get("doc_requests", 0) >= 600:       # every 10 minutes
         last["doc_requests"] = now
         from app.notify.gmail import GmailClient

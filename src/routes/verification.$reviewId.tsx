@@ -25,6 +25,7 @@ import {
   when,
   day,
   type ActivationCheck,
+  type BatchNav,
   type ExtractedDocument,
   type ReviewDetail,
   type ReviewRow,
@@ -154,6 +155,10 @@ function ReviewPage() {
           </div>
         ) : null}
       </div>
+
+      {review.batch ? (
+        <BatchBar nav={review.batch} reviewId={review.id} onDone={() => refresh()} />
+      ) : null}
 
       {open ? (
         <div className="surface-card mt-4 flex flex-wrap items-center gap-3 p-3">
@@ -353,6 +358,80 @@ function ReviewPage() {
         }}
       />
     </AppShell>
+  );
+}
+
+function BatchBar({
+  nav,
+  reviewId,
+  onDone,
+}: {
+  nav: BatchNav;
+  reviewId: string;
+  onDone: () => unknown;
+}) {
+  const [note, setNote] = useState(nav.spot_note ?? "");
+  const [msg, setMsg] = useState<string | null>(null);
+  async function check(verdict: "Correct" | "Not correct") {
+    setMsg(null);
+    try {
+      await dvRequest(`/api/dv-batches/spot-check/${reviewId}`, {
+        method: "POST",
+        body: JSON.stringify({ verdict, note }),
+      });
+      setMsg(`Saved: ${verdict}.`);
+      await onDone();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+  const btn = "rounded-lg border border-border px-3 py-1.5 text-sm font-semibold hover:bg-muted";
+  return (
+    <div className="surface-card mt-4 flex flex-wrap items-center gap-3 p-3">
+      <Link
+        to="/verification/batches/$batchId"
+        params={{ batchId: nav.batch_id }}
+        className="text-sm font-semibold text-primary hover:underline"
+      >
+        Batch {nav.number} · account {nav.position} of {nav.size}
+      </Link>
+      <span className="text-xs text-muted-foreground">{nav.channel}</span>
+      <div className="flex gap-2">
+        {nav.previous ? (
+          <Link to="/verification/$reviewId" params={{ reviewId: nav.previous }} className={btn}>
+            ← Previous
+          </Link>
+        ) : null}
+        {nav.next ? (
+          <Link to="/verification/$reviewId" params={{ reviewId: nav.next }} className={btn}>
+            Next account →
+          </Link>
+        ) : null}
+      </div>
+      <div className="ml-auto flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-muted-foreground">Spot-check:</span>
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Note (required for Not correct)"
+          aria-label="Spot-check note"
+          className="h-8 w-56 rounded-lg border border-border bg-background px-2 text-sm"
+        />
+        <button type="button" onClick={() => void check("Correct")} className={btn}>
+          Correct
+        </button>
+        <button type="button" onClick={() => void check("Not correct")} className={btn}>
+          Not correct
+        </button>
+        {nav.spot_check ? (
+          <span className="text-xs">
+            {nav.spot_check}
+            {nav.spot_by ? ` · ${nav.spot_by}` : ""}
+          </span>
+        ) : null}
+        {msg ? <span className="text-xs">{msg}</span> : null}
+      </div>
+    </div>
   );
 }
 

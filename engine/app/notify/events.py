@@ -247,6 +247,8 @@ def _announce_review(db, client, notifier, rec, status, f, sf) -> None:
 
 def notify_engine_review(db: Session, review, notifier: Notifier) -> None:
     """A decision taken in the Accounts dashboard (engine review API)."""
+    if getattr(review, "batch_id", None):     # batch check: decisions send no emails
+        return
     ref = f"engine:{review.id}:{review.status}"
     if not notifier.enabled or already_sent(db, "review", ref):
         return
