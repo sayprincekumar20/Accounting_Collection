@@ -5,7 +5,14 @@ import { AppShell } from "@/components/AppShell";
 import { Panel, RefreshButton } from "@/components/collections/Bits";
 import { RequestDialog } from "@/components/verification/RequestDialog";
 import { VerificationTabs } from "@/components/verification/VerificationTabs";
-import { dvRequest, when, type BatchItemRow, type BatchReport, type BatchSummary } from "@/lib/dv";
+import {
+  BATCH_TONE,
+  dvRequest,
+  when,
+  type BatchItemRow,
+  type BatchReport,
+  type BatchSummary,
+} from "@/lib/dv";
 
 export const Route = createFileRoute("/verification/batches/$batchId")({
   head: () => ({ meta: [{ title: "Batch | Document Verification" }] }),
