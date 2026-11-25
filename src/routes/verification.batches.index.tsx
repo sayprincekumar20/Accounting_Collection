@@ -6,7 +6,7 @@ import { Panel, RefreshButton } from "@/components/collections/Bits";
 import { VerificationTabs } from "@/components/verification/VerificationTabs";
 import { BATCH_TONE, dvRequest, when, type BatchHead, type BatchReport } from "@/lib/dv";
 
-export const Route = createFileRoute("/verification/batches")({
+export const Route = createFileRoute("/verification/batches/")({
   head: () => ({ meta: [{ title: "Batch Check | Document Verification" }] }),
   component: BatchesPage,
 });

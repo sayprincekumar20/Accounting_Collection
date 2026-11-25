@@ -69,7 +69,6 @@ import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
 import { Route as UploadTokenRouteImport } from './routes/upload.$token'
 import { Route as VerificationIndexRouteImport } from './routes/verification.index'
 import { Route as VerificationReviewIdRouteImport } from './routes/verification.$reviewId'
-import { Route as VerificationBatchesRouteImport } from './routes/verification.batches'
 import { Route as VerificationExpiryRouteImport } from './routes/verification.expiry'
 import { Route as VerificationRequestsRouteImport } from './routes/verification.requests'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant.chat'
@@ -85,6 +84,7 @@ import { Route as ApiOutboundMediaTokenRouteImport } from './routes/api/outbound
 import { Route as ApiReminderPreviewRouteImport } from './routes/api/reminder.preview'
 import { Route as ApiReminderSendRouteImport } from './routes/api/reminder.send'
 import { Route as ApiUploadTokenRouteImport } from './routes/api/upload.$token'
+import { Route as VerificationBatchesIndexRouteImport } from './routes/verification.batches.index'
 import { Route as VerificationBatchesBatchIdRouteImport } from './routes/verification.batches.$batchId'
 import { Route as ApiDvRequestsRequestIdResendRouteImport } from './routes/api/dv-requests.$requestId.resend'
 import { Route as ApiDvReviewsReviewIdActionRouteImport } from './routes/api/dv-reviews.$reviewId.$action'
@@ -394,11 +394,6 @@ const VerificationReviewIdRoute = VerificationReviewIdRouteImport.update({
   path: '/verification/$reviewId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VerificationBatchesRoute = VerificationBatchesRouteImport.update({
-  id: '/verification/batches',
-  path: '/verification/batches',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const VerificationExpiryRoute = VerificationExpiryRouteImport.update({
   id: '/verification/expiry',
   path: '/verification/expiry',
@@ -474,11 +469,17 @@ const ApiUploadTokenRoute = ApiUploadTokenRouteImport.update({
   path: '/api/upload/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerificationBatchesIndexRoute =
+  VerificationBatchesIndexRouteImport.update({
+    id: '/verification/batches/',
+    path: '/verification/batches/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const VerificationBatchesBatchIdRoute =
   VerificationBatchesBatchIdRouteImport.update({
-    id: '/$batchId',
-    path: '/$batchId',
-    getParentRoute: () => VerificationBatchesRoute,
+    id: '/verification/batches/$batchId',
+    path: '/verification/batches/$batchId',
+    getParentRoute: () => rootRouteImport,
   } as any)
 const ApiDvRequestsRequestIdResendRoute =
   ApiDvRequestsRequestIdResendRouteImport.update({
@@ -574,7 +575,6 @@ export interface FileRoutesByFullPath {
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/upload/$token': typeof UploadTokenRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
-  '/verification/batches': typeof VerificationBatchesRouteWithChildren
   '/verification/expiry': typeof VerificationExpiryRoute
   '/verification/requests': typeof VerificationRequestsRoute
   '/clients/': typeof ClientsIndexRoute
@@ -593,6 +593,7 @@ export interface FileRoutesByFullPath {
   '/api/reminder/send': typeof ApiReminderSendRoute
   '/api/upload/$token': typeof ApiUploadTokenRouteWithChildren
   '/verification/batches/$batchId': typeof VerificationBatchesBatchIdRoute
+  '/verification/batches/': typeof VerificationBatchesIndexRoute
   '/api/dv-requests/$requestId/resend': typeof ApiDvRequestsRequestIdResendRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/upload/$token/files': typeof ApiUploadTokenFilesRoute
@@ -659,7 +660,6 @@ export interface FileRoutesByTo {
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/upload/$token': typeof UploadTokenRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
-  '/verification/batches': typeof VerificationBatchesRouteWithChildren
   '/verification/expiry': typeof VerificationExpiryRoute
   '/verification/requests': typeof VerificationRequestsRoute
   '/clients': typeof ClientsIndexRoute
@@ -678,6 +678,7 @@ export interface FileRoutesByTo {
   '/api/reminder/send': typeof ApiReminderSendRoute
   '/api/upload/$token': typeof ApiUploadTokenRouteWithChildren
   '/verification/batches/$batchId': typeof VerificationBatchesBatchIdRoute
+  '/verification/batches': typeof VerificationBatchesIndexRoute
   '/api/dv-requests/$requestId/resend': typeof ApiDvRequestsRequestIdResendRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/upload/$token/files': typeof ApiUploadTokenFilesRoute
@@ -745,7 +746,6 @@ export interface FileRoutesById {
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/upload/$token': typeof UploadTokenRoute
   '/verification/$reviewId': typeof VerificationReviewIdRoute
-  '/verification/batches': typeof VerificationBatchesRouteWithChildren
   '/verification/expiry': typeof VerificationExpiryRoute
   '/verification/requests': typeof VerificationRequestsRoute
   '/clients/': typeof ClientsIndexRoute
@@ -764,6 +764,7 @@ export interface FileRoutesById {
   '/api/reminder/send': typeof ApiReminderSendRoute
   '/api/upload/$token': typeof ApiUploadTokenRouteWithChildren
   '/verification/batches/$batchId': typeof VerificationBatchesBatchIdRoute
+  '/verification/batches/': typeof VerificationBatchesIndexRoute
   '/api/dv-requests/$requestId/resend': typeof ApiDvRequestsRequestIdResendRoute
   '/api/dv-reviews/$reviewId/$action': typeof ApiDvReviewsReviewIdActionRoute
   '/api/upload/$token/files': typeof ApiUploadTokenFilesRoute
@@ -832,7 +833,6 @@ export interface FileRouteTypes {
     | '/clients/$clientId'
     | '/upload/$token'
     | '/verification/$reviewId'
-    | '/verification/batches'
     | '/verification/expiry'
     | '/verification/requests'
     | '/clients/'
@@ -851,6 +851,7 @@ export interface FileRouteTypes {
     | '/api/reminder/send'
     | '/api/upload/$token'
     | '/verification/batches/$batchId'
+    | '/verification/batches/'
     | '/api/dv-requests/$requestId/resend'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/upload/$token/files'
@@ -917,7 +918,6 @@ export interface FileRouteTypes {
     | '/clients/$clientId'
     | '/upload/$token'
     | '/verification/$reviewId'
-    | '/verification/batches'
     | '/verification/expiry'
     | '/verification/requests'
     | '/clients'
@@ -936,6 +936,7 @@ export interface FileRouteTypes {
     | '/api/reminder/send'
     | '/api/upload/$token'
     | '/verification/batches/$batchId'
+    | '/verification/batches'
     | '/api/dv-requests/$requestId/resend'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/upload/$token/files'
@@ -1002,7 +1003,6 @@ export interface FileRouteTypes {
     | '/clients/$clientId'
     | '/upload/$token'
     | '/verification/$reviewId'
-    | '/verification/batches'
     | '/verification/expiry'
     | '/verification/requests'
     | '/clients/'
@@ -1021,6 +1021,7 @@ export interface FileRouteTypes {
     | '/api/reminder/send'
     | '/api/upload/$token'
     | '/verification/batches/$batchId'
+    | '/verification/batches/'
     | '/api/dv-requests/$requestId/resend'
     | '/api/dv-reviews/$reviewId/$action'
     | '/api/upload/$token/files'
@@ -1088,7 +1089,6 @@ export interface RootRouteChildren {
   ClientsClientIdRoute: typeof ClientsClientIdRoute
   UploadTokenRoute: typeof UploadTokenRoute
   VerificationReviewIdRoute: typeof VerificationReviewIdRoute
-  VerificationBatchesRoute: typeof VerificationBatchesRouteWithChildren
   VerificationExpiryRoute: typeof VerificationExpiryRoute
   VerificationRequestsRoute: typeof VerificationRequestsRoute
   ClientsIndexRoute: typeof ClientsIndexRoute
@@ -1104,6 +1104,8 @@ export interface RootRouteChildren {
   ApiReminderPreviewRoute: typeof ApiReminderPreviewRoute
   ApiReminderSendRoute: typeof ApiReminderSendRoute
   ApiUploadTokenRoute: typeof ApiUploadTokenRouteWithChildren
+  VerificationBatchesBatchIdRoute: typeof VerificationBatchesBatchIdRoute
+  VerificationBatchesIndexRoute: typeof VerificationBatchesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1528,13 +1530,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerificationReviewIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/verification/batches': {
-      id: '/verification/batches'
-      path: '/verification/batches'
-      fullPath: '/verification/batches'
-      preLoaderRoute: typeof VerificationBatchesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/verification/expiry': {
       id: '/verification/expiry'
       path: '/verification/expiry'
@@ -1640,12 +1635,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiUploadTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/verification/batches/': {
+      id: '/verification/batches/'
+      path: '/verification/batches'
+      fullPath: '/verification/batches/'
+      preLoaderRoute: typeof VerificationBatchesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/verification/batches/$batchId': {
       id: '/verification/batches/$batchId'
-      path: '/$batchId'
+      path: '/verification/batches/$batchId'
       fullPath: '/verification/batches/$batchId'
       preLoaderRoute: typeof VerificationBatchesBatchIdRouteImport
-      parentRoute: typeof VerificationBatchesRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/dv-requests/$requestId/resend': {
       id: '/api/dv-requests/$requestId/resend'
@@ -1733,17 +1735,6 @@ const ApiDvReviewsRouteWithChildren = ApiDvReviewsRoute._addFileChildren(
   ApiDvReviewsRouteChildren,
 )
 
-interface VerificationBatchesRouteChildren {
-  VerificationBatchesBatchIdRoute: typeof VerificationBatchesBatchIdRoute
-}
-
-const VerificationBatchesRouteChildren: VerificationBatchesRouteChildren = {
-  VerificationBatchesBatchIdRoute: VerificationBatchesBatchIdRoute,
-}
-
-const VerificationBatchesRouteWithChildren =
-  VerificationBatchesRoute._addFileChildren(VerificationBatchesRouteChildren)
-
 interface ApiUploadTokenRouteChildren {
   ApiUploadTokenFilesRoute: typeof ApiUploadTokenFilesRoute
   ApiUploadTokenSubmitRoute: typeof ApiUploadTokenSubmitRoute
@@ -1817,7 +1808,6 @@ const rootRouteChildren: RootRouteChildren = {
   ClientsClientIdRoute: ClientsClientIdRoute,
   UploadTokenRoute: UploadTokenRoute,
   VerificationReviewIdRoute: VerificationReviewIdRoute,
-  VerificationBatchesRoute: VerificationBatchesRouteWithChildren,
   VerificationExpiryRoute: VerificationExpiryRoute,
   VerificationRequestsRoute: VerificationRequestsRoute,
   ClientsIndexRoute: ClientsIndexRoute,
@@ -1833,6 +1823,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiReminderPreviewRoute: ApiReminderPreviewRoute,
   ApiReminderSendRoute: ApiReminderSendRoute,
   ApiUploadTokenRoute: ApiUploadTokenRouteWithChildren,
+  VerificationBatchesBatchIdRoute: VerificationBatchesBatchIdRoute,
+  VerificationBatchesIndexRoute: VerificationBatchesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
