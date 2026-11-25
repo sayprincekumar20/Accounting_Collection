@@ -17,6 +17,7 @@ import {
   dvRequest,
   getReviewerName,
   isDecidable,
+  isToDecide,
   isOpen,
   RECOMMENDATION_TONE,
   recommendationLabel,
@@ -58,6 +59,7 @@ function ReviewPage() {
   const [name, setName] = useState("");
   const [dialog, setDialog] = useState<null | "approve" | "reject" | "request-documents">(null);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [onlyToDecide, setOnlyToDecide] = useState(false);
   useEffect(() => {
     setName(getReviewerName());
   }, []);
@@ -93,6 +95,7 @@ function ReviewPage() {
   }
 
   const open = isOpen(review.status);
+  const toDecide = review.rows.filter(isToDecide).length;
   const checks = review.summary.activation_checks ?? [];
   const met = checks.filter((c) => c.status === "PASS").length;
 
@@ -287,10 +290,20 @@ function ReviewPage() {
           title="Proposed changes"
           description={
             open
-              ? "Only rows marked Approve or Edit are written to the Zoho Account"
+              ? `${toDecide} to decide (marked) · only rows marked Approve or Edit are written to the Zoho Account`
               : "Result of the write-back"
           }
         >
+          {open && toDecide ? (
+            <label className="flex items-center gap-2 px-4 pt-3 text-sm">
+              <input
+                type="checkbox"
+                checked={onlyToDecide}
+                onChange={(e) => setOnlyToDecide(e.target.checked)}
+              />
+              Show only the {toDecide} row{toDecide === 1 ? "" : "s"} to decide
+            </label>
+          ) : null}
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
@@ -303,17 +316,19 @@ function ReviewPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {review.rows.map((row) => (
-                  <ChangeRow
-                    key={row.id}
-                    row={row}
-                    reviewId={review.id}
-                    open={open}
-                    needName={needName}
-                    onSaved={refresh}
-                    onError={(text) => setMessage({ tone: "error", text })}
-                  />
-                ))}
+                {review.rows
+                  .filter((row) => !onlyToDecide || isToDecide(row))
+                  .map((row) => (
+                    <ChangeRow
+                      key={row.id}
+                      row={row}
+                      reviewId={review.id}
+                      open={open}
+                      needName={needName}
+                      onSaved={refresh}
+                      onError={(text) => setMessage({ tone: "error", text })}
+                    />
+                  ))}
               </tbody>
             </table>
           </div>
@@ -575,10 +590,18 @@ function ChangeRow({
     }
   };
 
+  const pending = open && isToDecide(row);
   return (
-    <tr className={decidable ? "" : "text-muted-foreground"}>
+    <tr
+      className={`${decidable ? "" : "text-muted-foreground"} ${pending ? "border-l-4 border-l-primary bg-primary/5" : ""}`}
+    >
       <td className="px-4 py-3 align-top">
         <p className="font-semibold text-foreground">{row.field_label || row.zoho_field}</p>
+        {pending ? (
+          <span className="mt-1 inline-block rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
+            To decide
+          </span>
+        ) : null}
         <p className="text-xs text-muted-foreground">
           {(row.action || "").replace(/_/g, " ").toLowerCase()}
           {row.auto_applied === "Applied" ? " · written automatically" : ""}

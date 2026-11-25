@@ -105,6 +105,21 @@ const DECIDABLE = new Set([
   "NO_PICKLIST_VALUE",
   "ATTACH",
 ]);
+/** Rows counted as "to decide" in the Reviews list (same rule as the engine): a value change in
+ *  Zoho that is still Pending. Files to attach and information-only rows are not counted. */
+const TO_DECIDE = new Set([
+  "FILL",
+  "CORRECT",
+  "REVIEW_CONFLICT",
+  "HOLD",
+  "DIFFERS",
+  "NO_PICKLIST_VALUE",
+]);
+export const isToDecide = (r: ReviewRow) =>
+  r.decision === "Pending" &&
+  TO_DECIDE.has(String(r.action || "").toUpperCase()) &&
+  r.auto_applied !== "Applied";
+
 export const isDecidable = (r: ReviewRow) =>
   DECIDABLE.has(String(r.action || "").toUpperCase()) && r.auto_applied !== "Applied";
 
