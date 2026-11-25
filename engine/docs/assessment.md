@@ -131,3 +131,8 @@ URGENT "expired, collect the renewal" alert is raised; the activation email's su
   2303, DTI, SEC, Mayor's permit, barangay clearance, food safety permit); TIN is checked only when
   a TIN is on the documents; Invoice Company Name and Billing Address only need to be filled;
   activation needs COD, the contact and one document confirmed as this customer's (name or TIN).
+
+- **Contact details (Phone, Email)** are proposed only from the customer's own form (Customer
+  Information Sheet / credit application fields), never from numbers printed elsewhere, and never
+  Rare Global Food's own (policy.OWN_PHONES, OWN_EMAIL_DOMAINS: e.g. 02-886-8579 on the Credit
+  Application letterhead).

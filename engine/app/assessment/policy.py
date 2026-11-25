@@ -154,3 +154,11 @@ def _norm_channel(value: str | None) -> str:
 
 def is_wet_market(channel: str | None) -> bool:
     return _norm_channel(channel) in WET_MARKET_CHANNELS
+
+
+# Rare Global Food's own contact details (printed on its forms, e.g. the Credit Application
+# letterhead): never taken as the customer's. Phone numbers compared by their digits.
+OWN_PHONES = {"028868579", "8868579"}
+OWN_EMAIL_DOMAINS = ("rareglobalfood.com",)
+# Phone / Email for the Account are proposed only from the customer's own form, in its own fields
+CONTACT_SOURCE_TYPES = ("CUSTOMER_INFO_SHEET",)

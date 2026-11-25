@@ -479,3 +479,48 @@ def test_other_channels_keep_the_full_checks():
     a = assess({**SNAPSHOT, "Channel": "Key Accounts - Food Service"}, [bir()], TODAY)
     assert a["channel"] == "Key Accounts - Food Service" and a["channel_rule"] is None
     assert checks_of(a)["invoice_name"]["label"] == "Invoice Company Name matches the documents"
+
+
+# ---- contact details only from the customer's own form, never Rare Global Food's own ------
+def _cis(phone=None, email=None, other=None):
+    fields = {"registered_name": f("JUAN'S MEAT SHOP")}
+    if phone:
+        fields["phone"] = f(phone)
+    if email:
+        fields["email"] = f(email)
+    d = DocInput("cis", "Credit Application Form.pdf", "CUSTOMER_INFO_SHEET", fields, None, None)
+    d.other_fields = other or []
+    return d
+
+
+def _contact_props(a):
+    return {p["zoho_field"]: p for p in a["proposals"] if p["zoho_field"] in ("Phone", "Email")}
+
+
+def test_rare_global_food_letterhead_phone_is_never_proposed():
+    """FRUS CORP: 02-886-8579 is RGF's own number on the Credit Application letterhead."""
+    letterhead = [{"label": "Telephone Number", "value": "02-886-8579"},
+                  {"label": "Email", "value": "info@rareglobalfood.com"}]
+    a = assess({**SNAPSHOT, "Phone": None, "Email": None}, [bir(), _cis(other=letterhead)],
+               TODAY)
+    assert _contact_props(a) == {}
+
+
+def test_phone_from_another_document_is_not_proposed():
+    printed = permit()
+    printed.other_fields = [{"label": "Tel. No.", "value": "(046) 431-0000"}]   # city hall
+    a = assess({**SNAPSHOT, "Phone": None}, [bir(), printed], TODAY)
+    assert "Phone" not in _contact_props(a)
+
+
+def test_contact_from_the_customer_form_is_proposed():
+    a = assess({**SNAPSHOT, "Phone": None, "Email": None},
+               [bir(), _cis(phone="0917 555 1234", email="buyer@frus.ph")], TODAY)
+    props = _contact_props(a)
+    assert props["Phone"]["proposed_value"] == "0917 555 1234"
+    assert props["Email"]["proposed_value"] == "buyer@frus.ph"
+
+
+def test_customer_form_with_rgf_number_in_its_own_field_is_ignored():
+    a = assess({**SNAPSHOT, "Phone": None}, [bir(), _cis(phone="(02) 886 8579")], TODAY)
+    assert "Phone" not in _contact_props(a)

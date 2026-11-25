@@ -672,23 +672,45 @@ function DocumentViewer({ reviewId, pages }: { reviewId: string; pages: ReviewDe
       title="Documents"
       description={
         pages.length
-          ? "Compare each value with the page"
+          ? `${new Set(pages.map((p) => p.file)).size} file(s) · compare each value with the page`
           : "No page images (removed 30 days after closing)"
       }
     >
       <div className="space-y-3 px-4 py-3">
-        <div className="flex flex-wrap gap-2">
-          {pages.map((p) => (
-            <button
-              key={p.n}
-              type="button"
-              aria-pressed={p.n === current}
-              onClick={() => setCurrent(p.n)}
-              className={`min-h-9 rounded-lg border px-3 text-xs font-semibold ${p.n === current ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted"}`}
-            >
-              {p.file} · p{p.page}
-            </button>
-          ))}
+        <div className="space-y-2">
+          {Array.from(new Set(pages.map((p) => p.file))).map((file) => {
+            const filePages = pages.filter((p) => p.file === file);
+            const active = filePages.some((p) => p.n === current);
+            return (
+              <div
+                key={file}
+                className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${active ? "border-primary bg-primary/5" : "border-border"}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setCurrent(filePages[0]!.n)}
+                  className="mr-auto text-left text-xs font-semibold hover:underline"
+                >
+                  {file}
+                  <span className="ml-1 font-normal text-muted-foreground">
+                    · {filePages.length} page{filePages.length === 1 ? "" : "s"}
+                  </span>
+                </button>
+                {filePages.map((p) => (
+                  <button
+                    key={p.n}
+                    type="button"
+                    aria-pressed={p.n === current}
+                    aria-label={`${file}, page ${p.page}`}
+                    onClick={() => setCurrent(p.n)}
+                    className={`h-7 min-w-7 rounded-md border px-2 text-xs font-semibold ${p.n === current ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted"}`}
+                  >
+                    p{p.page}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
         </div>
         {page ? (
           <>
