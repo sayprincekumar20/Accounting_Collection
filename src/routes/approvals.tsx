@@ -28,6 +28,9 @@ interface Invoice {
   balance: number;
   status: string;
   po: string;
+  counter?: string;
+  /** Unticked at the last approval: not sent this cycle. */
+  excluded?: boolean;
 }
 interface Item {
   credit_terms?: string;
@@ -256,6 +259,7 @@ function ApprovalsPage() {
             approved: true,
             allow_multibranch: true,
             note: "5+ branches: approved by AR for contact",
+            excluded_invoices: [...untickedOf(i)],
           })),
         }),
       });
@@ -280,6 +284,33 @@ function ApprovalsPage() {
       setBusy(false);
     }
   }
+
+  // INVOICE SELECTION: every invoice is ticked by default; unticked ones are not sent this cycle (statement,
+  // texts, email, Grace's call, AI replies). Starts from the saved selection; at least one invoice stays ticked.
+  const [unticked, setUnticked] = useState<Record<string, Set<string>>>({});
+  const savedUnticked = (i: Item) =>
+    new Set(i.invoices.filter((v) => v.excluded).map((v) => v.number));
+  const untickedOf = (i: Item) => unticked[i.client_id] ?? savedUnticked(i);
+  const selectionChanged = (i: Item) => {
+    const a = untickedOf(i);
+    const b = savedUnticked(i);
+    return a.size !== b.size || [...a].some((x) => !b.has(x));
+  };
+  const toggleInvoice = (i: Item, num: string) => {
+    const next = new Set(untickedOf(i));
+    if (next.has(num)) next.delete(num);
+    else {
+      if (i.invoices.filter((v) => !next.has(v.number)).length <= 1) {
+        setMsg(`${i.client_name}: at least one invoice must stay selected.`);
+        return;
+      }
+      next.add(num);
+    }
+    setMsg("");
+    setUnticked((prev) => ({ ...prev, [i.client_id]: next }));
+  };
+  const sentAmount = (i: Item) =>
+    i.invoices.filter((v) => !untickedOf(i).has(v.number)).reduce((t, v) => t + v.balance, 0);
 
   async function save(list: Item[], approve: boolean) {
     setMsg("");
@@ -307,6 +338,7 @@ function ApprovalsPage() {
             client_name: i.client_name,
             approved: approve,
             note,
+            ...(approve ? { excluded_invoices: [...untickedOf(i)] } : {}),
           })),
         }),
       });
@@ -315,6 +347,11 @@ function ApprovalsPage() {
         throw new Error(b.detail || b.error || "Save failed");
       }
       setSelected(new Set());
+      setUnticked((prev) => {
+        const n = { ...prev };
+        for (const i of list) delete n[i.client_id];
+        return n;
+      });
       setMsg(`${approve ? "Approved" : "Approval removed for"} ${list.length} client(s).`);
       await qc.invalidateQueries({ queryKey: ["contact-approvals"] });
     } catch (e) {
@@ -601,6 +638,11 @@ function ApprovalsPage() {
                                 : `Show ${i.invoices.length} invoice(s)`}
                             </button>
                           </div>
+                          <SelectionLine
+                            count={i.invoices.length}
+                            unticked={untickedOf(i).size}
+                            sent={sentAmount(i)}
+                          />
                           <p className="mt-1 text-[10px] text-muted-foreground">
                             Data from Zoho: {when(i.refreshed_at)} ·{" "}
                             <StatementLink fileId={i.pdf_file_id} at={i.pdf_generated_at} />
@@ -644,6 +686,16 @@ function ApprovalsPage() {
                               >
                                 Remove
                               </button>
+                              {selectionChanged(i) ? (
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => save([i], true)}
+                                  className="ml-1 mt-1 rounded-md bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                                >
+                                  Save selection
+                                </button>
+                              ) : null}
                             </>
                           ) : (
                             <>
@@ -678,7 +730,15 @@ function ApprovalsPage() {
                         <tr>
                           <td />
                           <td colSpan={6} className="px-3 pb-4">
-                            <InvoiceTable invoices={i.invoices} />
+                            <InvoiceTable
+                              invoices={i.invoices}
+                              selectable={{
+                                unticked: untickedOf(i),
+                                onToggle: (n) => {
+                                  toggleInvoice(i, n);
+                                },
+                              }}
+                            />
                           </td>
                         </tr>
                       ) : null}
@@ -786,6 +846,11 @@ function ApprovalsPage() {
                             }
                           />
                         </div>
+                        <SelectionLine
+                          count={i.invoices.length}
+                          unticked={untickedOf(i).size}
+                          sent={sentAmount(i)}
+                        />
                         <p className="mt-1 text-[10px] text-muted-foreground">
                           Data from Zoho: {when(i.refreshed_at)} ·{" "}
                           <StatementLink fileId={i.pdf_file_id} at={i.pdf_generated_at} />
@@ -828,7 +893,15 @@ function ApprovalsPage() {
                       <tr>
                         <td />
                         <td colSpan={6} className="px-3 pb-4">
-                          <InvoiceTable invoices={i.invoices} />
+                          <InvoiceTable
+                            invoices={i.invoices}
+                            selectable={{
+                              unticked: untickedOf(i),
+                              onToggle: (n) => {
+                                toggleInvoice(i, n);
+                              },
+                            }}
+                          />
                         </td>
                       </tr>
                     ) : null}
@@ -901,5 +974,24 @@ function CycleStatus({ i }: { i: Item }) {
         <p className="text-muted-foreground">Not called this cycle</p>
       )}
     </div>
+  );
+}
+
+/** "4 of 6 invoices · PHP X sent": shown when some invoices are unticked. */
+function SelectionLine({
+  count,
+  unticked,
+  sent,
+}: {
+  count: number;
+  unticked: number;
+  sent: number;
+}) {
+  if (!unticked) return null;
+  return (
+    <p className="mt-1 text-[11px] font-semibold text-primary">
+      {count - unticked} of {count} invoices selected · PHP{" "}
+      {sent.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sent
+    </p>
   );
 }

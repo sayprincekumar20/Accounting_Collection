@@ -36,9 +36,24 @@ export const Route = createFileRoute("/api/contact-approvals")({
               client_name?: string;
               approved?: boolean;
               note?: string;
+              allow_multibranch?: boolean;
+              /** Invoice numbers unticked at approval: only the ticked ones are sent this cycle. */
+              excluded_invoices?: unknown;
             }[];
           };
-          const items = (b.items || []).filter((i) => i && i.client_id).slice(0, 500);
+          const items = (b.items || [])
+            .filter((i) => i && i.client_id)
+            .slice(0, 500)
+            .map((i) => ({
+              ...i,
+              ...(Array.isArray(i.excluded_invoices)
+                ? {
+                    excluded_invoices: i.excluded_invoices
+                      .map((x) => String(x).slice(0, 80))
+                      .slice(0, 500),
+                  }
+                : {}),
+            }));
           if (!items.length || !s(b.approved_by).trim())
             return json({ error: "approved_by and at least one client are required" }, 400);
           const res = await fetch(APPROVAL_WEBHOOK, {
@@ -52,6 +67,8 @@ export const Route = createFileRoute("/api/contact-approvals")({
           const out = (await res.json().catch(() => ({}))) as { ok?: boolean; saved?: number };
           if (!res.ok || !out.ok) throw new Error(`n8n approval update failed (${res.status})`);
           clearDataTableCache(APPROVALS);
+          // An invoice selection changes the clients' rows (n8n 28): show them fresh.
+          clearDataTableCache("rJpqXxmxhqJnlLrJ");
           return json({ ok: true, saved: out.saved ?? items.length });
         } catch (err) {
           console.error("[contact-approvals] POST error:", err);

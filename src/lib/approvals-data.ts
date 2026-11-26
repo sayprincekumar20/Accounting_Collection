@@ -56,6 +56,7 @@ export async function loadApprovalItems() {
         status: string;
         po: string;
         counter: string;
+        excluded: boolean;
       }[] = [];
       try {
         for (const b of JSON.parse(s(c["branches_data"]) || "[]")) {
@@ -76,6 +77,7 @@ export async function loadApprovalItems() {
               status: s(i["status"]).toUpperCase(),
               po: s(i["po_number"]),
               counter: s(i["counter_date"]).slice(0, 10),
+              excluded: i["excluded"] === true,
             });
           }
         }

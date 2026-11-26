@@ -1,5 +1,6 @@
 import { getEnv } from "@/lib/env";
 import { manilaToday, withLiveStatus } from "./live-status";
+import { withSelectionRestored } from "./invoice-selection";
 
 // Direct calls to n8n's Data Table REST API (/api/v1/data-tables/{id}/rows),
 // authenticated with a dedicated read-only N8N_API_KEY. This is a genuine
@@ -179,7 +180,10 @@ function clientsAsOfToday<T>(result: DataTableResult<T>): DataTableResult<T> {
   if (hit && hit.day === day) return hit.value as DataTableResult<T>;
   const value = {
     ...result,
-    rows: result.rows.map((r) => withLiveStatus(r as Record<string, unknown>, day) as T),
+    // Unticked invoices back in (full balance shown; `selection` = what is sent), then status as of today.
+    rows: result.rows.map(
+      (r) => withLiveStatus(withSelectionRestored(r as Record<string, unknown>), day) as T,
+    ),
   };
   liveMemo.set(result, { day, value: value as DataTableResult<unknown> });
   return value;

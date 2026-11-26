@@ -10,6 +10,8 @@ export interface InvoiceRow {
   po: string;
   /** Zoho Inventory "Date Counter" (payment terms often run from it); empty = not yet countered / not refreshed. */
   counter?: string;
+  /** Unticked at approval: not sent to the client this cycle (Contact Approvals invoice selection). */
+  excluded?: boolean;
 }
 
 const peso = (v: number) =>
@@ -41,7 +43,14 @@ export function InvoiceToggle({
   );
 }
 
-export function InvoiceTable({ invoices }: { invoices: InvoiceRow[] }) {
+export function InvoiceTable({
+  invoices,
+  selectable,
+}: {
+  invoices: InvoiceRow[];
+  /** Contact Approvals: tick boxes; only ticked invoices are sent (statement, texts, email, calls). */
+  selectable?: { unticked: Set<string>; onToggle: (invoiceNumber: string) => void } | undefined;
+}) {
   if (!invoices.length)
     return <p className="py-1 text-xs text-muted-foreground">No open invoices.</p>;
   return (
@@ -49,6 +58,11 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceRow[] }) {
       <table className="w-full text-xs">
         <thead>
           <tr className="text-left text-muted-foreground">
+            {selectable ? (
+              <th className="py-1 pr-2" title="Ticked invoices are sent to the client">
+                Send
+              </th>
+            ) : null}
             <th className="py-1 pr-3">Invoice</th>
             <th className="py-1 pr-3">Branch</th>
             <th className="py-1 pr-3">Date</th>
@@ -62,8 +76,31 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceRow[] }) {
         </thead>
         <tbody>
           {invoices.map((v, k) => (
-            <tr key={k} className="border-t border-border">
-              <td className="py-1 pr-3 font-semibold">{v.number}</td>
+            <tr
+              key={k}
+              className={`border-t border-border ${selectable?.unticked.has(v.number) ? "opacity-50" : ""}`}
+            >
+              {selectable ? (
+                <td className="py-1 pr-2">
+                  <input
+                    type="checkbox"
+                    aria-label={`Send invoice ${v.number}`}
+                    checked={!selectable.unticked.has(v.number)}
+                    onChange={() => {
+                      selectable.onToggle(v.number);
+                    }}
+                    className="h-4 w-4 accent-primary"
+                  />
+                </td>
+              ) : null}
+              <td className="py-1 pr-3 font-semibold">
+                {v.number}
+                {selectable?.unticked.has(v.number) ? (
+                  <span className="ml-1 rounded bg-muted px-1 text-[10px] font-normal text-muted-foreground">
+                    not sent
+                  </span>
+                ) : null}
+              </td>
               <td className="py-1 pr-3">{v.branch}</td>
               <td className="py-1 pr-3">{day(v.date)}</td>
               <td className="py-1 pr-3">{day(v.due)}</td>

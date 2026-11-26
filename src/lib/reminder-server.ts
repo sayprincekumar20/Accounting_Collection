@@ -15,6 +15,7 @@ import {
   type ReminderClient,
   type ReminderDraft,
 } from "@/lib/reminder-templates";
+import { sentView } from "@/lib/invoice-selection";
 
 type Row = Record<string, unknown>;
 const CLIENTS = "rJpqXxmxhqJnlLrJ";
@@ -63,17 +64,21 @@ export async function reminderPreview(
   ]);
   const row = rows.find((r) => s(r["client_id"]) === clientId);
   if (!row) return null;
-  const m = clients.find((c) => c.client_id === clientId);
+  // Invoices unticked at approval are not sent: the reminder uses the ticked ones only (like the automation).
+  const sel = row["selection"] ? sentView(row) : null;
+  const m = sel ? undefined : clients.find((c) => c.client_id === clientId);
   const rc: ReminderClient = {
     client_id: clientId,
     client_name: s(row["client_name"]),
     contact_person: s(row["contact_person"]),
     email: s(row["email"]).trim(),
     phone: s(row["phone"]).trim(),
-    overdue: m?.overdue ?? num(row["overdue_total"]),
-    current: m?.current ?? num(row["current_total"]),
-    total: m?.total ?? num(row["collection_amount"]),
-    invoice_statuses: m ? m.invoices.map((i) => i.status.toUpperCase()) : statusesFromBranches(row),
+    overdue: sel?.overdue ?? m?.overdue ?? num(row["overdue_total"]),
+    current: sel?.current ?? m?.current ?? num(row["current_total"]),
+    total: sel?.total ?? m?.total ?? num(row["collection_amount"]),
+    invoice_statuses:
+      sel?.statuses ??
+      (m ? m.invoices.map((i) => i.status.toUpperCase()) : statusesFromBranches(row)),
     pdf_file_id: s(row["pdf_file_id"]),
     pdf_generated_date: s(row["pdf_generated_date"]),
   };
