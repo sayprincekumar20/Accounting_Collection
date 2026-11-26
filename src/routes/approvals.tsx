@@ -12,6 +12,7 @@ import { CreditLine } from "@/components/collections/CreditLine";
 import { Pager } from "@/components/collections/Pager";
 import { OtherAccountsContent } from "./other-accounts";
 import { InvoiceTable, InvoiceToggle } from "@/components/collections/InvoiceTable";
+import { StatementLink } from "@/components/collections/StatementLink";
 
 export const Route = createFileRoute("/approvals")({
   head: () => ({ meta: [{ title: "Contact Approvals | Rare Global Food Collections" }] }),
@@ -48,6 +49,8 @@ interface Item {
   promise_until: string;
   ar_handoff_until: string;
   refreshed_at: string;
+  pdf_file_id?: string;
+  pdf_generated_at?: string;
   invoices: Invoice[];
   approved: boolean;
   approved_by: string;
@@ -599,7 +602,8 @@ function ApprovalsPage() {
                             </button>
                           </div>
                           <p className="mt-1 text-[10px] text-muted-foreground">
-                            Data from Zoho: {when(i.refreshed_at)}
+                            Data from Zoho: {when(i.refreshed_at)} ·{" "}
+                            <StatementLink fileId={i.pdf_file_id} at={i.pdf_generated_at} />
                           </p>
                         </td>
                         <td className="px-3 py-3 align-top text-xs">
@@ -783,7 +787,8 @@ function ApprovalsPage() {
                           />
                         </div>
                         <p className="mt-1 text-[10px] text-muted-foreground">
-                          Data from Zoho: {when(i.refreshed_at)}
+                          Data from Zoho: {when(i.refreshed_at)} ·{" "}
+                          <StatementLink fileId={i.pdf_file_id} at={i.pdf_generated_at} />
                         </p>
                       </td>
                       <td className="px-3 py-3 text-xs">

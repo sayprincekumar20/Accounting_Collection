@@ -103,6 +103,8 @@ export async function loadApprovalItems() {
         promise_until: s(c["promise_suppressed_until"]),
         ar_handoff_until: s(c["ar_handoff_until"]),
         refreshed_at: s(c["updatedAt"]),
+        pdf_file_id: s(c["pdf_file_id"]),
+        pdf_generated_at: s(c["pdf_generated_date"]),
         invoices,
         approved: approvedThisCycle,
         approval_expired: everApproved && !approvedThisCycle,

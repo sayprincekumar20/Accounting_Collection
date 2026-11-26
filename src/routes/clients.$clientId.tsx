@@ -16,6 +16,7 @@ import {
   StatCard,
   RefreshButton,
 } from "@/components/collections/Bits";
+import { StatementLink } from "@/components/collections/StatementLink";
 
 export const Route = createFileRoute("/clients/$clientId")({
   head: () => ({
@@ -50,6 +51,8 @@ interface ClientRow {
   invoice_numbers: string;
   credit_terms: string;
   credit_limit: number | null;
+  pdf_file_id?: string;
+  pdf_generated_at?: string;
 }
 interface QueueRow {
   queue_id: string;
@@ -316,6 +319,9 @@ function ClientDetail() {
           hint={client.credit_terms ?? "No terms on file"}
         />
       </div>
+      <p className="mt-3 text-xs">
+        <StatementLink fileId={client.pdf_file_id} at={client.pdf_generated_at} />
+      </p>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-3">
         <div className="xl:col-span-2">

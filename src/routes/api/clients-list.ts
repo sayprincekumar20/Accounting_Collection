@@ -97,6 +97,9 @@ export const Route = createFileRoute("/api/clients-list")({
               segment: r.segment || "",
               ar_owner: r.ar_owner || "",
               reach: reachOf(r),
+              pdf_file_id: (r as { pdf_file_id?: string | null }).pdf_file_id || "",
+              pdf_generated_at:
+                (r as { pdf_generated_date?: string | null }).pdf_generated_date || "",
               ...activityFor(r.client_id),
             }));
 

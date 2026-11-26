@@ -1,4 +1,5 @@
 import { getEnv } from "@/lib/env";
+import { manilaToday, withLiveStatus } from "./live-status";
 
 // Direct calls to n8n's Data Table REST API (/api/v1/data-tables/{id}/rows),
 // authenticated with a dedicated read-only N8N_API_KEY. This is a genuine
@@ -161,6 +162,30 @@ function startLoad<T>(dataTableId: string, q: TableQuery): Promise<DataTableResu
  * Pass fresh=true to bypass all caches.
  */
 export async function fetchDataTable<T = Record<string, unknown>>(
+  dataTableId: string,
+  opts: { fresh?: boolean } & TableQuery = {},
+): Promise<DataTableResult<T>> {
+  const result = await fetchDataTableRaw<T>(dataTableId, opts);
+  return dataTableId === CLIENTS_TABLE_ID ? clientsAsOfToday(result) : result;
+}
+
+// Clients: invoice statuses and overdue/current totals as of TODAY (lib/live-status.ts), for every page.
+// Worked out once per cached result and day.
+const CLIENTS_TABLE_ID = "rJpqXxmxhqJnlLrJ";
+const liveMemo = new WeakMap<object, { day: string; value: DataTableResult<unknown> }>();
+function clientsAsOfToday<T>(result: DataTableResult<T>): DataTableResult<T> {
+  const day = manilaToday();
+  const hit = liveMemo.get(result);
+  if (hit && hit.day === day) return hit.value as DataTableResult<T>;
+  const value = {
+    ...result,
+    rows: result.rows.map((r) => withLiveStatus(r as Record<string, unknown>, day) as T),
+  };
+  liveMemo.set(result, { day, value: value as DataTableResult<unknown> });
+  return value;
+}
+
+async function fetchDataTableRaw<T = Record<string, unknown>>(
   dataTableId: string,
   opts: { fresh?: boolean } & TableQuery = {},
 ): Promise<DataTableResult<T>> {

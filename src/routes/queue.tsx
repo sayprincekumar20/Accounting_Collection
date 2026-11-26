@@ -18,6 +18,7 @@ import {
   StatCard,
   RefreshButton,
 } from "@/components/collections/Bits";
+import { cycleStart } from "@/lib/cycle";
 
 export const Route = createFileRoute("/queue")({
   head: () => ({
@@ -68,6 +69,7 @@ const QUEUE_STATUSES = [
   { value: "q_SKIPPED_NOT_SALES_TEAM", label: "Skipped: owner not in Sales Team" },
   { value: "q_PAID", label: "Paid before sending" },
   { value: "q_STALE", label: "Stale (retired)" },
+  { value: "q_EARLIER", label: "Earlier cycles (not this week)" },
 ];
 
 function peso(v: number) {
@@ -102,8 +104,16 @@ function useQueue() {
 function QueuePage() {
   const { data, isLoading, isFetching, error, refetch } = useQueue();
   const all = data ?? [];
-  // Live queue = everything except STALE rows (retired clients / old cycles); Stale stays available via the filter.
-  const queue = all.filter((q) => q.queue_status.toUpperCase() !== "STALE");
+  // Live queue = THIS cycle's rows (created, attempted or sent since Wednesday 00:00 Manila), not retired.
+  // Rows of earlier cycles (old SENT rows, clients that no longer exist) used to be counted as "this cycle"
+  // (Nov 26: 204 shown, 177 real); they stay available through the "Earlier cycles" filter, Stale likewise.
+  const cycleMs = cycleStart().getTime();
+  const inCycle = (q: QueueRow) =>
+    [q.created_date, q.attempted_date, q.sent_date].some((d) =>
+      d ? new Date(d).getTime() >= cycleMs : false,
+    );
+  const queue = all.filter((q) => q.queue_status.toUpperCase() !== "STALE" && inCycle(q));
+  const earlier = all.filter((q) => q.queue_status.toUpperCase() !== "STALE" && !inCycle(q));
   const sent = queue.filter((q) => q.queue_status.toUpperCase() === "SENT");
   const waiting = queue.filter((q) => q.queue_status.toUpperCase() === "WAITING_QUOTA");
   const skipped = queue.filter((q) => q.queue_status.toUpperCase().startsWith("SKIPPED"));
@@ -112,9 +122,9 @@ function QueuePage() {
   const [filters, setFilters, clearFilters] = useLogFilters("queue");
   const statusIsMine = QUEUE_STATUSES.some((o) => o.value === filters.status);
   const wanted = statusIsMine && filters.status !== "all" ? filters.status.slice(2) : "";
-  const visible = (wanted === "STALE" ? all : queue).filter(
+  const visible = (wanted === "STALE" ? all : wanted === "EARLIER" ? earlier : queue).filter(
     (q) =>
-      (!wanted || q.queue_status.toUpperCase() === wanted) &&
+      (!wanted || wanted === "EARLIER" || q.queue_status.toUpperCase() === wanted) &&
       matchesLogFilters(
         {
           name: q.client_name,

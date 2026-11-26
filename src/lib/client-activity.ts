@@ -22,14 +22,7 @@ const str = (v: unknown) => (v == null ? "" : String(v));
 export const companyKey = (id: unknown) => str(id).split("___")[0]!.trim().toLowerCase();
 
 /** Start of the current reminder cycle: the most recent Wednesday 00:00 in Manila (UTC+8). */
-export function cycleStart(now: Date = new Date()): Date {
-  const manila = new Date(now.getTime() + 8 * 3600000);
-  const back = (manila.getUTCDay() - 3 + 7) % 7; // 3 = Wednesday
-  return new Date(
-    Date.UTC(manila.getUTCFullYear(), manila.getUTCMonth(), manila.getUTCDate() - back) -
-      8 * 3600000,
-  );
-}
+export { cycleStart } from "@/lib/cycle";
 
 export async function loadActivityTables(): Promise<[Act[], Act[], Act[]]> {
   return Promise.all([

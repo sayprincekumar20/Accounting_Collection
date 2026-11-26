@@ -76,6 +76,52 @@ const EMAIL_CODES: IssueCode[] = ["BOUNCED", "FAKE_EMAIL", "INTERNAL_EMAIL", "IN
 export const isPlaceholderEmail = (email: string) =>
   /(^|[@.])fake|fake\d*@|@example\.|@test\.|noemail|none@|n\/a/.test(email);
 export const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(email);
+
+// Common email providers. A domain one or two letters away from one of these is almost certainly a typo
+// (SUNRICH123@GMAILLLL.COM, ...@yahooo.com, ...@gmail.con); an exact match is always fine.
+const PROVIDERS = [
+  "gmail.com",
+  "googlemail.com",
+  "yahoo.com",
+  "yahoo.com.ph",
+  "ymail.com",
+  "rocketmail.com",
+  "hotmail.com",
+  "outlook.com",
+  "live.com",
+  "msn.com",
+  "icloud.com",
+  "me.com",
+  "mail.com",
+  "email.com",
+  "aol.com",
+  "proton.me",
+  "protonmail.com",
+  "zoho.com",
+];
+const distance = (a: string, b: string) => {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0]![j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++)
+      d[i]![j] = Math.min(
+        d[i - 1]![j]! + 1,
+        d[i]![j - 1]! + 1,
+        d[i - 1]![j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+  return d[a.length]![b.length]!;
+};
+/** The provider domain an email was probably meant for ("gmail.com" for "gmailll.com"), or "". */
+export function emailDomainTypo(email: string): string {
+  const domain = email.trim().toLowerCase().split("@")[1] ?? "";
+  if (!domain || PROVIDERS.includes(domain)) return "";
+  // Repeated letters collapsed first: "gmaillll.com" -> "gmail.com" (3 letters away, still a typo).
+  const squeeze = (s: string) => s.replace(/(.)\1+/g, "$1");
+  const repeated = PROVIDERS.find((p) => squeeze(p) === squeeze(domain));
+  if (repeated) return repeated;
+  const near = PROVIDERS.map((p) => ({ p, d: distance(domain, p) })).sort((x, y) => x.d - y.d)[0];
+  return near && near.d > 0 && near.d <= 2 ? near.p : "";
+}
 /** PH mobile: 63 9XX XXX XXXX, 09XX XXX XXXX or 9XX XXX XXXX. */
 export const isPhMobile = (raw: string) =>
   /^(63)?9\d{9}$/.test(raw.replace(/\D/g, "").replace(/^0/, ""));
@@ -99,6 +145,8 @@ export function classifyContact(c: {
   if (email && isPlaceholderEmail(email)) add("FAKE_EMAIL", c.email);
   else if (email.endsWith("@rareglobalfood.com")) add("INTERNAL_EMAIL", c.email);
   else if (email && !isValidEmail(email)) add("INVALID_EMAIL", c.email);
+  else if (email && emailDomainTypo(email))
+    add("INVALID_EMAIL", `${c.email} (looks like a typo for @${emailDomainTypo(email)})`);
   if (c.bounce) add("BOUNCED", c.bounce.replace(/^Email bounced:?\s*/i, ""));
   if (phone && !isPhMobile(phone)) add("BAD_PHONE", c.phone);
   if (!c.contact_person.trim()) add("NO_PERSON", "No Accounting / Primary contact in Zoho CRM.");

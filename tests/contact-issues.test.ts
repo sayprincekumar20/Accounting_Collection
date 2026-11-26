@@ -40,3 +40,34 @@ describe("contact problems and reachability", () => {
     expect(codes({ wrongPerson: "Client said wrong person" })).toEqual(["WRONG_PERSON"]);
   });
 });
+
+import { emailDomainTypo } from "../src/lib/contact-issues";
+describe("typo email domains", () => {
+  it("flags near-misses of common providers, never the real ones or company domains", () => {
+    expect(emailDomainTypo("SUNRICH123@GMAILLLL.COM")).toBe("gmail.com");
+    expect(emailDomainTypo("a@yahooo.com")).toBe("yahoo.com");
+    expect(emailDomainTypo("a@gmail.con")).toBe("gmail.com");
+    expect(emailDomainTypo("a@hotmial.com")).toBe("hotmail.com");
+    for (const ok of [
+      "a@gmail.com",
+      "a@mail.com",
+      "a@ymail.com",
+      "a@live.com",
+      "a@yahoo.com.ph",
+      "a@armynavy.com.ph",
+      "a@sodexo.com",
+      "a@accor.com",
+    ])
+      expect(emailDomainTypo(ok)).toBe("");
+  });
+  it("a typo domain makes the email unusable (Contacts to Fix, reachability)", () => {
+    const r = classifyContact({
+      email: "SUNRICH123@GMAILLLL.COM",
+      phone: "639173041524",
+      contact_person: "Miki Garcia",
+    });
+    expect(r.issues[0]).toMatchObject({ code: "INVALID_EMAIL" });
+    expect(r.issues[0]!.detail).toContain("typo for @gmail.com");
+    expect(r.reach).toEqual({ email: false, phone: true });
+  });
+});
