@@ -148,3 +148,12 @@ def test_review_shows_the_channel(setup):
     api, review, _ = setup
     detail = api.get(f"/v1/reviews/{review.id}", headers=KEY).json()
     assert "channel" in detail and "channel_rule" in detail
+
+
+def test_apply_returns_per_field_outcomes_and_notes(setup):
+    api, review, _ = setup
+    api.post(f"/v1/reviews/{review.id}/start", headers={**KEY, "X-Reviewer": "Ana"})
+    res = api.post(f"/v1/reviews/{review.id}/approve", headers={**KEY, "X-Reviewer": "Ana"},
+                   json={"values_compared": True}).json()
+    assert {"status", "activated", "error", "notes", "rows"} <= set(res)
+    assert all({"field", "outcome", "detail"} <= set(r) for r in res["rows"])
