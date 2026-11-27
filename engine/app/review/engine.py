@@ -221,6 +221,7 @@ def approve(db: Session, review: Review, client: ZohoClient, reviewer: str, *,
                  review.job_id, {"reviewer": reviewer, "activated": result.activated,
                                  "rows": {r.zoho_field: r.outcome for r in result.rows}})
     return {"status": result.status, "activated": result.activated, "error": result.error,
+            "notes": list(result.notes or []),
             "rows": [{"id": r.row_id, "field": r.zoho_field, "outcome": r.outcome,
                       "detail": r.detail} for r in result.rows]}
 
