@@ -791,17 +791,6 @@ type ApplyOutcome = {
   rows: { id: string; field: string; outcome: string; detail: string | null }[];
 };
 
-const OUTCOME: Record<string, { label: string; tone: string }> = {
-  APPLIED: { label: "Written to Zoho and confirmed", tone: "text-success" },
-  CONFLICT: { label: "Not written: changed in Zoho meanwhile", tone: "text-warning" },
-  FAILED: { label: "Not written", tone: "text-destructive" },
-  NO_VALUE: { label: "Not written: no value", tone: "text-muted-foreground" },
-  UNSUPPORTED: {
-    label: "Not written: not changed by the verification",
-    tone: "text-muted-foreground",
-  },
-};
-
 /** What really happened in Zoho after Apply: per field written (confirmed by reading the Account
  *  back) or not and why, and the activation. */
 function ApplyResultDialog({
@@ -819,84 +808,56 @@ function ApplyResultDialog({
   rows: ReviewRow[];
   onClose: () => void;
 }) {
-  const byField = new Map(rows.map((r) => [r.zoho_field, r]));
-  const shown = result.rows.filter((r) => r.outcome !== "SKIPPED" && r.outcome !== "PENDING");
-  const written = shown.filter((r) => r.outcome === "APPLIED").length;
-  const problems = shown.filter((r) => ["FAILED", "CONFLICT"].includes(r.outcome)).length;
-  const activationNote = (result.notes ?? []).find((n) => /Customer Status|Activation/i.test(n));
-  const ok = problems === 0 && !result.error && (!activationAsked || result.activated);
+  const label = new Map(rows.map((r) => [r.zoho_field, r.field_label || r.zoho_field]));
+  const value = new Map(
+    rows.map((r) => [r.zoho_field, r.decision === "Edit" ? r.edited_value : r.proposed_value]),
+  );
+  // only what was approved: written (confirmed in Zoho) or approved but not written
+  const written = result.rows.filter((r) => r.outcome === "APPLIED");
+  const notWritten = result.rows.filter((r) =>
+    ["FAILED", "CONFLICT", "NO_VALUE", "UNSUPPORTED"].includes(r.outcome),
+  );
+  const activated = !!result.activated;
+  const title = written.length
+    ? `Updated in Zoho: ${written.length} field${written.length === 1 ? "" : "s"}`
+    : activated
+      ? "Account activated in Zoho"
+      : "Nothing was changed in Zoho";
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            {ok
-              ? `Done: ${written} field${written === 1 ? "" : "s"} written to Zoho`
-              : "Some changes were not written to Zoho"}
-          </DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            {number} · {account} · checked by reading the Account back from Zoho after writing.
+            {number} · {account} · confirmed by reading the Account back from Zoho.
           </DialogDescription>
         </DialogHeader>
-        <div
-          className={`rounded-lg border p-3 text-sm ${ok ? "border-success/30 bg-success/10" : "border-destructive/30 bg-destructive/5"}`}
-        >
-          <p className="font-semibold">
-            Result: {result.status}
-            {written ? ` · ${written} written` : ""}
-            {problems ? ` · ${problems} not written` : ""}
-          </p>
+        <div className="space-y-1.5 text-sm">
+          {written.map((r) => (
+            <p key={r.id || r.field}>
+              <span className="text-success">✓</span>{" "}
+              <span className="font-semibold">{label.get(r.field) ?? r.field}</span>
+              {value.get(r.field) ? `: ${value.get(r.field)}` : ""}
+            </p>
+          ))}
+          {activationAsked || activated ? (
+            <p>
+              <span className={activated ? "text-success" : "text-destructive"}>
+                {activated ? "✓" : "✗"}
+              </span>{" "}
+              <span className="font-semibold">Customer Status</span>
+              {activated ? ": Active" : ": not changed"}
+            </p>
+          ) : null}
+          {notWritten.length ? (
+            <p className="pt-2 text-muted-foreground">
+              Not written ({notWritten.length}):{" "}
+              {notWritten.map((r) => label.get(r.field) ?? r.field).join(", ")}. See the Decision on
+              the review for the reason.
+            </p>
+          ) : null}
           {result.error ? <p className="text-destructive">{result.error}</p> : null}
         </div>
-        {shown.length ? (
-          <div className="max-h-72 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="py-1.5 font-semibold">Field</th>
-                  <th className="py-1.5 font-semibold">Value</th>
-                  <th className="py-1.5 font-semibold">In Zoho</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {shown.map((r) => {
-                  const row = byField.get(r.field);
-                  const o = OUTCOME[r.outcome] ?? { label: r.outcome, tone: "" };
-                  const value =
-                    row?.decision === "Edit" ? row.edited_value : (row?.proposed_value ?? "");
-                  return (
-                    <tr key={r.id || r.field}>
-                      <td className="py-2 pr-2 font-medium">{row?.field_label || r.field}</td>
-                      <td className="py-2 pr-2 break-words">{value || "—"}</td>
-                      <td className="py-2">
-                        <p className={`font-semibold ${o.tone}`}>
-                          {r.outcome === "APPLIED" ? "✓ " : "✗ "}
-                          {o.label}
-                        </p>
-                        {r.detail && r.outcome !== "APPLIED" ? (
-                          <p className="text-xs text-muted-foreground">{r.detail}</p>
-                        ) : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No field was marked to be written.</p>
-        )}
-        {activationAsked || result.activated ? (
-          <p
-            className={`rounded-lg border p-3 text-sm ${result.activated ? "border-success/30 bg-success/10" : "border-destructive/30 bg-destructive/5"}`}
-          >
-            {result.activated ? "✓ " : "✗ "}
-            {activationNote ||
-              (result.activated
-                ? "Customer Status set to Active"
-                : "Customer Status was not changed")}
-          </p>
-        ) : null}
         <DialogFooter>
           <Button onClick={onClose}>Close</Button>
         </DialogFooter>
