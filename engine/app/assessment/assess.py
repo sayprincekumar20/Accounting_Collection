@@ -7,6 +7,7 @@ from datetime import date
 from typing import Any
 
 from app.assessment import policy
+from app.assessment.alerts import DOCUMENT_LABELS
 from app.assessment.matching import (
     DIFFERENT,
     LIKELY_SAME,
@@ -363,6 +364,48 @@ def _compare_field(zoho_field: str, current: Any, chosen: Fact | None, proposed:
                      ("Zoho differs from the documents. " + extra_reason).strip(), **extra)
 
 
+ADDRESS_PRIORITY = ("CUSTOMER_INFO_SHEET", "BIR_2303", "MAYORS_PERMIT")
+
+
+def _lookup_name(value):
+    return value.get("name") if isinstance(value, dict) else value
+
+
+def billing_address_proposals(snap: dict, address_facts: list[Fact]) -> list[dict]:
+    from app.assessment.address import parse, same_part
+    source = None
+    for doc_type in ADDRESS_PRIORITY:
+        source = _best([f for f in address_facts if f.document_type == doc_type])
+        if source:
+            break
+    source = source or _best(address_facts)
+    if source is None:
+        return []
+    parts = parse(source.value)
+
+    def same(a, b):
+        return SAME if same_part(a, b) else DIFFERENT
+    where = DOCUMENT_LABELS.get(source.document_type, source.document_type)
+    out = []
+    for zoho_field, value, current, matcher in (
+            ("Billing_Street", parts["street"], snap.get("Billing_Street"), match_address),
+            ("Billing_Barangay", parts["barangay"], snap.get("Billing_Barangay"), same),
+            ("Billing_City1", parts["city"], _lookup_name(snap.get("Billing_City1")), same),
+            ("Billing_Province", parts["province"], snap.get("Billing_Province"), same),
+            ("Billing_Code", parts["zip"], snap.get("Billing_Code"), same)):
+        if not value:
+            continue
+        p = _compare_field(zoho_field, None if current in ("-None-",) else current, source,
+                           value,
+                           lambda a, b, m=matcher: m(a, b) or DIFFERENT, [source], False,
+                           allow_correct=True,
+                           extra_reason=f"Part of the address on the {where}.")
+        if p:
+            p["needs_attention"] = p["action"] != "MATCH"
+            out.append(p)
+    return out
+
+
 def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
     facts = collect_facts(docs)
     checks = cross_check(facts)
@@ -436,14 +479,11 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
         if p:
             proposals.append(p)
 
-    # Address -> Billing_Street (fill only; Zoho splits street/city/province)
-    addr = _best(facts["address"])
-    if addr:
-        p = _compare_field("Billing_Street", snap.get("Billing_Street"), addr, addr.value,
-                           match_address, [addr], False, allow_correct=False,
-                           extra_reason="Addresses are split into several Zoho fields.")
-        if p:
-            proposals.append(p)
+    # Address -> Zoho's billing fields (rules-1.6): one source by priority (customer sheet,
+    # BIR 2303, Mayor's permit), split into street / barangay / city / province / ZIP;
+    # each part is its own row and needs a reviewer (never written automatically)
+    for p in billing_address_proposals(snap, facts["address"]):
+        proposals.append(p)
 
     # Contact details -> Zoho (fill only; a different value is shown, never overwritten)
     # (Contact_Person is "Bank Contact Person" in this org's Accounts: not a target.)

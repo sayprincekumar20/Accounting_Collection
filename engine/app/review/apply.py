@@ -21,7 +21,30 @@ from app.zoho.review_record import load_names
 
 WRITABLE_FIELDS = {"Owner_Name", "Tax_Identification_Number_TIN",
                    "Type_of_Business_Organization", "Business_Style", "Invoice_Company_Name",
-                   "Billing_Street", "Account_Name", "Email", "Phone"}
+                   "Billing_Street", "Account_Name", "Email", "Phone",
+                   "Billing_Barangay", "Billing_City1", "Billing_Province", "Billing_Code"}
+LOOKUPS = {"Billing_City1": "Master_Location"}      # written as {"id": ...}, compared by name
+
+
+def _shown(value):
+    """A lookup is {'name', 'id'}: compare and show it by name."""
+    return value.get("name") if isinstance(value, dict) else value
+
+
+def _find_location(client: ZohoClient, module: str, name: str) -> dict | None:
+    """The Master_Location record for a city name: exact name, then common variants."""
+    import unicodedata
+    plain = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    base = name.removesuffix(" City")
+    for variant in dict.fromkeys([name, plain, f"{base} City", f"City of {base}", base]):
+        escaped = "".join(f"\\{c}" if c in "(),\\" else c for c in variant)
+        try:
+            rows = client.search_records(module, f"(Name:equals:{escaped})")
+        except ZohoError:
+            rows = []
+        if rows:
+            return {"id": str(rows[0]["id"]), "name": rows[0].get("Name") or variant}
+    return None
 APPROVED = {"Approve", "Edit"}
 
 
@@ -68,10 +91,13 @@ def _verify_written(client: ZohoClient, account_id: str, result: "ApplyResult",
     except ZohoError:
         return
     for r in result.rows:
-        if r.outcome == "APPLIED" and _norm(now.get(r.zoho_field)) != _norm(written.get(
-                r.zoho_field)):
+        sent = written.get(r.zoho_field)
+        kept = now.get(r.zoho_field)
+        same = (str((kept or {}).get("id")) == str(sent.get("id")) if isinstance(sent, dict)
+                else _norm(kept) == _norm(sent))
+        if r.outcome == "APPLIED" and not same:
             r.outcome = "FAILED"
-            r.detail = (f"Zoho kept {now.get(r.zoho_field)!r}: the field was not changed (check "
+            r.detail = (f"Zoho kept {_shown(kept)!r}: the field was not changed (check "
                         "the field permissions of the API user's profile)")
             result.error = result.error or "Some fields were not changed by Zoho"
 
@@ -110,10 +136,19 @@ def apply_rows(client: ZohoClient, account_id: str | None, rows: list[dict], *,
     for r, row in zip(result.rows, rows, strict=True):
         if r.outcome != "WRITE":
             continue
-        if _norm(current.get(r.zoho_field)) != _norm(row.get("current_value")):
+        if _norm(_shown(current.get(r.zoho_field))) != _norm(row.get("current_value")):
             r.outcome = "CONFLICT"
-            r.detail = (f"Account now has {current.get(r.zoho_field)!r}, review expected "
-                        f"{row.get('current_value')!r}")
+            r.detail = (f"Account now has {_shown(current.get(r.zoho_field))!r}, review "
+                        f"expected {row.get('current_value')!r}")
+        elif r.zoho_field in LOOKUPS:
+            found = _find_location(client, LOOKUPS[r.zoho_field], str(r.value))
+            if found is None:
+                r.outcome = "FAILED"
+                r.detail = (f"{r.value!r} is not in the {LOOKUPS[r.zoho_field]} list in Zoho; "
+                            "choose the city on the Account by hand")
+            else:
+                to_write[r.zoho_field] = {"id": found["id"]}
+                r.value = found["name"]
         else:
             to_write[r.zoho_field] = r.value
     if dry_run:

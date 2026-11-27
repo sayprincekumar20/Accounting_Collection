@@ -35,6 +35,8 @@ FIELD_LABELS = {
     "Type_of_Business_Organization": "Type of Business Organization",
     "Invoice_Company_Name": "Invoice Company Name", "Business_Style": "Business Style",
     "Billing_Street": "Billing Street", "Account_Name": "Account Name",
+    "Billing_Barangay": "Billing Barangay", "Billing_City1": "Billing City",
+    "Billing_Province": "Billing State/Province", "Billing_Code": "Billing ZIP Code",
     "Email": "Email", "Phone": "Phone",
     "Business_Permit": "Business Permit (file)",
     "BIR_Registration_COR": "BIR Registration COR (file)",

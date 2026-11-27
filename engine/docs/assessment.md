@@ -136,3 +136,14 @@ URGENT "expired, collect the renewal" alert is raised; the activation email's su
   Information Sheet / credit application fields), never from numbers printed elsewhere, and never
   Rare Global Food's own (policy.OWN_PHONES, OWN_EMAIL_DOMAINS: e.g. 02-886-8579 on the Credit
   Application letterhead).
+
+
+## rules-1.6 (2026-11-27): billing address split into Zoho's fields
+
+The address of one document, by priority Customer Information Sheet (billing address) > BIR 2303
+(registered address) > Mayor's permit (business address), is split (app/assessment/address.py) into
+Billing_Street, Billing_Barangay, Billing_City1 (lookup to Master_Location), Billing_Province (the
+picklist; Metro Manila cities give "National Capital Region (Manila)") and Billing_Code (ZIP). Each
+part is a review row: empty -> fill, same -> information only, different -> the reviewer decides.
+On approval the city is written as the Master_Location record found by name (variants: "X City",
+"City of X", without ñ); a city not in the list is not written (row failed with the reason).
