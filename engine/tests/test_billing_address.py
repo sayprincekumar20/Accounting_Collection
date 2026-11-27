@@ -93,3 +93,20 @@ def test_city_not_in_the_locations_list_is_not_written():
     assert result.rows[0].outcome == "FAILED" and "not in the Master_Location" in \
         result.rows[0].detail
     assert zoho.updates == []
+
+
+def test_address_without_commas_from_a_bir_2303():
+    """DV-31: the BIR 2303 address is read as one line, without commas."""
+    p = parse("LT 7 BLK 4 MARIAN ROAD BRGY SAN MARTIN DE PORRES UPS 11 PARANAQUE CITY 1700")
+    assert p == {"street": "LT 7 BLK 4 MARIAN ROAD, UPS 11", "barangay": "San Martin de Porres",
+                 "city": "Parañaque", "province": NCR, "zip": "1700"}
+    q = parse("UNIT 5 GROUND FLR ABC BLDG QUEZON AVE QUEZON CITY METRO MANILA 1100")
+    assert (q["street"], q["city"], q["province"]) == (
+        "UNIT 5 GROUND FLR ABC BLDG QUEZON AVE", "Quezon City", NCR)
+    r = parse("810 MOLINA ST CARIDAD CAVITE CITY CAVITE 4100")
+    assert (r["city"], r["province"], r["zip"]) == ("Cavite City", "Cavite", "4100")
+
+
+def test_numbered_barangay_is_kept():
+    p = parse("123 RIZAL AVE BRGY 123 ZONE 9 CALOOCAN CITY 1400")
+    assert p["city"] == "Caloocan" and p["barangay"].startswith("123")
