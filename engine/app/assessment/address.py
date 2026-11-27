@@ -17,6 +17,27 @@ NCR_CITIES = {
     "CALOOCAN": "Caloocan", "MALABON": "Malabon", "NAVOTAS": "Navotas", "VALENZUELA": "Valenzuela",
     "SAN JUAN": "San Juan", "PATEROS": "Pateros",
 }
+# Philippine cities outside Metro Manila (name without "City"), to find the city in an address
+# written without commas, e.g. on a BIR 2303
+CITIES = [
+    "Alaminos", "Angeles", "Antipolo", "Bacolod", "Bacoor", "Bago", "Baguio", "Bais",
+    "Balanga", "Batac", "Batangas", "Bayawan", "Baybay", "Bayugan", "Binan", "Bislig", "Bogo",
+    "Borongan", "Butuan", "Cabadbaran", "Cabanatuan", "Cabuyao", "Cadiz", "Cagayan de Oro",
+    "Calaca", "Calamba", "Calapan", "Calbayog", "Candon", "Canlaon", "Carcar", "Carmona",
+    "Catbalogan", "Cauayan", "Cavite", "Cebu", "Cotabato", "Dagupan", "Danao", "Dapitan",
+    "Dasmarinas", "Davao", "Digos", "Dipolog", "Dumaguete", "El Salvador", "Escalante",
+    "Gapan", "General Santos", "General Trias", "Gingoog", "Guihulngan", "Himamaylan",
+    "Ilagan", "Iligan", "Iloilo", "Imus", "Iriga", "Isabela", "Kabankalan", "Kidapawan",
+    "Koronadal", "La Carlota", "Lamitan", "Laoag", "Lapu-Lapu", "Legazpi", "Ligao", "Lipa",
+    "Lucena", "Maasin", "Mabalacat", "Malaybalay", "Malolos", "Mandaue", "Marawi", "Masbate",
+    "Mati", "Meycauayan", "Munoz", "Naga", "Olongapo", "Ormoc", "Oroquieta", "Ozamiz",
+    "Pagadian", "Palayan", "Panabo", "Passi", "Puerto Princesa", "Roxas", "Sagay",
+    "San Carlos", "San Fernando", "San Jose", "San Jose del Monte", "San Pablo", "San Pedro",
+    "Santa Rosa", "Santiago", "Silay", "Sipalay", "Sorsogon", "Surigao", "Tabaco", "Tabuk",
+    "Tacloban", "Tacurong", "Tagaytay", "Tagbilaran", "Tagum", "Talisay", "Tanauan", "Tandag",
+    "Tangub", "Tanjay", "Tarlac", "Tayabas", "Toledo", "Trece Martires", "Tuguegarao",
+    "Urdaneta", "Valencia", "Victorias", "Vigan", "Zamboanga",
+]
 # Zoho's Billing State/Province values (the dropdown); NCR handled above
 PROVINCES = [
     "Abra", "Agusan del Norte", "Agusan del Sur", "Aklan", "Albay", "Antique", "Apayao",
@@ -73,6 +94,8 @@ def parse(address: str | None) -> dict:
         out["zip"] = m.group(1)
         text = text[:m.start()].rstrip(" ,.")
     parts = [p.strip() for p in re.split(r",|\n|;", text) if p.strip(" .")]
+    if len(parts) == 1:          # written without commas (e.g. a BIR 2303 read as one line)
+        return _split_subdivision(_parse_flat(parts[0], out))
     used: set[int] = set()
 
     # province: NCR words or a province name as a whole part (or at the end of one)
@@ -141,6 +164,69 @@ def parse(address: str | None) -> dict:
     street = [parts[i] for i in range(len(parts)) if i not in used
               and (city_i is None or i < city_i)]
     out["street"] = ", ".join(p.strip(" ,") for p in street).strip(" ,") or None
+    return _split_subdivision(out)
+
+
+def _city_label(found: str, had_city_word: bool) -> str:
+    k = _key(found)
+    if k in NCR_CITIES:
+        return NCR_CITIES[k]
+    return _title(found) + (" City" if had_city_word else "")
+
+
+def _parse_flat(text: str, out: dict) -> dict:
+    """An address without separators: find the city by name, the barangay after 'Brgy', the
+    province at the end; the street is what comes before."""
+    key = _key(text)
+    # province / NCR words at the end
+    for w in _NCR_WORDS:
+        if key.endswith(" " + w):
+            out["province"], key = NCR, key[: -len(w)].strip()
+            break
+    else:
+        prov = next((p for p in sorted(PROVINCES, key=len, reverse=True)
+                     if key.endswith(" " + _key(p))), None)
+        if prov:
+            out["province"], key = prov, key[: -len(_key(prov))].strip()
+    # city: the last known city name (longest first), with or without "CITY" / "CITY OF"
+    names = sorted([*NCR_CITIES, *(_key(c) for c in CITIES)], key=len, reverse=True)
+    best = None
+    for n in names:
+        for m in re.finditer(rf"(?:\bCITY OF )?\b{re.escape(n)}\b(?: CITY\b)?", key):
+            if best is None or m.start() > best[0].start():
+                best = (m, n)
+    if best is None:                              # unknown city name: "<WORD> CITY"
+        found = list(re.finditer(r"\b([A-Z]+) CITY\b", key))
+        m = found[-1] if found else None
+        if m is None:
+            out["street"] = _plain(text).strip(" ,") or None
+            return out
+        best = (m, m.group(1))
+    m, name = best
+    out["city"] = _city_label(name, "CITY" in m.group(0))
+    if _key(name) in NCR_CITIES:
+        out["province"] = NCR
+    before = key[: m.start()].strip()
+    # map the key positions back to the original text (same length after _plain upper/clean)
+    original = re.sub(r"[^A-Za-z0-9 .#/-]", "", _plain(text))
+    before_text = original[: len(before)] if len(original) >= len(before) else before
+    b = re.search(r"(?i)\b(?:BRGY|BGY|BARANGAY)\.?\s+(.+)$", before_text)
+    if b:
+        out["barangay"] = _title(b.group(1))
+        before_text = before_text[: b.start()]
+    out["street"] = before_text.strip(" ,") or None
+    return out
+
+
+def _split_subdivision(out: dict) -> dict:
+    """'San Martin de Porres Ups 11': a trailing short code + number (subdivision, zone, phase)
+    belongs to the street, not the barangay name."""
+    b = out.get("barangay")
+    m = re.search(r"\s+([A-Za-z]{2,5}\.?\s+\d+[A-Za-z]?)$", b or "")
+    if m and len(b[: m.start()].split()) >= 1 and not re.fullmatch(r"\d+.*", b[: m.start()]):
+        out["barangay"] = b[: m.start()].strip()
+        extra = m.group(1).upper()
+        out["street"] = f"{out['street']}, {extra}" if out.get("street") else extra
     return out
 
 
