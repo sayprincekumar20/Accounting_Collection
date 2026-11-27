@@ -539,17 +539,9 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
                              "valid_until_source": valid_until_source(best) if best else None,
                              "identity": who, "identity_note": why})
 
-    # File attachments for empty fileupload fields
-    for doc_type, zoho_field in policy.FILE_FIELDS.items():
-        candidates = [d for d in by_type.get(doc_type, [])
-                      if d.validity_status in ("VALID", "NO_EXPIRY", "UNKNOWN")]
-        if candidates and not snap.get(zoho_field):
-            best = sorted(candidates, key=lambda d: (_named_for(d), d.valid_until or ""),
-                          reverse=True)[0]
-            proposals.append(_proposal(
-                zoho_field, None, best.file_name, "ATTACH", None,
-                [{"document": best.file_name, "type": doc_type}],
-                f"Attach the {doc_type.replace('_', ' ').title()} to this field."))
+    # (Nov 2026, business decision) documents stay under the Account's Attachments only: no
+    # rows to copy them into the file fields (BIR Registration COR, Business Permit, Business
+    # registration). Those fields are still read as document sources if they hold a file.
 
     # Documents disagree on who the customer is: nothing from them may be applied until a
     # person decides which documents belong to this account. Suggestions stay visible.

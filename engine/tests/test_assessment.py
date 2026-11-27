@@ -101,7 +101,7 @@ def test_all_valid_and_consistent_is_active():
     assert p["Type_of_Business_Organization"]["proposed_value"] == "Single Proprietorship"
     assert p["Invoice_Company_Name"]["action"] == "MATCH"
     assert p["Billing_Street"]["action"] == "MATCH"
-    assert p["Business_Permit"]["action"] == "ATTACH"
+    assert "Business_Permit" not in p          # files stay under Attachments only
     assert p["Owner_Name"]["confidence"] == 0.98  # three documents agree
 
 
@@ -331,9 +331,7 @@ def test_file_named_for_the_document_is_preferred():
                                                              permit()], TODAY)
     req = next(r for r in a["requirements"] if r["document_type"] == "BIR_2303")
     assert req["file"] == "2303_SMMegaFood.pdf"
-    attach = [p for p in a["proposals"] if p["action"] == "ATTACH"
-              and p["zoho_field"] == "BIR_Registration_COR"]
-    assert attach and attach[0]["proposed_value"] == "2303_SMMegaFood.pdf"
+    assert not [p for p in a["proposals"] if p["action"] == "ATTACH"]   # no file rows
     assert isinstance(D, type)
 
 
