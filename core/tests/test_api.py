@@ -31,7 +31,7 @@ def test_protected_endpoints_refuse_when_no_key_is_configured(db, monkeypatch):
 
 def test_switches_start_on_n8n_and_a_change_is_audited_with_the_acting_name(client):
     items = client.get("/v1/switches").json()["items"]
-    assert len(items) == 9 and {i["mode"] for i in items} == {"n8n"}
+    assert len(items) == 12 and {i["mode"] for i in items} == {"n8n"}
     assert "wave4.voice" in {i["key"] for i in items}
 
     r = client.put("/v1/switches/wave3.timers", json={"mode": "shadow", "note": "start the shadow week"},

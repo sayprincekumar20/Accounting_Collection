@@ -1,7 +1,7 @@
 // SERVER-ONLY. Client of the new backend (core/), which replaces the n8n workflows wave by wave.
 //
 // Nothing changes until CORE_URL and CORE_API_KEY are set. Even then every action is routed by its SWITCH
-// (wave1.dashboard_actions ...): "n8n" = today's path, "shadow" = n8n as today plus a dry run in the backend that
+// (wave1.approvals ...): "n8n" = today's path, "shadow" = n8n as today plus a dry run in the backend that
 // changes nothing, "core" = the backend does it. Anything unexpected (not configured, backend down, unknown switch)
 // means "n8n", so the dashboard keeps working exactly as before.
 import { getEnv } from "@/lib/env";

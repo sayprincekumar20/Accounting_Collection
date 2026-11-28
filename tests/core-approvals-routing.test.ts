@@ -53,7 +53,7 @@ beforeEach(() => {
       calls.push({ url: String(url), ...(init ? { init } : {}) });
       if (String(url) === `${CORE}/v1/switches`) {
         if (switchMode === "down") throw new Error("connect ECONNREFUSED");
-        return Response.json({ items: [{ key: "wave1.dashboard_actions", mode: switchMode }] });
+        return Response.json({ items: [{ key: "wave1.approvals", mode: switchMode }] });
       }
       if (String(url) === `${CORE}/v1/approvals`) return coreApprovals();
       if (String(url).includes("/webhook/contact-approval-update"))

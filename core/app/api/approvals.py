@@ -6,13 +6,13 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
 from app.db import get_session
-from app.models import FeatureSwitch
 from app.n8n_mirror import N8nHooks, N8nTables, hooks_from_settings, tables_from_settings
 from app.security import acting_user, require_service
 from app.services.approvals import MirrorError, apply_approvals
+from app.switch_gate import require_core_or_dry_run
 
 router = APIRouter(prefix="/v1", tags=["approvals"], dependencies=[Depends(require_service)])
-SWITCH = "wave1.dashboard_actions"
+SWITCH = "wave1.approvals"
 
 
 class ApprovalItem(BaseModel):
@@ -48,12 +48,7 @@ def post_approvals(
     n8n: N8nTables = Depends(get_n8n_tables),
     hooks: N8nHooks = Depends(get_n8n_hooks),
 ) -> dict[str, Any]:
-    mode = session.get(FeatureSwitch, SWITCH)
-    if not body.dry_run and (mode is None or mode.mode != "core"):
-        current = mode.mode if mode else "missing"
-        raise HTTPException(
-            status_code=409, detail=f"{SWITCH} is on '{current}': approvals still go through n8n"
-        )
+    require_core_or_dry_run(session, SWITCH, body.dry_run)
     items: list[dict[str, Any]] = [i.model_dump() for i in body.items]
     try:
         return apply_approvals(

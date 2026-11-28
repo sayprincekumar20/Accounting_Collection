@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireSecret } from "@/lib/env";
 import { escalationType } from "@/lib/escalation-type";
 import { clearDataTableCache, fetchAllDataTableRows } from "@/lib/n8n-datatable";
 import { isNotReachedAlert } from "@/lib/authorship";
 import { isSystemRow } from "@/lib/escalation-alerts";
 import { logIssueEvent } from "@/lib/n8n-actions";
+import { saveIssueStatus } from "@/lib/issues-engine";
 
 // AR worklist: every escalation raised by a client (not the automatic "Not reached by phone" alert), with its
 // handling status. POST updates status / handled_by / note for one escalation (entry_id).
@@ -13,7 +13,6 @@ const CLIENTS = "rJpqXxmxhqJnlLrJ";
 type Row = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? "" : String(v));
 const STATUSES = ["OPEN", "IN_PROGRESS", "DONE"];
-const WORKLIST_WEBHOOK = "https://rareglobalfood.app.n8n.cloud/webhook/worklist-update";
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -94,24 +93,14 @@ export const Route = createFileRoute("/api/worklist")({
           const status = s(b.status).toUpperCase();
           if (!entryId || !STATUSES.includes(status))
             return json({ error: "entry_id and a valid status are required" }, 400);
-          // Saved by the n8n workflow 27_Worklist_Update (a data-table update node), so the
-          // dashboard's read-only API key never needs write access.
-          const res = await fetch(WORKLIST_WEBHOOK, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-worklist-secret": await requireSecret("N8N_WORKLIST_SECRET"),
-            },
-            body: JSON.stringify({
-              entry_id: entryId,
-              status,
-              handled_by: s(b.handled_by).trim(),
-              note: s(b.note).trim(),
-            }),
+          // Saved through the engine chosen by the switch (n8n 27_Worklist_Update, or the backend). Data only.
+          const { updated } = await saveIssueStatus({
+            entryId,
+            status: status as "OPEN" | "IN_PROGRESS" | "DONE",
+            handledBy: s(b.handled_by).trim(),
+            note: s(b.note).trim(),
           });
-          const out = (await res.json().catch(() => ({}))) as { ok?: boolean; updated?: number };
-          if (!res.ok || !out.ok) throw new Error(`n8n worklist update failed (${res.status})`);
-          if (!out.updated)
+          if (!updated)
             return json(
               { error: "This escalation was not found (it may have been archived)." },
               404,

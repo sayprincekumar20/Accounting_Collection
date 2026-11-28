@@ -6,6 +6,7 @@
 //  - sendReminderViaN8n: one reminder from the assistant's reminder composer (25_Dashboard_Reminder).
 import { requireSecret } from "@/lib/env";
 import { saveApprovals, type ApprovalItems } from "@/lib/approvals-engine";
+import { saveIssueEvent, saveIssueStatus, type IssueEventIn } from "@/lib/issues-engine";
 
 // Keys are server secrets (N8N_APPROVAL_SECRET, N8N_CONTACT_SECRET), never in the code.
 const N8N = "https://rareglobalfood.app.n8n.cloud/webhook";
@@ -138,49 +139,16 @@ export async function updateIssueStatus(
   handledBy: string,
   note: string,
 ): Promise<number> {
-  const res = await fetch(`${N8N}/worklist-update`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-worklist-secret": await requireSecret("N8N_WORKLIST_SECRET"),
-    },
-    body: JSON.stringify({
-      entry_id: entryId,
-      status,
-      handled_by: handledBy.slice(0, 80),
-      note: note.slice(0, 1000),
-    }),
-  });
-  const out = (await res.json().catch(() => ({}))) as { ok?: boolean; updated?: number };
-  if (!res.ok || !out.ok) throw new Error(`Saving the status failed (${res.status})`);
-  return Number(out.updated) || 0;
+  // Same engine and switch as the Escalations screen (n8n, shadow or the backend). Data only.
+  return (await saveIssueStatus({ entryId, status, handledBy, note })).updated;
 }
 
 /**
- * History of an escalation or a system notification (n8n 33_Issue_Log, table issue_log): the AI's diagnosis,
- * actions taken, status changes and the final resolution, with who and when.
+ * History of an escalation or a system notification: the AI's diagnosis, actions taken, status changes and the
+ * final resolution, with who and when (n8n 33_Issue_Log or the backend, by the switch). Data only.
  */
-export async function logIssueEvent(e: {
-  issue_id: string;
-  issue_kind: "ESCALATION" | "SYSTEM";
-  ref: string;
-  event: "DIAGNOSIS" | "ACTION" | "STATUS" | "RESOLUTION" | "NOTE";
-  summary: string;
-  detail?: unknown;
-  actor: string;
-}): Promise<void> {
-  const res = await fetch(`${N8N}/issue-log`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-worklist-secret": await requireSecret("N8N_WORKLIST_SECRET"),
-    },
-    body: JSON.stringify({
-      ...e,
-      detail: typeof e.detail === "string" ? e.detail : JSON.stringify(e.detail ?? {}),
-    }),
-  });
-  if (!res.ok) throw new Error(`Recording the history failed (${res.status})`);
+export async function logIssueEvent(e: IssueEventIn): Promise<void> {
+  await saveIssueEvent(e);
 }
 
 /**

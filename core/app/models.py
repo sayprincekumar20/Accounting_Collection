@@ -101,3 +101,20 @@ class ApprovalBatch(Base):
     overdue_at_approval: Mapped[float] = mapped_column(Numeric(14, 2))
     clients: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     note: Mapped[str] = mapped_column(String(500), default="")
+
+
+class IssueEvent(Base):
+    """History of an escalation or a system notification: the AI's diagnosis, actions, status changes and the
+    final resolution, with who and when (replaces n8n's issue_log table)."""
+
+    __tablename__ = "issue_events"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    issue_id: Mapped[str] = mapped_column(String(200), index=True)
+    issue_kind: Mapped[str] = mapped_column(String(12))
+    ref: Mapped[str] = mapped_column(String(80), default="")
+    event: Mapped[str] = mapped_column(String(12))
+    summary: Mapped[str] = mapped_column(String(1000))
+    detail: Mapped[str] = mapped_column(Text, default="")
+    actor: Mapped[str] = mapped_column(String(80), default="")
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

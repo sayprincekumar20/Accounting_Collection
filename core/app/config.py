@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     # n8n webhooks the backend still calls while a wave is not moved yet (statement PDFs, sending).
     n8n_webhook_base: str = "https://rareglobalfood.app.n8n.cloud/webhook"
     n8n_contact_secret: str = ""
+    # THE OUTBOUND LOCK. While False nothing in this backend may send a message or place a call (SMS, Viber,
+    # WhatsApp, email, voice). Every module that can reach a client must call app.outbound.ensure_allowed() first.
+    # It is switched on only by an explicit decision of the owner, per environment.
+    outbound_enabled: bool = False
 
 
 @lru_cache

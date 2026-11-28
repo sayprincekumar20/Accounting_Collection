@@ -1,5 +1,3 @@
-import threading
-
 import pytest
 from sqlalchemy import select
 
@@ -7,6 +5,7 @@ from app.api.approvals import get_n8n_hooks, get_n8n_tables
 from app.domain.common import dumps, parse_json
 from app.main import create_app
 from app.models import Approval, ApprovalBatch, AuditLog
+from tests.fakes import FakeHooks, FakeTables
 
 CLIENT = "ZOHO FORM TEST ACCOUNT___pk8543264@gmail.com"
 ACTOR = {"X-Acting-User": "Prince%20Kumar"}
@@ -30,47 +29,6 @@ def clients_table():
     ]  # fmt: skip
 
 
-class FakeTables:
-    def __init__(self, tables):
-        self.tables = {k: [dict(r) for r in v] for k, v in tables.items()}
-        self.calls = []
-        self.fail_on = None
-        self._lock = threading.Lock()
-
-    def get_rows(self, table, column, value):
-        with self._lock:
-            self.calls.append(("get", table, value))
-            return [dict(r) for r in self.tables.get(table, []) if str(r.get(column)) == value]
-
-    def insert(self, table, rows):
-        if self.fail_on == "insert":
-            raise RuntimeError("n8n is down")
-        with self._lock:
-            self.calls.append(("insert", table, len(rows)))
-            self.tables.setdefault(table, []).extend(dict(r) for r in rows)
-
-    def update(self, table, column, value, data):
-        if self.fail_on == "update":
-            raise RuntimeError("n8n is down")
-        with self._lock:
-            self.calls.append(("update", table, value))
-            for r in self.tables.get(table, []):
-                if str(r.get(column)) == value:
-                    r.update(data)
-
-
-class FakeHooks:
-    def __init__(self):
-        self.calls = []
-        self.fail = False
-
-    def regenerate_pdfs(self, client_ids, requested_by):
-        if self.fail:
-            raise RuntimeError("webhook not published")
-        self.calls.append((client_ids, requested_by))
-        return len(client_ids)
-
-
 @pytest.fixture()
 def world(db, client):
     tables = FakeTables({"clients": clients_table(), "approvals": [], "approval_batches": []})
@@ -81,7 +39,7 @@ def world(db, client):
 
 
 def go_core(client):
-    r = client.put("/v1/switches/wave1.dashboard_actions", json={"mode": "core"}, headers=ACTOR)
+    r = client.put("/v1/switches/wave1.approvals", json={"mode": "core"}, headers=ACTOR)
     assert r.status_code == 200
 
 
@@ -102,7 +60,7 @@ def body(**over):
 def test_while_the_switch_is_on_n8n_a_real_approval_is_refused_and_nothing_changes(world):
     client, tables, hooks, db = world
     r = client.post("/v1/approvals", json=body(), headers=ACTOR)
-    assert r.status_code == 409 and "still go through n8n" in r.json()["detail"]
+    assert r.status_code == 409 and "still goes through n8n" in r.json()["detail"]
     assert tables.tables["approvals"] == [] and db.scalars(select(Approval)).all() == []
 
 

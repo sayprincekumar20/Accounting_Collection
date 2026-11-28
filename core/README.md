@@ -31,7 +31,7 @@ selection (unticked invoices out of the sent data, all restored when an approval
   tables through n8n's data API, so n8n's senders keep working unchanged. No workflow execution is used.
 - The new statement PDFs are requested with ONE call to the n8n webhook `batch-regenerate-pdf`
   (workflow `35_Batch_Regenerate_Statement_PDFs`, built but unpublished until the switch goes to `core`).
-- It follows the switch `wave1.dashboard_actions`: on `n8n` a real approval is refused (409); `dry_run: true` always
+- It follows the switch `wave1.approvals`: on `n8n` a real approval is refused (409); `dry_run: true` always
   works and changes nothing (shadow mode); on `core` the backend does it.
 - If writing to n8n's tables fails after the approval was saved here, the answer is 502 with `saved_in_backend`.
 
@@ -39,8 +39,26 @@ The dashboard routes the Contact Approvals screen and the AI assistant through t
 (`src/lib/approvals-engine.ts`). Without `CORE_URL` and `CORE_API_KEY` it behaves exactly as before. If the backend is
 down or its switch is not on `core`, n8n takes over.
 
-Switch a wave: `PUT /v1/switches/wave1.dashboard_actions` with `{"mode": "shadow"}` or `{"mode": "core"}` (and
+Switch a wave: `PUT /v1/switches/wave1.approvals` with `{"mode": "shadow"}` or `{"mode": "core"}` (and
 `"n8n"` to go back), with `X-API-Key` and `X-Acting-User`.
+
+## Wave 1, slice 2: escalation status and issue history (built, not switched on)
+
+Data only. `POST /v1/escalations/status` does what n8n workflow 27 does (status, who handled it, when, the note) and
+`POST /v1/issues/events` what workflow 33 does (one history line: diagnosis, action, status, resolution, note);
+`GET /v1/issues/history` reads them back. Results are identical to the real workflows (checked on the test
+account). History lines are stored here and mirrored to n8n's `issue_log` table; the status is written to n8n's
+`escalations` row (n8n still creates those rows until waves 3 and 4) and recorded in the audit log.
+
+The switch is `wave1.escalations`. The Escalations screen and the AI assistant's status and history helpers both go
+through `src/lib/issues-engine.ts`.
+
+## The outbound lock
+
+This backend **cannot send a message or place a call**. `OUTBOUND_ENABLED` is off by default, and every module that
+can reach a client must call `app.outbound.ensure_allowed(channel)` first. A test also fails if sending code
+appears anywhere in `app/` without that being a deliberate change. The reminder composer and the contact and call
+commands (switches `wave1.reminders` and `wave1.contact_commands`) stay on n8n until the owner allows outbound.
 
 ## Run the tests
 

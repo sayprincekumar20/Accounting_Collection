@@ -1,11 +1,11 @@
-// SERVER-ONLY. Saves Contact Approvals through the engine chosen by the switch "wave1.dashboard_actions":
+// SERVER-ONLY. Saves Contact Approvals through the engine chosen by the switch "wave1.approvals":
 // n8n (today's workflow 28), shadow (n8n + a dry run in the backend) or core (the backend). Used by the
 // Contact Approvals screen AND the AI assistant, so both always follow the same switch.
 import { requireSecret } from "@/lib/env";
 import { coreFetch, switchMode } from "@/lib/core-client";
 
 const APPROVAL_WEBHOOK = "https://rareglobalfood.app.n8n.cloud/webhook/contact-approval-update";
-const SWITCH = "wave1.dashboard_actions";
+const SWITCH = "wave1.approvals";
 export type ApprovalItems = Record<string, unknown>[];
 
 /** Today's path: n8n 28_Contact_Approval_Update. */
