@@ -41,7 +41,9 @@ def db(migrated_db):
     reset_db_caches()
     engine = get_engine()
     with engine.begin() as conn:
-        conn.execute(text("truncate audit_log, import_runs, n8n_rows restart identity"))
+        conn.execute(
+            text("truncate audit_log, import_runs, n8n_rows, approvals, approval_batches restart identity")
+        )
         conn.execute(text("update feature_switches set mode='n8n', updated_by='migration'"))
     with Session(engine) as session:
         yield session

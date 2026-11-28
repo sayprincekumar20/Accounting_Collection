@@ -6,9 +6,20 @@ import math
 from typing import Any
 
 
+def _js_numbers(value: Any) -> Any:
+    """JavaScript has one number type: 10.0 is written as 10. Python would write 10.0."""
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, dict):
+        return {k: _js_numbers(v) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [_js_numbers(v) for v in value]
+    return value
+
+
 def dumps(value: Any) -> str:
-    """JSON.stringify: compact, non-ASCII kept as is."""
-    return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+    """JSON.stringify: compact, non-ASCII kept as is, whole numbers without a decimal point."""
+    return json.dumps(_js_numbers(value), separators=(",", ":"), ensure_ascii=False)
 
 
 def parse_json(value: Any, default: Any) -> Any:

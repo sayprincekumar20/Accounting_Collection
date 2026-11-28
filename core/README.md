@@ -20,6 +20,28 @@ explicit permission, and every wave has a switch to go back to n8n.
 Customer status (Active / Inactive in Zoho CRM) is not a group: an Inactive customer with an open balance is still
 reminded.
 
+## Wave 1: Contact Approvals (built, not switched on)
+
+`POST /v1/approvals` does what n8n workflow 28 does today, on the same input and with byte-identical results
+(checked against the real workflow on the test account): one approval per company, one batch per action, the invoice
+selection (unticked invoices out of the sent data, all restored when an approval is removed).
+
+- The acting name (`X-Acting-User`) is stamped on the approval, the batch and the audit line.
+- It records the approval here (`approvals`, `approval_batches`, `audit_log`) and writes the same rows into n8n's data
+  tables through n8n's data API, so n8n's senders keep working unchanged. No workflow execution is used.
+- The new statement PDFs are requested with ONE call to the n8n webhook `batch-regenerate-pdf`
+  (workflow `35_Batch_Regenerate_Statement_PDFs`, built but unpublished until the switch goes to `core`).
+- It follows the switch `wave1.dashboard_actions`: on `n8n` a real approval is refused (409); `dry_run: true` always
+  works and changes nothing (shadow mode); on `core` the backend does it.
+- If writing to n8n's tables fails after the approval was saved here, the answer is 502 with `saved_in_backend`.
+
+The dashboard routes the Contact Approvals screen and the AI assistant through the same switch
+(`src/lib/approvals-engine.ts`). Without `CORE_URL` and `CORE_API_KEY` it behaves exactly as before. If the backend is
+down or its switch is not on `core`, n8n takes over.
+
+Switch a wave: `PUT /v1/switches/wave1.dashboard_actions` with `{"mode": "shadow"}` or `{"mode": "core"}` (and
+`"n8n"` to go back), with `X-API-Key` and `X-Acting-User`.
+
 ## Run the tests
 
 Needs a PostgreSQL. Default test database: `postgresql+psycopg://rgf:rgf@localhost:5432/rgf_core_test`

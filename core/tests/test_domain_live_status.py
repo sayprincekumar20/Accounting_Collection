@@ -79,3 +79,10 @@ def test_manila_day_and_cycle_start():
     )
     # Sunday Nov 29 Manila -> still the cycle that began Wednesday Nov 25
     assert cycle_start(datetime(2026, 11, 29, 3, 0, tzinfo=UTC)) == datetime(2026, 11, 24, 16, 0, tzinfo=UTC)
+
+
+def test_json_text_matches_javascript_whole_numbers_have_no_decimal_point():
+    assert (
+        dumps({"balance": 10.0, "amount": 1.12, "list": [300.0, "x"], "name": "Max’s"})
+        == '{"balance":10,"amount":1.12,"list":[300,"x"],"name":"Max’s"}'
+    )

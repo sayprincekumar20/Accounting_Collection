@@ -1,18 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireSecret } from "@/lib/env";
 import { clearDataTableCache } from "@/lib/n8n-datatable";
 import { loadApprovalItems } from "@/lib/approvals-data";
+import { saveApprovals } from "@/lib/approvals-engine";
 
 // Contact Approvals: every active client with unpaid invoices, its contact, amounts, invoices and
 // the Accounting team's approval. Texts and calls (via /call or the automation) only go to approved
 // clients. Approvals are stored per company (client_id before '___') by n8n 28_Contact_Approval_Update.
 const APPROVALS = "3IvKKI4AwrBlDeOo";
-const APPROVAL_WEBHOOK = "https://rareglobalfood.app.n8n.cloud/webhook/contact-approval-update";
 const s = (v: unknown) => (v == null ? "" : String(v));
-const json = (body: unknown, status = 200) =>
+const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...extra },
   });
 
 export const Route = createFileRoute("/api/contact-approvals")({
@@ -56,20 +55,14 @@ export const Route = createFileRoute("/api/contact-approvals")({
             }));
           if (!items.length || !s(b.approved_by).trim())
             return json({ error: "approved_by and at least one client are required" }, 400);
-          const res = await fetch(APPROVAL_WEBHOOK, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-approval-secret": await requireSecret("N8N_APPROVAL_SECRET"),
-            },
-            body: JSON.stringify({ approved_by: s(b.approved_by).trim(), items }),
-          });
-          const out = (await res.json().catch(() => ({}))) as { ok?: boolean; saved?: number };
-          if (!res.ok || !out.ok) throw new Error(`n8n approval update failed (${res.status})`);
+          const who = s(b.approved_by).trim();
+          const { saved, handledBy, warnings } = await saveApprovals(items, who);
           clearDataTableCache(APPROVALS);
           // An invoice selection changes the clients' rows (n8n 28): show them fresh.
           clearDataTableCache("rJpqXxmxhqJnlLrJ");
-          return json({ ok: true, saved: out.saved ?? items.length });
+          return json({ ok: true, saved, ...(warnings.length ? { warnings } : {}) }, 200, {
+            "X-Handled-By": handledBy,
+          });
         } catch (err) {
           console.error("[contact-approvals] POST error:", err);
           return json({ error: "Failed to save", detail: String(err).slice(0, 300) }, 500);

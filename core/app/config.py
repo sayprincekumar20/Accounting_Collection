@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     # One-time import of the n8n data tables only.
     n8n_base_url: str = "https://rareglobalfood.app.n8n.cloud"
     n8n_api_key: str = ""
+    # n8n webhooks the backend still calls while a wave is not moved yet (statement PDFs, sending).
+    n8n_webhook_base: str = "https://rareglobalfood.app.n8n.cloud/webhook"
+    n8n_contact_secret: str = ""
 
 
 @lru_cache

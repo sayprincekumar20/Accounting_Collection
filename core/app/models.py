@@ -8,7 +8,7 @@ before anything depends on it.
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, Integer, String, Text, func
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -67,3 +67,37 @@ class N8nRow(Base):
     data: Mapped[dict[str, Any]] = mapped_column(JSONB)
     source_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Approval(Base):
+    """The accounting team's approval of a company for the current cycle (latest approval per company only).
+    The history of every change is in audit_log."""
+
+    __tablename__ = "approvals"
+
+    company_key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    client_id: Mapped[str] = mapped_column(String(250))
+    client_name: Mapped[str] = mapped_column(String(200), default="")
+    approved: Mapped[bool] = mapped_column(Boolean, default=False)
+    approved_by: Mapped[str] = mapped_column(String(80))
+    approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    note: Mapped[str] = mapped_column(String(500), default="")
+    allow_multibranch: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Invoice numbers unticked at approval: not sent this cycle.
+    excluded_invoices: Mapped[list[str]] = mapped_column(JSONB, default=list)
+
+
+class ApprovalBatch(Base):
+    """One approval action = one batch: the clients approved in that request, with their balance at that moment."""
+
+    __tablename__ = "approval_batches"
+
+    batch_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    approved_by: Mapped[str] = mapped_column(String(80))
+    source: Mapped[str] = mapped_column(String(40), default="dashboard")
+    client_count: Mapped[int] = mapped_column(Integer)
+    balance_at_approval: Mapped[float] = mapped_column(Numeric(14, 2))
+    overdue_at_approval: Mapped[float] = mapped_column(Numeric(14, 2))
+    clients: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    note: Mapped[str] = mapped_column(String(500), default="")

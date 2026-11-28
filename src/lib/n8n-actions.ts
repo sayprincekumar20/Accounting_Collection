@@ -5,6 +5,7 @@
 //    Cliq no longer knows this key.
 //  - sendReminderViaN8n: one reminder from the assistant's reminder composer (25_Dashboard_Reminder).
 import { requireSecret } from "@/lib/env";
+import { saveApprovals, type ApprovalItems } from "@/lib/approvals-engine";
 
 // Keys are server secrets (N8N_APPROVAL_SECRET, N8N_CONTACT_SECRET), never in the code.
 const N8N = "https://rareglobalfood.app.n8n.cloud/webhook";
@@ -21,17 +22,12 @@ export async function approveClients(
   approvedBy: string,
   items: ApprovalItem[],
 ): Promise<{ ok: boolean; saved: number }> {
-  const res = await fetch(`${N8N}/contact-approval-update`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-approval-secret": await requireSecret("N8N_APPROVAL_SECRET"),
-    },
-    body: JSON.stringify({ approved_by: approvedBy.slice(0, 80), items: items.slice(0, 500) }),
-  });
-  const out = (await res.json().catch(() => ({}))) as { ok?: boolean; saved?: number };
-  if (!res.ok || out.ok === false) throw new Error(`Saving approvals failed (${res.status})`);
-  return { ok: true, saved: Number(out.saved ?? items.length) };
+  // Same engine and switch as the Contact Approvals screen (n8n, shadow or the backend).
+  const out = await saveApprovals(
+    items.slice(0, 500) as unknown as ApprovalItems,
+    approvedBy.slice(0, 80),
+  );
+  return { ok: true, saved: out.saved };
 }
 
 /**

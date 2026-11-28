@@ -2,7 +2,7 @@ import uuid
 
 from fastapi import FastAPI, Request
 
-from app.api import audit, groups, health, switches
+from app.api import approvals, audit, groups, health, switches
 
 
 def create_app() -> FastAPI:
@@ -20,6 +20,7 @@ def create_app() -> FastAPI:
     app.include_router(audit.router)
     app.include_router(switches.router)
     app.include_router(groups.router)
+    app.include_router(approvals.router)
     return app
 
 
