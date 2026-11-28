@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+# customer data is never committed (exports of the n8n tables, parity fixtures)
+fixtures/
+*.fixture.json

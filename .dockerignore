@@ -16,3 +16,5 @@ docs
 images
 # the verification engine is built separately (engine/Dockerfile)
 engine
+# the new backend is built separately (core/Dockerfile)
+core
